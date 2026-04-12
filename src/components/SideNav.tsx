@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
-import { FolderOpen, Settings, Users, Plus } from "lucide-react";
+import { FolderOpen, Key, Settings, Users, Plus } from "lucide-react";
 
 interface SideNavProps {
   onNewProject: () => void;
@@ -76,6 +76,13 @@ export function SideNav({ onNewProject }: SideNavProps) {
           >
             <Users className="h-4 w-4 shrink-0" />
             Members
+          </NavLink>
+          <NavLink
+            to={`/orgs/${org.slug}/settings/openrouter-key`}
+            className={linkClass}
+          >
+            <Key className="h-4 w-4 shrink-0" />
+            API Key
           </NavLink>
         </>
       )}

@@ -31,6 +31,15 @@ const schema = defineSchema({
     name: v.string(),
     description: v.optional(v.string()),
     createdById: v.id("users"),
+    metaContext: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          question: v.string(),
+          answer: v.string(),
+        }),
+      ),
+    ),
   }).index("by_org", ["organizationId"]),
 
   projectCollaborators: defineTable({
@@ -49,8 +58,92 @@ const schema = defineSchema({
     .index("by_user", ["userId"])
     .index("by_project_and_user", ["projectId", "userId"]),
 
-  // M2: projectVariables, testCases, promptVersions, promptAttachments
-  // M3: openRouterKeys, promptRuns, runOutputs
+  // M2: Variables
+  projectVariables: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    defaultValue: v.optional(v.string()),
+    required: v.boolean(),
+    order: v.number(),
+  }).index("by_project", ["projectId"]),
+
+  // M2: Test Cases
+  testCases: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(),
+    variableValues: v.record(v.string(), v.string()),
+    attachmentIds: v.array(v.id("_storage")),
+    order: v.number(),
+    createdById: v.id("users"),
+  }).index("by_project", ["projectId"]),
+
+  // M2: Prompt Versions & Attachments
+  promptVersions: defineTable({
+    projectId: v.id("projects"),
+    versionNumber: v.number(),
+    systemMessage: v.optional(v.string()),
+    userMessageTemplate: v.string(),
+    parentVersionId: v.optional(v.id("promptVersions")),
+    sourceVersionId: v.optional(v.id("promptVersions")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("active"),
+      v.literal("archived"),
+    ),
+    createdById: v.id("users"),
+  }).index("by_project", ["projectId"]),
+
+  promptAttachments: defineTable({
+    promptVersionId: v.id("promptVersions"),
+    storageId: v.id("_storage"),
+    filename: v.string(),
+    mimeType: v.string(),
+    sizeBytes: v.number(),
+    order: v.number(),
+  }).index("by_version", ["promptVersionId"]),
+
+  // M3: BYOK + Run Execution
+  openRouterKeys: defineTable({
+    organizationId: v.id("organizations"),
+    encryptedKey: v.string(),
+    lastRotatedAt: v.number(),
+    createdById: v.id("users"),
+  }).index("by_org", ["organizationId"]),
+
+  promptRuns: defineTable({
+    projectId: v.id("projects"),
+    promptVersionId: v.id("promptVersions"),
+    testCaseId: v.id("testCases"),
+    model: v.string(),
+    temperature: v.number(),
+    maxTokens: v.optional(v.number()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    triggeredById: v.id("users"),
+  })
+    .index("by_version", ["promptVersionId"])
+    .index("by_version_testcase", ["promptVersionId", "testCaseId"])
+    .index("by_project_and_status", ["projectId", "status"]),
+
+  runOutputs: defineTable({
+    runId: v.id("promptRuns"),
+    blindLabel: v.string(),
+    outputContent: v.string(),
+    promptTokens: v.optional(v.number()),
+    completionTokens: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    rawResponseStorageId: v.optional(v.id("_storage")),
+  }).index("by_run", ["runId"]),
+
   // M4: outputFeedback, promptFeedback
   // M5: optimizationRequests
 });

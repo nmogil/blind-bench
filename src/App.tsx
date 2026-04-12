@@ -11,9 +11,16 @@ import { Onboarding } from "./routes/Onboarding";
 import { OrgHome } from "./routes/orgs/OrgHome";
 import { OrgSettings } from "./routes/orgs/settings/OrgSettings";
 import { OrgMembers } from "./routes/orgs/settings/OrgMembers";
+import { OpenRouterKey } from "./routes/orgs/settings/OpenRouterKey";
 import { ProjectHome } from "./routes/orgs/projects/ProjectHome";
 import { ProjectSettings } from "./routes/orgs/projects/settings/ProjectSettings";
 import { ProjectCollaborators } from "./routes/orgs/projects/settings/ProjectCollaborators";
+import { Variables } from "./routes/orgs/projects/Variables";
+import { TestCases } from "./routes/orgs/projects/TestCases";
+import { TestCaseEditor } from "./routes/orgs/projects/TestCaseEditor";
+import { Versions } from "./routes/orgs/projects/Versions";
+import { VersionEditor } from "./routes/orgs/projects/VersionEditor";
+import { MetaContext } from "./routes/orgs/projects/MetaContext";
 import { EvalInbox } from "./routes/eval/EvalInbox";
 import { NotFound } from "./routes/errors/NotFound";
 import { Denied } from "./routes/errors/Denied";
@@ -31,8 +38,21 @@ export function App() {
             <Route index element={<OrgHome />} />
             <Route path="settings" element={<OrgSettings />} />
             <Route path="settings/members" element={<OrgMembers />} />
+            <Route path="settings/openrouter-key" element={<OpenRouterKey />} />
             <Route path="projects/:projectId" element={<ProjectLayout />}>
               <Route index element={<ProjectHome />} />
+              <Route path="variables" element={<Variables />} />
+              <Route path="test-cases" element={<TestCases />} />
+              <Route
+                path="test-cases/:testCaseId"
+                element={<TestCaseEditor />}
+              />
+              <Route path="versions" element={<Versions />} />
+              <Route
+                path="versions/:versionId"
+                element={<VersionEditor />}
+              />
+              <Route path="meta-context" element={<MetaContext />} />
               <Route path="settings" element={<ProjectSettings />} />
               <Route
                 path="settings/collaborators"
