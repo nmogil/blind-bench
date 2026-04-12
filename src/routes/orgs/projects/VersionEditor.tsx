@@ -463,7 +463,7 @@ export function VersionEditor() {
             <Label className="text-xs">Test case</Label>
             <Select
               value={selectedTestCaseId}
-              onValueChange={setSelectedTestCaseId}
+              onValueChange={(v) => { if (v) setSelectedTestCaseId(v); }}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue

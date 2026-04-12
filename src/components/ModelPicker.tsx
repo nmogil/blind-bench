@@ -20,7 +20,7 @@ export function ModelPicker({ value, onChange, hasAttachments }: ModelPickerProp
     : MODELS;
 
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={(v) => { if (v) onChange(v); }}>
       <SelectTrigger className="h-8 text-xs">
         <SelectValue placeholder="Select model" />
       </SelectTrigger>
