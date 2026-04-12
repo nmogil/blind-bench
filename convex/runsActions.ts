@@ -84,9 +84,21 @@ export const executeRunAction = internalAction({
     messages.push({ role: "user", content: userContent });
 
     // 6. Fire 3 parallel streaming calls
+    const appendChunk = (outputId: Id<"runOutputs">, chunk: string) =>
+      ctx.runMutation(internal.runs.appendOutputChunk, { outputId, chunk });
+    const finalize = (
+      outputId: Id<"runOutputs">,
+      stats: {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+        latencyMs?: number;
+      },
+    ) => ctx.runMutation(internal.runs.finalizeOutput, { outputId, ...stats });
+
     const results = await Promise.allSettled(
       outputIds.map((outputId) =>
-        runSingleOutput(ctx, {
+        runSingleOutput({
           apiKey,
           model: run.model,
           messages,
@@ -94,6 +106,8 @@ export const executeRunAction = internalAction({
           maxTokens: run.maxTokens,
           outputId,
           startTime,
+          appendChunk,
+          finalize,
         }),
       ),
     );
@@ -151,25 +165,29 @@ async function buildUserContent(
   return content;
 }
 
-async function runSingleOutput(
-  ctx: {
-    runMutation: typeof import("./_generated/server").internalAction extends never
-      ? never
-      : (...args: unknown[]) => Promise<unknown>;
-    storage: { getUrl: (id: Id<"_storage">) => Promise<string | null> };
-  },
-  params: {
-    apiKey: string;
-    model: string;
-    messages: OpenRouterMessage[];
-    temperature: number;
-    maxTokens?: number;
-    outputId: Id<"runOutputs">;
-    startTime: number;
-  },
-): Promise<void> {
-  const { apiKey, model, messages, temperature, maxTokens, outputId, startTime } =
-    params;
+async function runSingleOutput(params: {
+  apiKey: string;
+  model: string;
+  messages: OpenRouterMessage[];
+  temperature: number;
+  maxTokens?: number;
+  outputId: Id<"runOutputs">;
+  startTime: number;
+  appendChunk: (outputId: Id<"runOutputs">, chunk: string) => Promise<void>;
+  finalize: (
+    outputId: Id<"runOutputs">,
+    stats: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+      latencyMs?: number;
+    },
+  ) => Promise<void>;
+}): Promise<void> {
+  const {
+    apiKey, model, messages, temperature, maxTokens,
+    outputId, startTime, appendChunk, finalize,
+  } = params;
 
   let finalUsage: StreamUsage | undefined;
 
@@ -181,10 +199,7 @@ async function runSingleOutput(
     maxTokens,
     onChunk: async ({ chunk, done, usage }) => {
       if (chunk) {
-        await (ctx.runMutation as Function)(internal.runs.appendOutputChunk, {
-          outputId,
-          chunk,
-        });
+        await appendChunk(outputId, chunk);
       }
       if (done && usage) {
         finalUsage = usage;
@@ -192,9 +207,7 @@ async function runSingleOutput(
     },
   });
 
-  // Finalize output with stats
-  await (ctx.runMutation as Function)(internal.runs.finalizeOutput, {
-    outputId,
+  await finalize(outputId, {
     promptTokens: finalUsage?.promptTokens,
     completionTokens: finalUsage?.completionTokens,
     totalTokens: finalUsage?.totalTokens,
