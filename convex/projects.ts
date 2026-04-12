@@ -2,6 +2,35 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireOrgRole, requireProjectRole } from "./lib/auth";
 
+// ===== Meta Context (owner only) =====
+
+export const getMetaContext = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await requireProjectRole(ctx, args.projectId, ["owner"]);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return [];
+    return project.metaContext ?? [];
+  },
+});
+
+export const setMetaContext = mutation({
+  args: {
+    projectId: v.id("projects"),
+    metaContext: v.array(
+      v.object({
+        id: v.string(),
+        question: v.string(),
+        answer: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireProjectRole(ctx, args.projectId, ["owner"]);
+    await ctx.db.patch(args.projectId, { metaContext: args.metaContext });
+  },
+});
+
 export const create = mutation({
   args: {
     orgId: v.id("organizations"),
