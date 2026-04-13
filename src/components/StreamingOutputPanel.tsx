@@ -10,6 +10,8 @@ interface StreamingOutputPanelProps {
   output: Doc<"runOutputs">;
   runStatus: string;
   canAnnotate?: boolean;
+  resolvedModel?: string;
+  resolvedTemperature?: number;
 }
 
 function formatTokens(n: number | undefined): string {
@@ -28,6 +30,8 @@ export function StreamingOutputPanel({
   output,
   runStatus,
   canAnnotate = false,
+  resolvedModel,
+  resolvedTemperature,
 }: StreamingOutputPanelProps) {
   const isStreaming = runStatus === "running";
   const isFailed = runStatus === "failed";
@@ -58,6 +62,16 @@ export function StreamingOutputPanel({
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <div className="flex items-center gap-2">
           <BlindLabelBadge label={output.blindLabel} />
+          {resolvedModel && (
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <span className="font-mono truncate max-w-[120px]">
+                {resolvedModel.split("/").pop()}
+              </span>
+              {resolvedTemperature !== undefined && (
+                <span>T={resolvedTemperature}</span>
+              )}
+            </div>
+          )}
           {isCompleted && feedback && feedback.length > 0 && (
             <span className="text-xs text-muted-foreground">
               {feedback.length} comment{feedback.length !== 1 ? "s" : ""}
@@ -101,7 +115,12 @@ export function StreamingOutputPanel({
           )}
           aria-live="polite"
         >
-          {output.outputContent || (isStreaming ? "" : "Waiting...")}
+          {output.outputContent ||
+            (isStreaming
+              ? ""
+              : isCompleted
+                ? "This output failed to generate. The model may have been unavailable or returned an error."
+                : "Waiting...")}
           {isStreaming && (
             <span className="inline-block w-[2px] h-[1em] bg-foreground align-text-bottom animate-pulse ml-0.5">
               &#x258b;

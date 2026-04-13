@@ -11,8 +11,11 @@ import { AddVariableDialog } from "@/components/AddVariableDialog";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
 import { RunStatusPill } from "@/components/RunStatusPill";
 import { ModelPicker } from "@/components/ModelPicker";
+import { SlotConfigurator, type SlotConfig } from "@/components/SlotConfigurator";
+import { SuggestionCards } from "@/components/SuggestionCards";
 import { ConcurrentRunGauge } from "@/components/ConcurrentRunGauge";
 import { OptimizeConfirmationDialog } from "@/components/OptimizeConfirmationDialog";
+import { useModelCatalog } from "@/hooks/useModelCatalog";
 import { AttachmentCard } from "@/components/AttachmentCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +103,15 @@ export function VersionEditor() {
   const [maxTokens, setMaxTokens] = useState(1024);
   const [running, setRunning] = useState(false);
 
+  // M8: Mix & Match state
+  const [runMode, setRunMode] = useState<"uniform" | "mix">("uniform");
+  const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>([
+    { label: "A", model: "", temperature: 0.7 },
+    { label: "B", model: "", temperature: 0.7 },
+    { label: "C", model: "", temperature: 0.7 },
+  ]);
+  const { models: catalogModels } = useModelCatalog();
+
   const [feedbackMode, setFeedbackMode] = useState(false);
 
   // Optimization queries
@@ -114,6 +126,15 @@ export function VersionEditor() {
     { projectId },
   );
   const [optimizeDialogOpen, setOptimizeDialogOpen] = useState(false);
+
+  // M8: AI suggestions
+  const suggestions = useQuery(
+    api.runAssistant.getSuggestions,
+    versionId && runMode === "mix"
+      ? { versionId: versionId as Id<"promptVersions"> }
+      : "skip",
+  );
+  const requestSuggestions = useMutation(api.runAssistant.requestSuggestions);
 
   // Prompt feedback queries (only when viewing feedback)
   const promptFeedback = useQuery(
@@ -165,16 +186,20 @@ export function VersionEditor() {
   }, [versionId, isReadOnly, systemMessage, userTemplate, updateVersion]);
 
   const handleRun = useCallback(async () => {
-    if (!versionId || !selectedTestCaseId || !selectedModel || running) return;
+    const isMix = runMode === "mix";
+    const effectiveModel = isMix ? slotConfigs[0]?.model ?? "" : selectedModel;
+    if (!versionId || !selectedTestCaseId || !effectiveModel || running) return;
     setRunning(true);
     setError("");
     try {
       const runId = await executeRun({
         versionId: versionId as Id<"promptVersions">,
         testCaseId: selectedTestCaseId as Id<"testCases">,
-        model: selectedModel,
-        temperature,
+        model: effectiveModel,
+        temperature: isMix ? slotConfigs[0]?.temperature ?? 0.7 : temperature,
         maxTokens,
+        mode: isMix ? "mix" : undefined,
+        slotConfigs: isMix ? slotConfigs : undefined,
       });
       navigate(
         `/orgs/${orgSlug}/projects/${projectId}/runs/${runId}`,
@@ -195,6 +220,8 @@ export function VersionEditor() {
     navigate,
     orgSlug,
     projectId,
+    runMode,
+    slotConfigs,
   ]);
 
   // Cmd+S to save, Cmd+Enter to run
@@ -282,7 +309,12 @@ export function VersionEditor() {
   const runDisabledReason = (() => {
     if (!keyStatus?.hasKey) return "Set your OpenRouter key to run prompts.";
     if (!selectedTestCaseId) return "Select a test case to run this prompt.";
-    if (!selectedModel) return "Select a model to run this prompt.";
+    if (runMode === "mix") {
+      const missingModel = slotConfigs.find((s) => !s.model);
+      if (missingModel) return `Select a model for slot ${missingModel.label}.`;
+    } else {
+      if (!selectedModel) return "Select a model to run this prompt.";
+    }
     return null;
   })();
 
@@ -639,47 +671,173 @@ export function VersionEditor() {
             )}
           </div>
 
-          {/* Model selector */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Model</Label>
-            <ModelPicker
-              value={selectedModel}
-              onChange={setSelectedModel}
-              hasAttachments={!!hasAttachments}
-            />
+          {/* Mode toggle */}
+          <div className="flex rounded-md border overflow-hidden">
+            <button
+              className={cn(
+                "flex-1 px-2 py-1 text-xs font-medium transition-colors",
+                runMode === "uniform"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => {
+                if (runMode === "mix") {
+                  // Use first slot's config as the uniform config
+                  const first = slotConfigs[0];
+                  if (first?.model) setSelectedModel(first.model);
+                  if (first?.temperature !== undefined) setTemperature(first.temperature);
+                }
+                setRunMode("uniform");
+              }}
+            >
+              Uniform
+            </button>
+            <button
+              className={cn(
+                "flex-1 px-2 py-1 text-xs font-medium transition-colors",
+                runMode === "mix"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => {
+                if (runMode === "uniform") {
+                  // Init all slots with current uniform model/temp
+                  setSlotConfigs((prev) =>
+                    prev.map((s) => ({
+                      ...s,
+                      model: selectedModel,
+                      temperature,
+                    })),
+                  );
+                }
+                setRunMode("mix");
+              }}
+            >
+              Mix & Match
+            </button>
           </div>
 
-          {/* Temperature */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Temperature</Label>
-            <Input
-              type="number"
-              value={temperature}
-              onChange={(e) =>
-                setTemperature(
-                  Math.min(2, Math.max(0, parseFloat(e.target.value) || 0)),
-                )
-              }
-              step={0.1}
-              min={0}
-              max={2}
-              className="h-8 text-xs"
-            />
-          </div>
+          {runMode === "uniform" ? (
+            <>
+              {/* Model selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Model</Label>
+                <ModelPicker
+                  value={selectedModel}
+                  onChange={setSelectedModel}
+                  hasAttachments={!!hasAttachments}
+                  catalogModels={catalogModels}
+                />
+              </div>
 
-          {/* Max tokens */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Max tokens</Label>
-            <Input
-              type="number"
-              value={maxTokens}
-              onChange={(e) =>
-                setMaxTokens(Math.max(1, parseInt(e.target.value) || 1))
-              }
-              min={1}
-              className="h-8 text-xs"
-            />
-          </div>
+              {/* Temperature */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Temperature</Label>
+                <Input
+                  type="number"
+                  value={temperature}
+                  onChange={(e) =>
+                    setTemperature(
+                      Math.min(2, Math.max(0, parseFloat(e.target.value) || 0)),
+                    )
+                  }
+                  step={0.1}
+                  min={0}
+                  max={2}
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              {/* Max tokens */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Max tokens</Label>
+                <Input
+                  type="number"
+                  value={maxTokens}
+                  onChange={(e) =>
+                    setMaxTokens(Math.max(1, parseInt(e.target.value) || 1))
+                  }
+                  min={1}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <SlotConfigurator
+                slotConfigs={slotConfigs}
+                onChange={setSlotConfigs}
+                hasAttachments={!!hasAttachments}
+                catalogModels={catalogModels}
+              />
+
+              {/* Suggest button */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={
+                  suggestions?.status === "pending" ||
+                  suggestions?.status === "processing"
+                }
+                onClick={async () => {
+                  if (!versionId) return;
+                  try {
+                    await requestSuggestions({
+                      versionId: versionId as Id<"promptVersions">,
+                      slotCount: slotConfigs.length,
+                    });
+                  } catch (err) {
+                    setError(friendlyError(err, "Failed to request suggestions."));
+                  }
+                }}
+              >
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                {suggestions?.status === "pending" || suggestions?.status === "processing"
+                  ? "Suggesting..."
+                  : "Suggest configs"}
+              </Button>
+
+              {/* Loading state */}
+              {(suggestions?.status === "pending" || suggestions?.status === "processing") && (
+                <div className="space-y-2">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              )}
+
+              {/* Suggestion cards */}
+              {suggestions?.status === "completed" && suggestions.suggestions && (
+                <SuggestionCards
+                  suggestions={suggestions.suggestions}
+                  onApply={(configs) => {
+                    setSlotConfigs(configs);
+                  }}
+                />
+              )}
+
+              {/* Suggestion error */}
+              {suggestions?.status === "failed" && suggestions.errorMessage && (
+                <p className="text-[10px] text-destructive">
+                  {suggestions.errorMessage}
+                </p>
+              )}
+
+              {/* Max tokens (shared across slots) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Max tokens</Label>
+                <Input
+                  type="number"
+                  value={maxTokens}
+                  onChange={(e) =>
+                    setMaxTokens(Math.max(1, parseInt(e.target.value) || 1))
+                  }
+                  min={1}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </>
+          )}
 
           {/* API key missing callout */}
           {keyStatus && !keyStatus.hasKey && (

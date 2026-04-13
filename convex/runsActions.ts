@@ -25,9 +25,18 @@ export const executeRunAction = internalAction({
   args: {
     runId: v.id("promptRuns"),
     outputIds: v.array(v.id("runOutputs")),
+    slotConfigs: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          model: v.string(),
+          temperature: v.number(),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
-    const { runId, outputIds } = args;
+    const { runId, outputIds, slotConfigs } = args;
 
     // 1. Load full context
     const context = await ctx.runQuery(internal.runs.getRunContext, { runId });
@@ -97,19 +106,20 @@ export const executeRunAction = internalAction({
     ) => ctx.runMutation(internal.runs.finalizeOutput, { outputId, ...stats });
 
     const results = await Promise.allSettled(
-      outputIds.map((outputId) =>
-        runSingleOutput({
+      outputIds.map((outputId, index) => {
+        const slotConfig = slotConfigs?.[index];
+        return runSingleOutput({
           apiKey,
-          model: run.model,
+          model: slotConfig?.model ?? run.model,
           messages,
-          temperature: run.temperature,
+          temperature: slotConfig?.temperature ?? run.temperature,
           maxTokens: run.maxTokens,
           outputId,
           startTime,
           appendChunk,
           finalize,
-        }),
-      ),
+        });
+      }),
     );
 
     // 7. Determine final run status

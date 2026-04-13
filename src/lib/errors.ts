@@ -46,6 +46,12 @@ const friendlyMessages: Record<string, string> = {
     "This optimization is not awaiting review.",
   "No generated content to accept":
     "No generated content to accept.",
+  "Slot count must be between 2 and 5":
+    "Configure between 2 and 5 output slots.",
+  "must have a model selected":
+    "Each slot must have a model selected.",
+  "A suggestion request is already in progress":
+    "A suggestion request is already running.",
   "Select between 2 and 5 versions":
     "Select between 2 and 5 versions to compare.",
   "Test case not found":
@@ -78,6 +84,7 @@ export function friendlyError(err: unknown, fallback = "Something went wrong. Pl
     "The optimizer used unsupported template syntax",
     "The optimizer returned the same prompt",
     "The optimizer's reasoning was not grounded",
+    "Slot ",
   ];
   for (const prefix of passThroughPrefixes) {
     if (raw.includes(prefix)) {

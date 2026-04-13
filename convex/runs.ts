@@ -8,9 +8,9 @@ import {
 import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
 import { resolveEvalToken, mintEvalToken } from "./lib/evalTokens";
+import { getBlindLabels, validateSlotConfigs } from "./lib/slotConfig";
 
 const CONCURRENT_CAP = 10;
-const BLIND_LABELS = ["A", "B", "C"];
 
 export const execute = mutation({
   args: {
@@ -19,6 +19,17 @@ export const execute = mutation({
     model: v.string(),
     temperature: v.number(),
     maxTokens: v.optional(v.number()),
+    // M8: per-slot configuration
+    mode: v.optional(v.union(v.literal("uniform"), v.literal("mix"))),
+    slotConfigs: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          model: v.string(),
+          temperature: v.number(),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const version = await ctx.db.get(args.versionId);
@@ -55,6 +66,17 @@ export const execute = mutation({
       );
     }
 
+    // Determine mode and validate slot configs
+    const isMix = args.mode === "mix" && args.slotConfigs && args.slotConfigs.length > 0;
+
+    if (isMix) {
+      validateSlotConfigs(args.slotConfigs!);
+    }
+
+    const labels = isMix
+      ? getBlindLabels(args.slotConfigs!.length)
+      : getBlindLabels(3);
+
     // Create run
     const runId = await ctx.db.insert("promptRuns", {
       projectId: version.projectId,
@@ -63,17 +85,22 @@ export const execute = mutation({
       model: args.model,
       temperature: args.temperature,
       maxTokens: args.maxTokens,
+      mode: isMix ? "mix" : undefined,
+      slotConfigs: isMix ? args.slotConfigs : undefined,
       status: "pending",
       triggeredById: userId,
     });
 
-    // Create empty output rows
+    // Create empty output rows — per-slot model/temp in mix mode
     const outputIds = [];
-    for (const label of BLIND_LABELS) {
+    for (let i = 0; i < labels.length; i++) {
+      const slotConfig = isMix ? args.slotConfigs![i] : undefined;
       const outputId = await ctx.db.insert("runOutputs", {
         runId,
-        blindLabel: label,
+        blindLabel: labels[i]!,
         outputContent: "",
+        model: slotConfig?.model,
+        temperature: slotConfig?.temperature,
       });
       outputIds.push(outputId);
     }
@@ -82,7 +109,11 @@ export const execute = mutation({
     await ctx.scheduler.runAfter(
       0,
       internal.runsActions.executeRunAction,
-      { runId, outputIds },
+      {
+        runId,
+        outputIds,
+        slotConfigs: isMix ? args.slotConfigs : undefined,
+      },
     );
 
     return runId;
@@ -218,6 +249,8 @@ export const compareAcrossVersions = query({
         runId: string;
         blindLabel: string;
         outputContent: string;
+        model?: string;
+        temperature?: number;
         promptTokens?: number;
         completionTokens?: number;
         totalTokens?: number;
@@ -234,6 +267,8 @@ export const compareAcrossVersions = query({
             runId: o.runId as string,
             blindLabel: o.blindLabel,
             outputContent: o.outputContent,
+            model: o.model,
+            temperature: o.temperature,
             promptTokens: o.promptTokens,
             completionTokens: o.completionTokens,
             totalTokens: o.totalTokens,
@@ -255,6 +290,7 @@ export const compareAcrossVersions = query({
               status: runToShow.status,
               model: runToShow.model,
               temperature: runToShow.temperature,
+              mode: runToShow.mode ?? undefined,
               _creationTime: runToShow._creationTime,
             }
           : null,
@@ -398,6 +434,20 @@ export const updateRunStatus = internalMutation({
       const run = await ctx.db.get(args.runId);
       if (run) {
         await mintEvalToken(ctx, args.runId, run.projectId);
+
+        // Auto-trigger post-run insights for mix-mode runs
+        if (run.mode === "mix") {
+          const insightId = await ctx.db.insert("runInsights", {
+            runId: args.runId,
+            projectId: run.projectId,
+            status: "pending",
+          });
+          await ctx.scheduler.runAfter(
+            0,
+            internal.runInsightsActions.generateInsightsAction,
+            { insightId, runId: args.runId },
+          );
+        }
       }
     }
   },

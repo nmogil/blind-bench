@@ -473,6 +473,8 @@ export const getOptimizationContext = internalQuery({
       blindLabel: string;
       highlightedText: string;
       comment: string;
+      model?: string;
+      temperature?: number;
     }> = [];
 
     for (const run of runs) {
@@ -490,6 +492,8 @@ export const getOptimizationContext = internalQuery({
             blindLabel: output.blindLabel,
             highlightedText: f.annotationData.highlightedText,
             comment: f.annotationData.comment,
+            model: output.model,
+            temperature: output.temperature,
           });
         }
       }

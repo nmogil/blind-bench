@@ -119,12 +119,20 @@ function VersionRunsSection({
           className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs text-muted-foreground">
-              {run.model.split("/").pop()}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              T={run.temperature}
-            </span>
+            {run.mode === "mix" ? (
+              <span className="inline-flex items-center rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 text-[10px] font-medium">
+                Mix & Match ({run.slotConfigs?.length ?? 3})
+              </span>
+            ) : (
+              <>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {run.model.split("/").pop()}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  T={run.temperature}
+                </span>
+              </>
+            )}
             <span className="text-xs text-muted-foreground">
               {new Date(run._creationTime).toLocaleString()}
             </span>

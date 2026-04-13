@@ -205,6 +205,7 @@ interface ComparisonColumnProps {
       status: string;
       model: string;
       temperature: number;
+      mode?: string;
       _creationTime?: number;
     } | null;
     outputs: Array<{
@@ -212,6 +213,8 @@ interface ComparisonColumnProps {
       runId: string;
       blindLabel: string;
       outputContent: string;
+      model?: string;
+      temperature?: number;
       promptTokens?: number;
       completionTokens?: number;
       totalTokens?: number;
@@ -238,14 +241,19 @@ function ComparisonColumn({ data }: ComparisonColumnProps) {
 
       {/* Outputs */}
       {data.run && data.outputs.length > 0 ? (
-        data.outputs.map((output) => (
-          <StreamingOutputPanel
-            key={output._id}
-            output={output as any}
-            runStatus={data.run!.status}
-            canAnnotate={data.run!.status === "completed"}
-          />
-        ))
+        data.outputs.map((output) => {
+          const isMix = data.run!.mode === "mix";
+          return (
+            <StreamingOutputPanel
+              key={output._id}
+              output={output as any}
+              runStatus={data.run!.status}
+              canAnnotate={data.run!.status === "completed"}
+              resolvedModel={isMix ? (output.model ?? data.run!.model) : undefined}
+              resolvedTemperature={isMix ? (output.temperature ?? data.run!.temperature) : undefined}
+            />
+          );
+        })
       ) : (
         <div className="flex items-center justify-center h-48 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
           {data.hasCompletedRun

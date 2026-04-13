@@ -12,6 +12,8 @@ export interface OptimizerInput {
     blindLabel: string;
     highlightedText: string;
     comment: string;
+    model?: string;
+    temperature?: number;
   }>;
   promptFeedback: Array<{
     targetField: "system_message" | "user_message_template";
@@ -146,8 +148,8 @@ export function validateOptimizerOutput(
   // 7. Reasoning without citation
   const reasoning = changesReasoning as string;
   const hasCitation =
-    /\b[A-C]\b/.test(reasoning) ||
-    /\bOutput [A-C]\b/i.test(reasoning) ||
+    /\b[A-E]\b/.test(reasoning) ||
+    /\bOutput [A-E]\b/i.test(reasoning) ||
     /\bsystem[_ ]message\b/i.test(reasoning) ||
     /\buser[_ ](message[_ ])?template\b/i.test(reasoning);
   if (!hasCitation) {

@@ -8,7 +8,9 @@ import { RunStatusPill } from "@/components/RunStatusPill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { FeedbackSheet } from "@/components/FeedbackSheet";
+import { InsightsPanel } from "@/components/InsightsPanel";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
+import { cn } from "@/lib/utils";
 
 function formatTime(ts: number | undefined): string {
   if (!ts) return "—";
@@ -74,8 +76,16 @@ export function RunView() {
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
               <span>Test: {run.testCaseName ?? "—"}</span>
-              <span>Model: {run.model}</span>
-              <span>Temp: {run.temperature}</span>
+              {run.mode === "mix" ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 text-[10px] font-medium">
+                  Mix & Match
+                </span>
+              ) : (
+                <>
+                  <span>Model: {run.model}</span>
+                  <span>Temp: {run.temperature}</span>
+                </>
+              )}
               <span>By: {run.triggeredByName ?? "—"}</span>
               <span>Started: {formatTime(run.startedAt)}</span>
             </div>
@@ -89,10 +99,22 @@ export function RunView() {
         )}
       </div>
 
-      {/* Error banner */}
-      {run.status === "failed" && run.errorMessage && (
-        <div className="px-4 py-2 bg-destructive/10 border-b">
-          <p className="text-sm text-destructive">{run.errorMessage}</p>
+      {/* Error banner — shown on full failure or partial failure (some outputs failed) */}
+      {run.errorMessage && (
+        <div className={cn(
+          "px-4 py-2 border-b",
+          run.status === "failed"
+            ? "bg-destructive/10"
+            : "bg-amber-50/50 dark:bg-amber-950/10",
+        )}>
+          <p className={cn(
+            "text-sm",
+            run.status === "failed" ? "text-destructive" : "text-amber-700 dark:text-amber-400",
+          )}>
+            {run.status === "completed"
+              ? `Some outputs failed: ${run.errorMessage}`
+              : run.errorMessage}
+          </p>
         </div>
       )}
 
@@ -107,18 +129,35 @@ export function RunView() {
         </div>
       )}
 
-      {/* Three-column output grid */}
-      <div className="flex-1 overflow-hidden p-4">
-        <div className="grid grid-cols-3 gap-4 h-full">
-          {run.outputs.map((output) => (
-            <StreamingOutputPanel
-              key={output._id}
-              output={output}
-              runStatus={run.status}
-              canAnnotate={true}
-            />
-          ))}
+      {/* Dynamic output grid */}
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div
+          className={cn("grid gap-4", {
+            "grid-cols-1 sm:grid-cols-2": run.outputs.length === 2,
+            "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3": run.outputs.length === 3,
+            "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4": run.outputs.length === 4,
+            "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5": run.outputs.length >= 5,
+          })}
+        >
+          {run.outputs.map((output) => {
+            const isMix = run.mode === "mix";
+            return (
+              <StreamingOutputPanel
+                key={output._id}
+                output={output}
+                runStatus={run.status}
+                canAnnotate={true}
+                resolvedModel={isMix ? (output.model ?? run.model) : undefined}
+                resolvedTemperature={isMix ? (output.temperature ?? run.temperature) : undefined}
+              />
+            );
+          })}
         </div>
+
+        {/* Post-run AI insights (mix-mode only) */}
+        {run.mode === "mix" && run.status === "completed" && (
+          <InsightsPanel runId={runId as Id<"promptRuns">} />
+        )}
       </div>
     </div>
   );

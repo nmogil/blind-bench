@@ -118,6 +118,17 @@ const schema = defineSchema({
     model: v.string(),
     temperature: v.number(),
     maxTokens: v.optional(v.number()),
+    // M8: per-slot configuration
+    mode: v.optional(v.union(v.literal("uniform"), v.literal("mix"))),
+    slotConfigs: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          model: v.string(),
+          temperature: v.number(),
+        }),
+      ),
+    ),
     status: v.union(
       v.literal("pending"),
       v.literal("running"),
@@ -137,6 +148,9 @@ const schema = defineSchema({
     runId: v.id("promptRuns"),
     blindLabel: v.string(),
     outputContent: v.string(),
+    // M8: per-slot model/temperature (populated in mix mode)
+    model: v.optional(v.string()),
+    temperature: v.optional(v.number()),
     promptTokens: v.optional(v.number()),
     completionTokens: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
@@ -222,6 +236,63 @@ const schema = defineSchema({
     userId: v.id("users"),
     dismissedCallouts: v.array(v.string()),
   }).index("by_user", ["userId"]),
+
+  // M8: Model catalog (global, refreshed from OpenRouter API)
+  modelCatalog: defineTable({
+    modelId: v.string(),
+    name: v.string(),
+    provider: v.string(),
+    contextWindow: v.number(),
+    supportsVision: v.boolean(),
+    promptPricing: v.number(),
+    completionPricing: v.number(),
+    lastRefreshedAt: v.number(),
+  }).index("by_model_id", ["modelId"]),
+
+  // M8: AI Run Assistant — pre-run suggestions
+  runAssistantSuggestions: defineTable({
+    projectId: v.id("projects"),
+    promptVersionId: v.id("promptVersions"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    suggestions: v.optional(
+      v.array(
+        v.object({
+          title: v.string(),
+          description: v.string(),
+          slotConfigs: v.array(
+            v.object({
+              label: v.string(),
+              model: v.string(),
+              temperature: v.number(),
+            }),
+          ),
+        }),
+      ),
+    ),
+    errorMessage: v.optional(v.string()),
+    requestedById: v.id("users"),
+  })
+    .index("by_version", ["promptVersionId"])
+    .index("by_project_and_status", ["projectId", "status"]),
+
+  // M8: AI Run Assistant — post-run insights
+  runInsights: defineTable({
+    runId: v.id("promptRuns"),
+    projectId: v.id("projects"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    insightContent: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+  }).index("by_run", ["runId"]),
 });
 
 export default schema;
