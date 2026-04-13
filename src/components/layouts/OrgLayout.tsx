@@ -1,8 +1,20 @@
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { useQuery } from "convex/react";
 import { Navigate, Outlet, useParams } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import { OrgProvider } from "@/contexts/OrgContext";
+
+interface OrgLayoutContextValue {
+  openNewProjectDialog: () => void;
+}
+
+const OrgLayoutCtx = createContext<OrgLayoutContextValue>({
+  openNewProjectDialog: () => {},
+});
+
+export function useOrgLayout() {
+  return useContext(OrgLayoutCtx);
+}
 import { TopBar } from "@/components/TopBar";
 import { SideNav } from "@/components/SideNav";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
@@ -51,9 +63,15 @@ export function OrgLayout() {
         <TopBar />
         <div className="flex flex-1">
           <SideNav onNewProject={() => setShowNewProject(true)} />
-          <main className="flex-1 overflow-auto">
-            <Outlet />
-          </main>
+          <OrgLayoutCtx.Provider
+            value={{
+              openNewProjectDialog: () => setShowNewProject(true),
+            }}
+          >
+            <main className="flex-1 overflow-auto">
+              <Outlet />
+            </main>
+          </OrgLayoutCtx.Provider>
         </div>
       </div>
       <NewProjectDialog

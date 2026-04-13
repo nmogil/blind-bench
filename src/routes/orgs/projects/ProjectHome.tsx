@@ -18,6 +18,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OnboardingCallout } from "@/components/OnboardingCallout";
 
 export function ProjectHome() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
@@ -82,6 +83,11 @@ export function ProjectHome() {
                 You're ready to write, run, and iterate on your prompt.
               </p>
             </div>
+
+            <OnboardingCallout calloutKey="onboarding_shortcuts">
+              Pro tip: Press ? to see keyboard shortcuts, or ⌘K to search
+              anything.
+            </OnboardingCallout>
 
             <div className="space-y-2">
               {latestDraft && (

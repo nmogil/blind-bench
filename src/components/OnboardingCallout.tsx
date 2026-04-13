@@ -4,16 +4,18 @@ import { cn } from "@/lib/utils";
 
 interface OnboardingCalloutProps {
   calloutKey: string;
-  children: string;
+  children: React.ReactNode;
   className?: string;
+  prerequisiteDismissed?: string;
 }
 
 export function OnboardingCallout({
   calloutKey,
   children,
   className,
+  prerequisiteDismissed,
 }: OnboardingCalloutProps) {
-  const { show, dismiss } = useOnboardingCallout(calloutKey);
+  const { show, dismiss } = useOnboardingCallout(calloutKey, prerequisiteDismissed);
 
   if (!show) return null;
 

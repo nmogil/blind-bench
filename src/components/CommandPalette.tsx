@@ -3,6 +3,7 @@ import { useQuery } from "convex/react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
+import { onToggleCommandPalette } from "@/lib/commandPaletteState";
 import {
   CommandDialog,
   CommandEmpty,
@@ -35,14 +36,28 @@ export function CommandPalette() {
   // Always query projects for the current org
   const projects = useQuery(api.projects.list, { orgId });
 
-  // Only query project-scoped data when inside a project
+  // Check project role to avoid querying data the user can't access (e.g. evaluators)
+  const projectInfo = useQuery(
+    api.projects.get,
+    projectId ? { projectId: projectId as any } : "skip",
+  );
+  const canBrowseProject =
+    projectInfo?.role === "owner" || projectInfo?.role === "editor";
+
+  // Only query project-scoped data when inside a project and user has sufficient role
   const versions = useQuery(
     api.versions.list,
-    projectId ? { projectId: projectId as any } : "skip",
+    projectId && canBrowseProject ? { projectId: projectId as any } : "skip",
   );
   const testCases = useQuery(
     api.testCases.list,
-    projectId ? { projectId: projectId as any } : "skip",
+    projectId && canBrowseProject ? { projectId: projectId as any } : "skip",
+  );
+
+  // Subscribe to external toggle events (e.g. TopBar button)
+  useEffect(
+    () => onToggleCommandPalette(() => setOpen((prev) => !prev)),
+    [],
   );
 
   // Register Cmd+K globally
@@ -80,7 +95,7 @@ export function CommandPalette() {
             Go to projects
             <CommandShortcut>G P</CommandShortcut>
           </CommandItem>
-          {projectPath && (
+          {projectPath && canBrowseProject && (
             <>
               <CommandItem
                 onSelect={() => go(`${projectPath}/versions`)}

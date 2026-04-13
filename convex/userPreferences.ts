@@ -37,3 +37,37 @@ export const dismissCallout = mutation({
     }
   },
 });
+
+export const undismissCallout = mutation({
+  args: { calloutKey: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        dismissedCallouts: existing.dismissedCallouts.filter(
+          (k) => k !== args.calloutKey,
+        ),
+      });
+    }
+  },
+});
+
+export const resetCallouts = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { dismissedCallouts: [] });
+    }
+  },
+});

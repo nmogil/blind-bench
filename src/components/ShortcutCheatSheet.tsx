@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getGroupedShortcuts } from "@/lib/shortcuts";
+import { onToggleCheatSheet } from "@/lib/shortcutCheatSheetState";
 
 function isInputElement(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;
@@ -33,6 +34,9 @@ export function ShortcutCheatSheet() {
       : projectId
         ? "project"
         : "global";
+
+  // Subscribe to external toggle events (e.g. TopBar button)
+  useEffect(() => onToggleCheatSheet(() => setOpen((prev) => !prev)), []);
 
   // Register ? shortcut
   useEffect(() => {

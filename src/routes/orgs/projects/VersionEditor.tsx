@@ -375,6 +375,11 @@ export function VersionEditor() {
               >
                 <Save className="mr-1.5 h-3.5 w-3.5" />
                 {saving ? "Saving..." : "Save"}
+                {!saving && (
+                  <kbd className="ml-1.5 rounded border bg-background/50 px-1 py-0.5 text-[10px] font-mono opacity-60">
+                    ⌘S
+                  </kbd>
+                )}
               </Button>
               <Tooltip>
                 <TooltipTrigger
@@ -447,6 +452,10 @@ export function VersionEditor() {
           </div>
           {variables.length === 0 ? (
             <div className="space-y-1.5">
+              <OnboardingCallout calloutKey="onboarding_add_variable">
+                Define a variable like {"{{name}}"} to make your prompt
+                reusable across different test cases.
+              </OnboardingCallout>
               <p className="text-xs text-muted-foreground">
                 Variables are placeholders in your prompt. Use {"{{name}}"}
                 syntax in your template.
@@ -536,6 +545,14 @@ export function VersionEditor() {
             <Label className="text-sm font-medium">
               User message template
             </Label>
+            <OnboardingCallout
+              calloutKey="onboarding_write_template"
+              prerequisiteDismissed="onboarding_add_variable"
+              className="mt-2"
+            >
+              Write your prompt here. Use {"{{variableName}}"} to insert
+              variables. This is the message sent to the LLM.
+            </OnboardingCallout>
             <div className="mt-2">
               {feedbackMode ? (
                 <AnnotatedEditor
@@ -662,12 +679,21 @@ export function VersionEditor() {
               </SelectContent>
             </Select>
             {testCases && testCases.length === 0 && (
-              <Link
-                to={`/orgs/${orgSlug}/projects/${projectId}/test-cases`}
-                className="text-xs text-primary hover:underline"
-              >
-                Create a test case
-              </Link>
+              <>
+                <OnboardingCallout
+                  calloutKey="onboarding_add_test_case"
+                  prerequisiteDismissed="onboarding_write_template"
+                >
+                  Create a test case with sample inputs, then come back and
+                  click Run to see 3 outputs side by side.
+                </OnboardingCallout>
+                <Link
+                  to={`/orgs/${orgSlug}/projects/${projectId}/test-cases`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Create a test case
+                </Link>
+              </>
             )}
           </div>
 
@@ -862,7 +888,10 @@ export function VersionEditor() {
           )}
 
           {/* Onboarding callout: Run */}
-          <OnboardingCallout calloutKey="onboarding_run">
+          <OnboardingCallout
+            calloutKey="onboarding_run"
+            prerequisiteDismissed="onboarding_add_test_case"
+          >
             Click Run to execute your prompt against the selected test case.
           </OnboardingCallout>
 
@@ -873,6 +902,9 @@ export function VersionEditor() {
                 <Button className="w-full" disabled>
                   <Play className="mr-1.5 h-4 w-4" />
                   Run prompt
+                  <kbd className="ml-2 rounded border bg-background/50 px-1 py-0.5 text-[10px] font-mono opacity-60">
+                    ⌘↵
+                  </kbd>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{runDisabledReason}</TooltipContent>
@@ -885,6 +917,11 @@ export function VersionEditor() {
             >
               <Play className="mr-1.5 h-4 w-4" />
               {running ? "Starting..." : "Run prompt"}
+              {!running && (
+                <kbd className="ml-2 rounded border bg-background/50 px-1 py-0.5 text-[10px] font-mono opacity-60">
+                  ⌘↵
+                </kbd>
+              )}
             </Button>
           )}
 

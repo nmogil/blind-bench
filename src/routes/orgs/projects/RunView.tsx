@@ -118,10 +118,19 @@ export function RunView() {
         </div>
       )}
 
-      {/* Onboarding callout: Comment */}
+      {/* Onboarding callouts: Aha moment + Comment */}
       {run.status === "completed" && (
         <div className="px-4 pt-2 space-y-2">
-          <OnboardingCallout calloutKey="onboarding_comment">
+          <OnboardingCallout calloutKey="onboarding_aha_blind_eval">
+            These 3 outputs came from the same prompt and model — only the
+            randomness differs. They're labeled A, B, C so you evaluate the
+            writing, not the version number. This is blind evaluation: the best
+            output wins on merit.
+          </OnboardingCallout>
+          <OnboardingCallout
+            calloutKey="onboarding_comment"
+            prerequisiteDismissed="onboarding_aha_blind_eval"
+          >
             Select any text and press C to leave a comment. When you're done,
             go back to the version editor and click "Request optimization" to
             turn your feedback into a rewritten prompt.

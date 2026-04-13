@@ -2,22 +2,26 @@ import { useQuery } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
+import { useOrgLayout } from "@/components/layouts/OrgLayout";
 import { EmptyState } from "@/components/EmptyState";
+import { WelcomeCard } from "@/components/WelcomeCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FolderOpen, ChevronRight } from "lucide-react";
 
 export function OrgHome() {
   const { org, orgId } = useOrg();
+  const { openNewProjectDialog } = useOrgLayout();
   const projects = useQuery(api.projects.list, { orgId });
   const navigate = useNavigate();
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">{org.name}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Each project is a prompt you're developing. Write it, test it against
-        real inputs, and iterate until it's great.
-      </p>
+      <p className="mt-1 text-sm text-muted-foreground">Your projects</p>
+
+      <div className="mt-4">
+        <WelcomeCard onCreateProject={openNewProjectDialog} />
+      </div>
 
       <div className="mt-6">
         {projects === undefined ? (
