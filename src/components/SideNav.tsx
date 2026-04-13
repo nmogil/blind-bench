@@ -82,7 +82,7 @@ export function SideNav({ onNewProject }: SideNavProps) {
             className={linkClass}
           >
             <Key className="h-4 w-4 shrink-0" />
-            API Key
+            OpenRouter Key
           </NavLink>
         </>
       )}

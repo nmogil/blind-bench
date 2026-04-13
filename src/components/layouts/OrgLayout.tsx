@@ -6,6 +6,8 @@ import { OrgProvider } from "@/contexts/OrgContext";
 import { TopBar } from "@/components/TopBar";
 import { SideNav } from "@/components/SideNav";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
+import { CommandPalette } from "@/components/CommandPalette";
+import { ShortcutCheatSheet } from "@/components/ShortcutCheatSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function OrgLayout() {
@@ -58,6 +60,8 @@ export function OrgLayout() {
         open={showNewProject}
         onOpenChange={setShowNewProject}
       />
+      <CommandPalette />
+      <ShortcutCheatSheet />
     </OrgProvider>
   );
 }

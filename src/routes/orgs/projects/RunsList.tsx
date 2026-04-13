@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
 import { RunStatusPill } from "@/components/RunStatusPill";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,18 +37,56 @@ export function RunsList() {
             Create a version and run it to see results here.
           </p>
         ) : (
-          versions.map((version) => (
-            <VersionRunsSection
-              key={version._id}
-              versionId={version._id}
-              versionNumber={version.versionNumber}
-              orgSlug={orgSlug!}
-              projectId={projectId}
-            />
-          ))
+          <RunsContent
+            versions={versions}
+            orgSlug={orgSlug!}
+            projectId={projectId}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+function RunsContent({
+  versions,
+  orgSlug,
+  projectId,
+}: {
+  versions: { _id: string; versionNumber: number }[];
+  orgSlug: string;
+  projectId: string;
+}) {
+  // Query runs for all versions to check if any exist
+  const firstVersionRuns = useQuery(api.runs.list, {
+    versionId: versions[0]!._id as Id<"promptVersions">,
+  });
+
+  // If there's only one version and it has no runs, show the hint
+  // For multiple versions, we show sections + hint as a fallback
+  const showHint =
+    versions.length === 1 && firstVersionRuns && firstVersionRuns.length === 0;
+
+  if (showHint) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No runs yet. Open a version and click "Run prompt" to see results here.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {versions.map((version) => (
+        <VersionRunsSection
+          key={version._id}
+          versionId={version._id}
+          versionNumber={version.versionNumber}
+          orgSlug={orgSlug}
+          projectId={projectId}
+        />
+      ))}
+    </>
   );
 }
 
@@ -63,7 +102,7 @@ function VersionRunsSection({
   projectId: string;
 }) {
   const runs = useQuery(api.runs.list, {
-    versionId: versionId as any,
+    versionId: versionId as Id<"promptVersions">,
   });
 
   if (!runs || runs.length === 0) return null;

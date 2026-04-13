@@ -38,7 +38,7 @@ export function EvalInbox() {
         <EmptyState
           icon={Inbox}
           heading="You're all caught up"
-          description="New evaluations will appear here when runs complete."
+          description="Waiting for new runs."
         />
       </div>
     );

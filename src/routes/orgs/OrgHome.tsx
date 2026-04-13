@@ -15,7 +15,8 @@ export function OrgHome() {
     <div className="p-6">
       <h1 className="text-2xl font-bold">{org.name}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manage your prompt engineering projects.
+        Each project is a prompt you're developing. Write it, test it against
+        real inputs, and iterate until it's great.
       </p>
 
       <div className="mt-6">
@@ -29,7 +30,7 @@ export function OrgHome() {
           <EmptyState
             icon={FolderOpen}
             heading="No projects yet"
-            description="Create your first project to start drafting prompts."
+            description="A project holds one prompt and all its versions, test cases, and run history. Create one to get started."
           />
         ) : (
           <div className="divide-y rounded-lg border">

@@ -186,7 +186,7 @@ function FeedbackItem({
 function FeedbackEmpty() {
   return (
     <p className="text-sm text-muted-foreground py-6 text-center">
-      No feedback yet. Select text in an output and add a comment to get started.
+      No feedback for this version yet.
     </p>
   );
 }

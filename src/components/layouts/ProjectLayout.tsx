@@ -5,9 +5,14 @@ import { ProjectProvider } from "@/contexts/ProjectContext";
 import { ProjectTabs } from "@/components/ProjectTabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Id } from "../../../convex/_generated/dataModel";
+import { useGoToSequence } from "@/hooks/useGoToSequence";
 
 export function ProjectLayout() {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { orgSlug, projectId } = useParams<{
+    orgSlug: string;
+    projectId: string;
+  }>();
+  useGoToSequence(`/orgs/${orgSlug}/projects/${projectId}`);
   const result = useQuery(
     api.projects.get,
     projectId ? { projectId: projectId as Id<"projects"> } : "skip",

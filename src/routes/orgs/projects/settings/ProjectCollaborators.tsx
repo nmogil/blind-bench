@@ -22,7 +22,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trash2, UserPlus } from "lucide-react";
+import { Trash2, UserPlus, Users } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { Id } from "../../../../../convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 import { ProjectSettingsNav } from "./ProjectSettingsNav";
@@ -149,6 +150,18 @@ function CollaboratorTable({ projectId }: { projectId: Id<"projects"> }) {
         {[1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-12 w-full" />
         ))}
+      </div>
+    );
+  }
+
+  if (collaborators.length <= 1) {
+    return (
+      <div className="mt-6">
+        <EmptyState
+          icon={Users}
+          heading="Just you so far"
+          description="You're the only collaborator. Invite someone to start leaving feedback."
+        />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { RunStatusPill } from "@/components/RunStatusPill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { FeedbackSheet } from "@/components/FeedbackSheet";
+import { OnboardingCallout } from "@/components/OnboardingCallout";
 
 function formatTime(ts: number | undefined): string {
   if (!ts) return "—";
@@ -92,6 +93,17 @@ export function RunView() {
       {run.status === "failed" && run.errorMessage && (
         <div className="px-4 py-2 bg-destructive/10 border-b">
           <p className="text-sm text-destructive">{run.errorMessage}</p>
+        </div>
+      )}
+
+      {/* Onboarding callout: Comment */}
+      {run.status === "completed" && (
+        <div className="px-4 pt-2 space-y-2">
+          <OnboardingCallout calloutKey="onboarding_comment">
+            Select any text and press C to leave a comment. When you're done,
+            go back to the version editor and click "Request optimization" to
+            turn your feedback into a rewritten prompt.
+          </OnboardingCallout>
         </div>
       )}
 

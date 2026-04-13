@@ -42,7 +42,8 @@ export function Onboarding() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Create your workspace</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Set up an organization to start collaborating on prompts.
+            A workspace holds your team's projects, API keys, and members.
+            You can rename it later.
           </p>
         </CardHeader>
         <CardContent>

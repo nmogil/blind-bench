@@ -184,7 +184,44 @@ const schema = defineSchema({
     .index("by_token", ["token"])
     .index("by_run", ["runId"]),
 
-  // M5: optimizationRequests
+  // M5: Optimization
+  optimizationRequests: defineTable({
+    projectId: v.id("projects"),
+    promptVersionId: v.id("promptVersions"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    generatedSystemMessage: v.optional(v.string()),
+    generatedUserTemplate: v.optional(v.string()),
+    changesSummary: v.optional(v.string()),
+    changesReasoning: v.optional(v.string()),
+    optimizerModel: v.string(),
+    optimizerPromptVersion: v.string(),
+    reviewStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("accepted"),
+        v.literal("rejected"),
+        v.literal("edited"),
+      ),
+    ),
+    reviewedById: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    reviewNotes: v.optional(v.string()),
+    resultingVersionId: v.optional(v.id("promptVersions")),
+    requestedById: v.id("users"),
+    errorMessage: v.optional(v.string()),
+  })
+    .index("by_version", ["promptVersionId"])
+    .index("by_project_and_status", ["projectId", "status"]),
+  // M6: User preferences (onboarding state)
+  userPreferences: defineTable({
+    userId: v.id("users"),
+    dismissedCallouts: v.array(v.string()),
+  }).index("by_user", ["userId"]),
 });
 
 export default schema;

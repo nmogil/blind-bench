@@ -133,8 +133,8 @@ export function Variables() {
       {variables.length === 0 ? (
         <EmptyState
           icon={Variable}
-          heading="No variables yet"
-          description="Variables are project-scoped placeholders you can reference in any version. Create your first."
+          heading="No variables"
+          description="Variables are placeholders like {{customer_name}} in your prompt template. Each test case provides different values for them, so you can see how your prompt handles different inputs."
           action={{ label: "Add variable", onClick: handleAddNew }}
         />
       ) : (

@@ -147,8 +147,8 @@ export function TestCases() {
       {testCases.length === 0 ? (
         <EmptyState
           icon={FlaskConical}
-          heading="No test cases yet"
-          description="Test cases let you run the same prompt against multiple inputs. Create your first."
+          heading="No test cases"
+          description="A test case is a set of variable values that gets plugged into your prompt. Create several to see how your prompt handles different scenarios."
           action={{ label: "New test case", onClick: handleCreate }}
         />
       ) : (

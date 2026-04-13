@@ -36,6 +36,7 @@ export const create = mutation({
     orgId: v.id("organizations"),
     name: v.string(),
     description: v.optional(v.string()),
+    seedSample: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireOrgRole(ctx, args.orgId, [
@@ -59,6 +60,64 @@ export const create = mutation({
       invitedAt: Date.now(),
       acceptedAt: Date.now(),
     });
+
+    if (args.seedSample) {
+      // Seed variable
+      await ctx.db.insert("projectVariables", {
+        projectId,
+        name: "text",
+        description: "The text to translate",
+        required: true,
+        order: 0,
+      });
+
+      // Seed test case
+      await ctx.db.insert("testCases", {
+        projectId,
+        name: "Casual paragraph",
+        variableValues: {
+          text: "Hey! Just wanted to let you know that the meeting tomorrow has been moved to 3pm. Also, don't forget to bring those budget reports we talked about. Let me know if that works for you!",
+        },
+        attachmentIds: [],
+        order: 0,
+        createdById: userId,
+      });
+
+      // Seed v1 draft
+      await ctx.db.insert("promptVersions", {
+        projectId,
+        versionNumber: 1,
+        systemMessage:
+          "You are a professional translator. Render English text into natural, idiomatic French suitable for native speakers. Preserve the original tone and register.",
+        userMessageTemplate: "Translate the following into natural French:\n\n{{text}}",
+        status: "draft",
+        createdById: userId,
+      });
+
+      // Seed meta context
+      await ctx.db.patch(projectId, {
+        metaContext: [
+          {
+            id: "sample-1",
+            question: "What domain does this project serve?",
+            answer:
+              "General-purpose English-to-French translation for business communication.",
+          },
+          {
+            id: "sample-2",
+            question: "What tone should the output have?",
+            answer:
+              "Natural and conversational, matching the register of the input. Informal inputs should produce informal French.",
+          },
+          {
+            id: "sample-3",
+            question: "Who is the end user?",
+            answer:
+              "French-speaking colleagues who need to read translated messages from English-speaking team members.",
+          },
+        ],
+      });
+    }
 
     return projectId;
   },

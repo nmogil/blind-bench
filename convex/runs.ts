@@ -169,6 +169,104 @@ export const countInFlightRuns = query({
   },
 });
 
+// --- Cross-version comparison (M6) ---
+
+export const compareAcrossVersions = query({
+  args: {
+    projectId: v.id("projects"),
+    testCaseId: v.id("testCases"),
+    versionIds: v.array(v.id("promptVersions")),
+  },
+  handler: async (ctx, args) => {
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+
+    if (args.versionIds.length < 2 || args.versionIds.length > 5) {
+      throw new Error("Select between 2 and 5 versions to compare");
+    }
+
+    const testCase = await ctx.db.get(args.testCaseId);
+    if (!testCase || testCase.projectId !== args.projectId) {
+      throw new Error("Test case not found");
+    }
+
+    const results = [];
+    for (const versionId of args.versionIds) {
+      const version = await ctx.db.get(versionId);
+      if (!version || version.projectId !== args.projectId) continue;
+
+      // Find runs for this (version, testCase) pair
+      const runs = await ctx.db
+        .query("promptRuns")
+        .withIndex("by_version_testcase", (q) =>
+          q.eq("promptVersionId", versionId).eq("testCaseId", args.testCaseId),
+        )
+        .take(10);
+
+      // Prefer active (pending/running) run, then most recent completed
+      const activeRun =
+        runs.find((r) => r.status === "pending" || r.status === "running") ??
+        null;
+      const completedRuns = runs
+        .filter((r) => r.status === "completed")
+        .sort((a, b) => (b._creationTime ?? 0) - (a._creationTime ?? 0));
+      const latestCompleted = completedRuns[0] ?? null;
+
+      const runToShow = activeRun ?? latestCompleted;
+
+      let outputs: Array<{
+        _id: string;
+        runId: string;
+        blindLabel: string;
+        outputContent: string;
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+        latencyMs?: number;
+      }> = [];
+      if (runToShow) {
+        const rawOutputs = await ctx.db
+          .query("runOutputs")
+          .withIndex("by_run", (q) => q.eq("runId", runToShow._id))
+          .take(10);
+        outputs = rawOutputs
+          .map((o) => ({
+            _id: o._id as string,
+            runId: o.runId as string,
+            blindLabel: o.blindLabel,
+            outputContent: o.outputContent,
+            promptTokens: o.promptTokens,
+            completionTokens: o.completionTokens,
+            totalTokens: o.totalTokens,
+            latencyMs: o.latencyMs,
+          }))
+          .sort((a, b) => a.blindLabel.localeCompare(b.blindLabel));
+      }
+
+      results.push({
+        versionId: versionId as string,
+        versionNumber: version.versionNumber,
+        versionStatus: version.status,
+        sourceVersionId: version.sourceVersionId
+          ? (version.sourceVersionId as string)
+          : null,
+        run: runToShow
+          ? {
+              _id: runToShow._id as string,
+              status: runToShow.status,
+              model: runToShow.model,
+              temperature: runToShow.temperature,
+              _creationTime: runToShow._creationTime,
+            }
+          : null,
+        outputs,
+        hasCompletedRun: latestCompleted !== null,
+      });
+    }
+
+    return results;
+  },
+});
+
 // --- Evaluator-facing query (SECURITY BOUNDARY) ---
 
 export const getOutputsForEvaluator = query({

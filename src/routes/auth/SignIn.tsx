@@ -43,7 +43,7 @@ export function SignIn() {
             Hot or Prompt
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to start engineering prompts
+            Write, test, and improve LLM prompts with your team
           </p>
         </div>
 
@@ -128,7 +128,8 @@ export function SignIn() {
         )}
 
         <p className="text-center text-xs text-muted-foreground">
-          Collaborative prompt engineering, powered by blind evaluation.
+          Compare prompt outputs side-by-side without knowing which version
+          wrote them — so the best writing wins.
         </p>
       </div>
     </div>
