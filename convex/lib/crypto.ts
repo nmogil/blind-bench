@@ -24,17 +24,16 @@ function fromBase64(b64: string): Uint8Array {
 }
 
 async function deriveKey(secret: string): Promise<CryptoKey> {
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    "HKDF",
-    false,
-    ["deriveKey"],
+  // Hash the secret with SHA-256 to get a 256-bit AES key.
+  // HKDF is not available in Convex's V8 runtime.
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(secret + toBase64(SALT)),
   );
-  return crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt: SALT, info: new TextEncoder().encode("encryption") },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
+  return crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM" },
     false,
     ["encrypt", "decrypt"],
   );

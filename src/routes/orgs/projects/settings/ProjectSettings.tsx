@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { friendlyError } from "@/lib/errors";
+import { ProjectSettingsNav } from "./ProjectSettingsNav";
 
 export function ProjectSettings() {
   const { project, projectId, role } = useProject();
@@ -63,7 +64,9 @@ export function ProjectSettings() {
   }
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="flex">
+      <ProjectSettingsNav />
+      <div className="p-6 max-w-2xl flex-1">
       <h1 className="text-2xl font-bold">Project settings</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Manage project details.
@@ -109,6 +112,7 @@ export function ProjectSettings() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

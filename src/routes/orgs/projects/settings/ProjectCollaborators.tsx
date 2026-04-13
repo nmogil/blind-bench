@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Trash2, UserPlus } from "lucide-react";
 import { Id } from "../../../../../convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
+import { ProjectSettingsNav } from "./ProjectSettingsNav";
 
 type ProjectRole = "owner" | "editor" | "evaluator";
 
@@ -36,18 +37,21 @@ export function ProjectCollaborators() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold">Collaborators</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Manage who can access this project and their roles.
-      </p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Evaluators can only see blinded outputs and leave feedback. They cannot
-        see versions or know which version produced which output.
-      </p>
+    <div className="flex">
+      <ProjectSettingsNav />
+      <div className="p-6 max-w-3xl flex-1">
+        <h1 className="text-2xl font-bold">Collaborators</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage who can access this project and their roles.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Evaluators can only see blinded outputs and leave feedback. They cannot
+          see versions or know which version produced which output.
+        </p>
 
-      <InviteRow projectId={projectId} />
-      <CollaboratorTable projectId={projectId} />
+        <InviteRow projectId={projectId} />
+        <CollaboratorTable projectId={projectId} />
+      </div>
     </div>
   );
 }

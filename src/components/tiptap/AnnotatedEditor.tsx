@@ -9,13 +9,8 @@ import {
 } from "./AnnotationHighlightExtension";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
+import { MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
 
 export interface Annotation {
   _id?: string;
@@ -43,6 +38,12 @@ interface AnnotatedEditorProps {
   className?: string;
 }
 
+interface PendingComment {
+  from: number;
+  to: number;
+  highlightedText: string;
+}
+
 export function AnnotatedEditor({
   content,
   annotations,
@@ -54,7 +55,9 @@ export function AnnotatedEditor({
   className,
 }: AnnotatedEditorProps) {
   const [commentText, setCommentText] = useState("");
-  const [isCommenting, setIsCommenting] = useState(false);
+  const [pendingComment, setPendingComment] = useState<PendingComment | null>(
+    null,
+  );
   const [activeAnnotation, setActiveAnnotation] = useState<Annotation | null>(
     null,
   );
@@ -87,7 +90,6 @@ export function AnnotatedEditor({
           "whitespace-pre-wrap font-mono leading-relaxed text-sm",
         ),
       },
-      // Prevent paste/drop from modifying content
       handlePaste: () => true,
       handleDrop: () => true,
     },
@@ -119,7 +121,7 @@ export function AnnotatedEditor({
       const target = event.target as HTMLElement;
       const highlightEl = target.closest(".annotation-highlight");
       if (!highlightEl) {
-        setActiveAnnotation(null);
+        if (!pendingComment) setActiveAnnotation(null);
         return;
       }
       const annId = highlightEl.getAttribute("data-annotation-id");
@@ -128,26 +130,42 @@ export function AnnotatedEditor({
         if (ann) {
           setActiveAnnotation(ann);
           setIsEditing(false);
+          setPendingComment(null);
         }
       }
     };
     const editorDom = editor.view.dom;
     editorDom.addEventListener("click", handleClick);
     return () => editorDom.removeEventListener("click", handleClick);
-  }, [editor, annotations]);
+  }, [editor, annotations, pendingComment]);
 
-  const handleSubmitComment = useCallback(() => {
-    if (!editor || !commentText.trim() || !onCreateAnnotation) return;
-
+  // Capture selection and open comment form
+  const handleStartComment = useCallback(() => {
+    if (!editor) return;
     const { from, to } = editor.state.selection;
     if (from === to) return;
-
     const highlightedText = editor.state.doc.textBetween(from, to);
-    onCreateAnnotation(from, to, highlightedText, commentText.trim());
-
+    setPendingComment({ from, to, highlightedText });
+    setActiveAnnotation(null);
     setCommentText("");
-    setIsCommenting(false);
-  }, [editor, commentText, onCreateAnnotation]);
+  }, [editor]);
+
+  const handleSubmitComment = useCallback(() => {
+    if (!pendingComment || !commentText.trim() || !onCreateAnnotation) return;
+    onCreateAnnotation(
+      pendingComment.from,
+      pendingComment.to,
+      pendingComment.highlightedText,
+      commentText.trim(),
+    );
+    setCommentText("");
+    setPendingComment(null);
+  }, [pendingComment, commentText, onCreateAnnotation]);
+
+  const handleCancelComment = useCallback(() => {
+    setPendingComment(null);
+    setCommentText("");
+  }, []);
 
   const handleUpdateComment = useCallback(() => {
     if (!activeAnnotation?._id || !editingComment.trim() || !onUpdateAnnotation)
@@ -163,12 +181,12 @@ export function AnnotatedEditor({
     setActiveAnnotation(null);
   }, [activeAnnotation, onDeleteAnnotation]);
 
-  // Focus textarea when comment popover opens
+  // Focus textarea when comment form opens
   useEffect(() => {
-    if (isCommenting && textareaRef.current) {
+    if (pendingComment && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [isCommenting]);
+  }, [pendingComment]);
 
   return (
     <div className={cn("relative", className)}>
@@ -180,88 +198,101 @@ export function AnnotatedEditor({
       >
         <EditorContent editor={editor} />
 
-        {/* Floating "Add Comment" button on text selection */}
-        {editor && canAnnotate && (
+        {/* BubbleMenu: "Comment" button appears on text selection */}
+        {editor && canAnnotate && !pendingComment && (
           <BubbleMenu
             editor={editor}
             shouldShow={({ editor: e }) => {
               const { from, to } = e.state.selection;
-              return from !== to && !isCommenting;
+              return from !== to;
             }}
           >
-            <Popover
-              open={isCommenting}
-              onOpenChange={(open) => {
-                setIsCommenting(open);
-                if (!open) setCommentText("");
-              }}
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shadow-md"
+              onClick={handleStartComment}
             >
-              <PopoverTrigger
-                render={
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="shadow-md"
-                    onClick={() => setIsCommenting(true)}
-                  />
-                }
-              >
-                <MessageSquarePlus className="mr-1.5 h-3.5 w-3.5" />
-                Comment
-              </PopoverTrigger>
-              <PopoverContent side="bottom" className="w-72">
-                <Textarea
-                  ref={textareaRef}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Leave feedback..."
-                  className="min-h-[80px] text-sm"
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                      e.preventDefault();
-                      handleSubmitComment();
-                    }
-                    if (e.key === "Escape") {
-                      setIsCommenting(false);
-                      setCommentText("");
-                    }
-                  }}
-                />
-                <div className="flex justify-end gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setIsCommenting(false);
-                      setCommentText("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSubmitComment}
-                    disabled={!commentText.trim()}
-                  >
-                    Submit
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {"\u2318"}Enter to submit
-                </p>
-              </PopoverContent>
-            </Popover>
+              <MessageSquarePlus className="mr-1.5 h-3.5 w-3.5" />
+              Comment
+            </Button>
           </BubbleMenu>
         )}
       </div>
 
-      {/* Active annotation detail popover */}
+      {/* Comment form — rendered outside BubbleMenu so it persists */}
+      {pendingComment && (
+        <div className="absolute left-0 right-0 top-full z-20 mt-2">
+          <div className="rounded-lg border bg-popover p-3 shadow-lg mx-2">
+            <div className="flex items-start justify-between mb-2">
+              <blockquote className="border-l-2 border-blue-400 pl-2 text-xs text-muted-foreground italic flex-1 truncate">
+                {pendingComment.highlightedText}
+              </blockquote>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={handleCancelComment}
+                className="shrink-0 ml-2"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <Textarea
+              ref={textareaRef}
+              value={commentText}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setCommentText(e.target.value)
+              }
+              placeholder="Leave feedback..."
+              className="min-h-[80px] text-sm"
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  handleSubmitComment();
+                }
+                if (e.key === "Escape") {
+                  handleCancelComment();
+                }
+              }}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-muted-foreground">
+                {"\u2318"}Enter to submit
+              </p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={handleCancelComment}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSubmitComment}
+                  disabled={!commentText.trim()}
+                >
+                  Submit
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active annotation detail panel */}
       {activeAnnotation && (
         <div className="absolute right-0 top-0 z-10 w-72 rounded-lg border bg-popover p-3 shadow-md">
           <div className="space-y-2">
-            <blockquote className="border-l-2 border-blue-400 pl-2 text-xs text-muted-foreground italic">
-              {activeAnnotation.highlightedText}
-            </blockquote>
+            <div className="flex items-start justify-between">
+              <blockquote className="border-l-2 border-blue-400 pl-2 text-xs text-muted-foreground italic flex-1">
+                {activeAnnotation.highlightedText}
+              </blockquote>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => setActiveAnnotation(null)}
+                className="shrink-0 ml-2"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
             {showAuthor && activeAnnotation.authorName && (
               <p className="text-xs font-medium">
                 {activeAnnotation.authorName}
@@ -271,9 +302,11 @@ export function AnnotatedEditor({
               <>
                 <Textarea
                   value={editingComment}
-                  onChange={(e) => setEditingComment(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setEditingComment(e.target.value)
+                  }
                   className="min-h-[60px] text-sm"
-                  onKeyDown={(e) => {
+                  onKeyDown={(e: React.KeyboardEvent) => {
                     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                       e.preventDefault();
                       handleUpdateComment();
@@ -322,14 +355,6 @@ export function AnnotatedEditor({
                 )}
               </>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="w-full"
-              onClick={() => setActiveAnnotation(null)}
-            >
-              Close
-            </Button>
           </div>
         </div>
       )}
@@ -349,4 +374,3 @@ export function AnnotatedEditor({
     </div>
   );
 }
-
