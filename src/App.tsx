@@ -24,6 +24,7 @@ import { MetaContext } from "./routes/orgs/projects/MetaContext";
 import { RunView } from "./routes/orgs/projects/RunView";
 import { RunsList } from "./routes/orgs/projects/RunsList";
 import { EvalInbox } from "./routes/eval/EvalInbox";
+import { BlindEvalView } from "./routes/eval/BlindEvalView";
 import { NotFound } from "./routes/errors/NotFound";
 import { Denied } from "./routes/errors/Denied";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -66,6 +67,7 @@ export function App() {
           </Route>
           <Route path="/eval" element={<EvalLayout />}>
             <Route index element={<EvalInbox />} />
+            <Route path=":opaqueRunToken" element={<BlindEvalView />} />
           </Route>
           <Route path="/denied" element={<Denied />} />
           <Route path="*" element={<NotFound />} />

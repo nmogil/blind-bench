@@ -1,11 +1,15 @@
-import { Doc } from "../../convex/_generated/dataModel";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Doc, Id } from "../../convex/_generated/dataModel";
 import { BlindLabelBadge } from "./BlindLabelBadge";
 import { RunStatusPill } from "./RunStatusPill";
+import { AnnotatedEditor } from "./tiptap/AnnotatedEditor";
 import { cn } from "@/lib/utils";
 
 interface StreamingOutputPanelProps {
   output: Doc<"runOutputs">;
   runStatus: string;
+  canAnnotate?: boolean;
 }
 
 function formatTokens(n: number | undefined): string {
@@ -23,34 +27,88 @@ function formatLatency(ms: number | undefined): string {
 export function StreamingOutputPanel({
   output,
   runStatus,
+  canAnnotate = false,
 }: StreamingOutputPanelProps) {
   const isStreaming = runStatus === "running";
   const isFailed = runStatus === "failed";
   const isCompleted = runStatus === "completed";
 
+  // Feedback queries/mutations — only active when completed
+  const feedback = useQuery(
+    api.feedback.listOutputFeedback,
+    isCompleted ? { outputId: output._id } : "skip",
+  );
+  const addFeedback = useMutation(api.feedback.addOutputFeedback);
+  const updateFeedback = useMutation(api.feedback.updateOutputFeedback);
+  const deleteFeedback = useMutation(api.feedback.deleteOutputFeedback);
+
+  const annotations = (feedback ?? []).map((fb) => ({
+    _id: fb._id as string,
+    from: fb.annotationData.from,
+    to: fb.annotationData.to,
+    highlightedText: fb.annotationData.highlightedText,
+    comment: fb.annotationData.comment,
+    authorName: fb.authorName ?? undefined,
+    isOwn: fb.isOwn,
+  }));
+
   return (
     <div className="flex flex-col rounded-lg border bg-card h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
-        <BlindLabelBadge label={output.blindLabel} />
+        <div className="flex items-center gap-2">
+          <BlindLabelBadge label={output.blindLabel} />
+          {isCompleted && feedback && feedback.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {feedback.length} comment{feedback.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
         <RunStatusPill status={runStatus} />
       </div>
 
-      {/* Output body */}
-      <div
-        className={cn(
-          "flex-1 overflow-y-auto p-3 text-sm whitespace-pre-wrap font-mono leading-relaxed min-h-[200px]",
-          !output.outputContent && "text-muted-foreground italic",
-        )}
-        aria-live="polite"
-      >
-        {output.outputContent || (isStreaming ? "" : "Waiting...")}
-        {isStreaming && (
-          <span className="inline-block w-[2px] h-[1em] bg-foreground align-text-bottom animate-pulse ml-0.5">
-            &#x258b;
-          </span>
-        )}
-      </div>
+      {/* Output body — annotatable when completed */}
+      {isCompleted && output.outputContent ? (
+        <div className="flex-1 overflow-y-auto min-h-[200px]">
+          <AnnotatedEditor
+            content={output.outputContent}
+            annotations={annotations}
+            canAnnotate={canAnnotate}
+            onCreateAnnotation={(from, to, highlightedText, comment) => {
+              addFeedback({
+                outputId: output._id,
+                annotationData: { from, to, highlightedText, comment },
+              });
+            }}
+            onUpdateAnnotation={(id, comment) => {
+              updateFeedback({
+                feedbackId: id as Id<"outputFeedback">,
+                comment,
+              });
+            }}
+            onDeleteAnnotation={(id) => {
+              deleteFeedback({
+                feedbackId: id as Id<"outputFeedback">,
+              });
+            }}
+          />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "flex-1 overflow-y-auto p-3 text-sm whitespace-pre-wrap font-mono leading-relaxed min-h-[200px]",
+            !output.outputContent && "text-muted-foreground italic",
+          )}
+          aria-live="polite"
+        >
+          {output.outputContent || (isStreaming ? "" : "Waiting...")}
+          {isStreaming && (
+            <span className="inline-block w-[2px] h-[1em] bg-foreground align-text-bottom animate-pulse ml-0.5">
+              &#x258b;
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Footer — token counts + latency */}
       {isCompleted && (output.totalTokens !== undefined || output.latencyMs !== undefined) && (

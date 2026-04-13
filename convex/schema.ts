@@ -144,7 +144,46 @@ const schema = defineSchema({
     rawResponseStorageId: v.optional(v.id("_storage")),
   }).index("by_run", ["runId"]),
 
-  // M4: outputFeedback, promptFeedback
+  // M4: Feedback + Blind Eval
+  outputFeedback: defineTable({
+    outputId: v.id("runOutputs"),
+    userId: v.id("users"),
+    annotationData: v.object({
+      from: v.number(),
+      to: v.number(),
+      highlightedText: v.string(),
+      comment: v.string(),
+    }),
+  })
+    .index("by_output", ["outputId"])
+    .index("by_user", ["userId"]),
+
+  promptFeedback: defineTable({
+    promptVersionId: v.id("promptVersions"),
+    userId: v.id("users"),
+    targetField: v.union(
+      v.literal("system_message"),
+      v.literal("user_message_template"),
+    ),
+    annotationData: v.object({
+      from: v.number(),
+      to: v.number(),
+      highlightedText: v.string(),
+      comment: v.string(),
+    }),
+  })
+    .index("by_version", ["promptVersionId"])
+    .index("by_user", ["userId"]),
+
+  evalTokens: defineTable({
+    token: v.string(),
+    runId: v.id("promptRuns"),
+    projectId: v.id("projects"),
+    expiresAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_run", ["runId"]),
+
   // M5: optimizationRequests
 });
 

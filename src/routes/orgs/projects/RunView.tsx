@@ -7,6 +7,7 @@ import { StreamingOutputPanel } from "@/components/StreamingOutputPanel";
 import { RunStatusPill } from "@/components/RunStatusPill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
+import { FeedbackSheet } from "@/components/FeedbackSheet";
 
 function formatTime(ts: number | undefined): string {
   if (!ts) return "—";
@@ -79,6 +80,12 @@ export function RunView() {
             </div>
           </div>
         </div>
+        {run.status === "completed" && (
+          <FeedbackSheet
+            runId={runId as Id<"promptRuns">}
+            versionId={run.promptVersionId}
+          />
+        )}
       </div>
 
       {/* Error banner */}
@@ -96,6 +103,7 @@ export function RunView() {
               key={output._id}
               output={output}
               runStatus={run.status}
+              canAnnotate={true}
             />
           ))}
         </div>

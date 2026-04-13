@@ -6,6 +6,7 @@ import { Id, Doc } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { PromptEditor } from "@/components/tiptap/PromptEditor";
+import { AnnotatedEditor } from "@/components/tiptap/AnnotatedEditor";
 import { AddVariableDialog } from "@/components/AddVariableDialog";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
 import { RunStatusPill } from "@/components/RunStatusPill";
@@ -34,6 +35,7 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronRight,
+  MessageSquare,
   Paperclip,
   Play,
   Plus,
@@ -94,6 +96,19 @@ export function VersionEditor() {
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(1024);
   const [running, setRunning] = useState(false);
+
+  const [feedbackMode, setFeedbackMode] = useState(false);
+
+  // Prompt feedback queries (only when viewing feedback)
+  const promptFeedback = useQuery(
+    api.feedback.listPromptFeedback,
+    feedbackMode && versionId
+      ? { promptVersionId: versionId as Id<"promptVersions"> }
+      : "skip",
+  );
+  const addPromptFeedback = useMutation(api.feedback.addPromptFeedback);
+  const updatePromptFeedback = useMutation(api.feedback.updatePromptFeedback);
+  const deletePromptFeedback = useMutation(api.feedback.deletePromptFeedback);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -311,9 +326,19 @@ export function VersionEditor() {
             </>
           )}
           {isReadOnly && (
-            <span className="text-xs text-muted-foreground">
-              This version is read-only
-            </span>
+            <>
+              <Button
+                variant={feedbackMode ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFeedbackMode(!feedbackMode)}
+              >
+                <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                {feedbackMode ? "Back to viewing" : "View feedback"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Read-only
+              </span>
+            </>
           )}
         </div>
       </div>
@@ -378,12 +403,48 @@ export function VersionEditor() {
             </button>
             {systemExpanded && (
               <div className="mt-2">
-                <PromptEditor
-                  content={systemMessage}
-                  onChange={setSystemMessage}
-                  readOnly={isReadOnly}
-                  placeholder="You are a helpful assistant..."
-                />
+                {feedbackMode ? (
+                  <AnnotatedEditor
+                    content={systemMessage}
+                    annotations={(promptFeedback ?? [])
+                      .filter((fb) => fb.targetField === "system_message")
+                      .map((fb) => ({
+                        _id: fb._id as string,
+                        from: fb.annotationData.from,
+                        to: fb.annotationData.to,
+                        highlightedText: fb.annotationData.highlightedText,
+                        comment: fb.annotationData.comment,
+                        authorName: fb.authorName ?? undefined,
+                        isOwn: fb.isOwn,
+                      }))}
+                    canAnnotate={true}
+                    onCreateAnnotation={(from, to, highlightedText, comment) => {
+                      addPromptFeedback({
+                        promptVersionId: versionId as Id<"promptVersions">,
+                        targetField: "system_message",
+                        annotationData: { from, to, highlightedText, comment },
+                      });
+                    }}
+                    onUpdateAnnotation={(id, comment) => {
+                      updatePromptFeedback({
+                        feedbackId: id as Id<"promptFeedback">,
+                        comment,
+                      });
+                    }}
+                    onDeleteAnnotation={(id) => {
+                      deletePromptFeedback({
+                        feedbackId: id as Id<"promptFeedback">,
+                      });
+                    }}
+                  />
+                ) : (
+                  <PromptEditor
+                    content={systemMessage}
+                    onChange={setSystemMessage}
+                    readOnly={isReadOnly}
+                    placeholder="You are a helpful assistant..."
+                  />
+                )}
               </div>
             )}
           </div>
@@ -394,12 +455,48 @@ export function VersionEditor() {
               User message template
             </Label>
             <div className="mt-2">
-              <PromptEditor
-                content={userTemplate}
-                onChange={setUserTemplate}
-                readOnly={isReadOnly}
-                placeholder="Hello {{customer_name}}, ..."
-              />
+              {feedbackMode ? (
+                <AnnotatedEditor
+                  content={userTemplate}
+                  annotations={(promptFeedback ?? [])
+                    .filter((fb) => fb.targetField === "user_message_template")
+                    .map((fb) => ({
+                      _id: fb._id as string,
+                      from: fb.annotationData.from,
+                      to: fb.annotationData.to,
+                      highlightedText: fb.annotationData.highlightedText,
+                      comment: fb.annotationData.comment,
+                      authorName: fb.authorName ?? undefined,
+                      isOwn: fb.isOwn,
+                    }))}
+                  canAnnotate={true}
+                  onCreateAnnotation={(from, to, highlightedText, comment) => {
+                    addPromptFeedback({
+                      promptVersionId: versionId as Id<"promptVersions">,
+                      targetField: "user_message_template",
+                      annotationData: { from, to, highlightedText, comment },
+                    });
+                  }}
+                  onUpdateAnnotation={(id, comment) => {
+                    updatePromptFeedback({
+                      feedbackId: id as Id<"promptFeedback">,
+                      comment,
+                    });
+                  }}
+                  onDeleteAnnotation={(id) => {
+                    deletePromptFeedback({
+                      feedbackId: id as Id<"promptFeedback">,
+                    });
+                  }}
+                />
+              ) : (
+                <PromptEditor
+                  content={userTemplate}
+                  onChange={setUserTemplate}
+                  readOnly={isReadOnly}
+                  placeholder="Hello {{customer_name}}, ..."
+                />
+              )}
             </div>
           </div>
 
