@@ -15,7 +15,9 @@ const CONCURRENT_CAP = 10;
 export const execute = mutation({
   args: {
     versionId: v.id("promptVersions"),
-    testCaseId: v.id("testCases"),
+    testCaseId: v.optional(v.id("testCases")),
+    // M12: Quick run — inline variable values when no test case
+    inlineVariables: v.optional(v.record(v.string(), v.string())),
     model: v.string(),
     temperature: v.number(),
     maxTokens: v.optional(v.number()),
@@ -40,10 +42,17 @@ export const execute = mutation({
       "editor",
     ]);
 
-    // Verify test case belongs to same project
-    const testCase = await ctx.db.get(args.testCaseId);
-    if (!testCase || testCase.projectId !== version.projectId) {
-      throw new Error("Test case not found");
+    // Require exactly one of testCaseId or inlineVariables
+    if (!args.testCaseId && !args.inlineVariables) {
+      throw new Error("Provide a test case or inline variable values.");
+    }
+
+    // Verify test case belongs to same project (when using test case)
+    if (args.testCaseId) {
+      const testCase = await ctx.db.get(args.testCaseId);
+      if (!testCase || testCase.projectId !== version.projectId) {
+        throw new Error("Test case not found");
+      }
     }
 
     // Enforce concurrent run cap
@@ -82,6 +91,7 @@ export const execute = mutation({
       projectId: version.projectId,
       promptVersionId: args.versionId,
       testCaseId: args.testCaseId,
+      inlineVariables: args.inlineVariables,
       model: args.model,
       temperature: args.temperature,
       maxTokens: args.maxTokens,
@@ -165,7 +175,9 @@ export const get = query({
       .take(10);
 
     const version = await ctx.db.get(run.promptVersionId);
-    const testCase = await ctx.db.get(run.testCaseId);
+    const testCase = run.testCaseId
+      ? await ctx.db.get(run.testCaseId)
+      : null;
     const trigger = await ctx.db.get(run.triggeredById);
 
     return {
@@ -173,6 +185,8 @@ export const get = query({
       outputs: outputs.sort((a, b) => a.blindLabel.localeCompare(b.blindLabel)),
       versionNumber: version?.versionNumber ?? null,
       testCaseName: testCase?.name ?? null,
+      isQuickRun: !run.testCaseId,
+      inlineVariables: run.inlineVariables ?? null,
       triggeredByName: trigger?.name ?? null,
     };
   },
@@ -365,8 +379,17 @@ export const getRunContext = internalQuery({
     const version = await ctx.db.get(run.promptVersionId);
     if (!version) throw new Error("Version not found");
 
-    const testCase = await ctx.db.get(run.testCaseId);
-    if (!testCase) throw new Error("Test case not found");
+    // Quick run: no test case — use inline variables
+    const testCase = run.testCaseId
+      ? await ctx.db.get(run.testCaseId)
+      : null;
+    if (run.testCaseId && !testCase) throw new Error("Test case not found");
+
+    // Construct a synthetic test case shape for quick runs
+    const effectiveTestCase = testCase ?? {
+      variableValues: (run.inlineVariables ?? {}) as Record<string, string>,
+      attachmentIds: [] as Array<import("./_generated/dataModel").Id<"_storage">>,
+    };
 
     const project = await ctx.db.get(version.projectId);
     if (!project) throw new Error("Project not found");
@@ -387,7 +410,7 @@ export const getRunContext = internalQuery({
     return {
       run,
       version,
-      testCase,
+      testCase: effectiveTestCase,
       project,
       variables,
       promptAttachments,
@@ -448,6 +471,17 @@ export const updateRunStatus = internalMutation({
             { insightId, runId: args.runId },
           );
         }
+
+        // M10: Notify evaluators about the new run
+        await ctx.scheduler.runAfter(
+          0,
+          internal.evaluatorNotifications.notifyEvaluators,
+          {
+            projectId: run.projectId,
+            type: "new_run" as const,
+            message: "New outputs are ready for your review.",
+          },
+        );
       }
     }
   },

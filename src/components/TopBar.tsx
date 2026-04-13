@@ -1,8 +1,11 @@
+import { Link } from "react-router-dom";
 import { OrgSwitcher } from "@/components/OrgSwitcher";
 import { UserMenu } from "@/components/UserMenu";
 import { HelpMenu } from "@/components/HelpMenu";
+import { NotificationBell } from "@/components/NotificationBell";
 import { toggleCommandPalette } from "@/lib/commandPaletteState";
 import { toggleCheatSheet } from "@/lib/shortcutCheatSheetState";
+import { LayoutDashboard } from "lucide-react";
 
 interface TopBarProps {
   variant?: "default" | "evaluator";
@@ -44,6 +47,18 @@ export function TopBar({ variant = "default" }: TopBarProps) {
               <span>Shortcuts</span>
             </button>
             <HelpMenu />
+          </>
+        )}
+        {variant === "evaluator" && (
+          <>
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              Dashboard
+            </Link>
+            <NotificationBell />
           </>
         )}
         <UserMenu />

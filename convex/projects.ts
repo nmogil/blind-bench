@@ -123,6 +123,69 @@ export const create = mutation({
   },
 });
 
+export const createWithPrompt = mutation({
+  args: {
+    orgId: v.id("organizations"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    promptText: v.string(),
+    detectedVariables: v.array(
+      v.object({
+        name: v.string(),
+        defaultValue: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireOrgRole(ctx, args.orgId, [
+      "owner",
+      "admin",
+      "member",
+    ]);
+
+    // 1. Create project
+    const projectId = await ctx.db.insert("projects", {
+      organizationId: args.orgId,
+      name: args.name,
+      description: args.description,
+      createdById: userId,
+    });
+
+    // 2. Add creator as owner
+    await ctx.db.insert("projectCollaborators", {
+      projectId,
+      userId,
+      role: "owner",
+      invitedById: userId,
+      invitedAt: Date.now(),
+      acceptedAt: Date.now(),
+    });
+
+    // 3. Create variables
+    for (let i = 0; i < args.detectedVariables.length; i++) {
+      const v = args.detectedVariables[i]!;
+      await ctx.db.insert("projectVariables", {
+        projectId,
+        name: v.name,
+        defaultValue: v.defaultValue,
+        required: true,
+        order: i,
+      });
+    }
+
+    // 4. Create v1 draft version with the pasted prompt
+    const versionId = await ctx.db.insert("promptVersions", {
+      projectId,
+      versionNumber: 1,
+      userMessageTemplate: args.promptText,
+      status: "draft",
+      createdById: userId,
+    });
+
+    return { projectId, versionId };
+  },
+});
+
 export const list = query({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args) => {

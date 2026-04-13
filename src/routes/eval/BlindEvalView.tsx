@@ -6,6 +6,8 @@ import { AnnotatedEditor } from "@/components/tiptap/AnnotatedEditor";
 import { BlindLabelBadge } from "@/components/BlindLabelBadge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PreferenceRating } from "@/components/PreferenceRating";
+import { RunComment } from "@/components/RunComment";
 import { ArrowLeft, Send } from "lucide-react";
 
 export function BlindEvalView() {
@@ -120,18 +122,18 @@ export function BlindEvalView() {
       {/* Instruction card */}
       <div className="px-4 py-3 bg-muted/30 border-b">
         <p className="text-sm text-muted-foreground">
-          Leave feedback on each output by selecting text and commenting.
+          Rate each output and leave feedback by selecting text and commenting.
           Outputs are labeled A/B/C to remove bias. Submit when you're done.
         </p>
       </div>
 
       {/* Three-column output grid */}
-      <div className="flex-1 overflow-hidden p-4">
-        <div className="grid grid-cols-3 gap-4 h-full">
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div className="grid grid-cols-3 gap-4 min-h-[400px]">
           {data.outputs.map((output) => (
             <div
               key={output.blindLabel}
-              className="flex flex-col rounded-lg border bg-card h-full"
+              className="flex flex-col rounded-lg border bg-card"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-3 py-2 border-b">
@@ -168,9 +170,21 @@ export function BlindEvalView() {
                   }}
                 />
               </div>
+
+              {/* Preference rating */}
+              <div className="px-3 py-2 border-t">
+                <PreferenceRating
+                  mode="eval"
+                  opaqueToken={opaqueRunToken!}
+                  blindLabel={output.blindLabel}
+                />
+              </div>
             </div>
           ))}
         </div>
+
+        {/* General comment section */}
+        <RunComment mode="eval" opaqueToken={opaqueRunToken!} />
       </div>
     </div>
   );

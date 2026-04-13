@@ -9,6 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { FeedbackSheet } from "@/components/FeedbackSheet";
 import { InsightsPanel } from "@/components/InsightsPanel";
+import { PreferenceRating } from "@/components/PreferenceRating";
+import { PreferenceAggregate } from "@/components/PreferenceAggregate";
+import { RunComment } from "@/components/RunComment";
+import { RunCommentList } from "@/components/RunCommentList";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +79,11 @@ export function RunView() {
               <RunStatusPill status={run.status} />
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-              <span>Test: {run.testCaseName ?? "—"}</span>
+              <span>
+                {run.isQuickRun
+                  ? <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[10px] font-medium">Quick run</span>
+                  : `Test: ${run.testCaseName ?? "—"}`}
+              </span>
               {run.mode === "mix" ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 text-[10px] font-medium">
                   Mix & Match
@@ -151,17 +159,39 @@ export function RunView() {
           {run.outputs.map((output) => {
             const isMix = run.mode === "mix";
             return (
-              <StreamingOutputPanel
-                key={output._id}
-                output={output}
-                runStatus={run.status}
-                canAnnotate={true}
-                resolvedModel={isMix ? (output.model ?? run.model) : undefined}
-                resolvedTemperature={isMix ? (output.temperature ?? run.temperature) : undefined}
-              />
+              <div key={output._id} className="flex flex-col gap-2">
+                <StreamingOutputPanel
+                  output={output}
+                  runStatus={run.status}
+                  canAnnotate={true}
+                  resolvedModel={isMix ? (output.model ?? run.model) : undefined}
+                  resolvedTemperature={isMix ? (output.temperature ?? run.temperature) : undefined}
+                />
+                {run.status === "completed" && (
+                  <div className="flex items-center justify-between px-1">
+                    <PreferenceRating
+                      mode="auth"
+                      outputId={output._id}
+                      runId={runId as Id<"promptRuns">}
+                    />
+                    <PreferenceAggregate
+                      runId={runId as Id<"promptRuns">}
+                      outputId={output._id as string}
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
+
+        {/* General run comments */}
+        {run.status === "completed" && (
+          <div className="space-y-3">
+            <RunComment mode="auth" runId={runId as Id<"promptRuns">} />
+            <RunCommentList runId={runId as Id<"promptRuns">} />
+          </div>
+        )}
 
         {/* Post-run AI insights (mix-mode only) */}
         {run.mode === "mix" && run.status === "completed" && (

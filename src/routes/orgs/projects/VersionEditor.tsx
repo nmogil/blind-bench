@@ -47,6 +47,7 @@ import {
   Shield,
   Sparkles,
 } from "lucide-react";
+import { QuickRunInputs } from "@/components/QuickRunInputs";
 import { cn } from "@/lib/utils";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
 
@@ -112,6 +113,10 @@ export function VersionEditor() {
   ]);
   const { models: catalogModels } = useModelCatalog();
 
+  // M12: Quick run state
+  const [quickRunMode, setQuickRunMode] = useState(false);
+  const [inlineVarValues, setInlineVarValues] = useState<Record<string, string>>({});
+
   const [feedbackMode, setFeedbackMode] = useState(false);
 
   // Optimization queries
@@ -157,6 +162,28 @@ export function VersionEditor() {
       testCases?.find((tc) => tc._id === selectedTestCaseId)?.attachmentIds
         ?.length);
 
+  // Default to quick run mode when no test cases exist
+  useEffect(() => {
+    if (testCases !== undefined && testCases.length === 0) {
+      setQuickRunMode(true);
+    }
+  }, [testCases]);
+
+  // Pre-fill inline variables with defaults
+  useEffect(() => {
+    if (variables && quickRunMode) {
+      const defaults: Record<string, string> = {};
+      for (const v of variables) {
+        if (v.defaultValue && !inlineVarValues[v.name]) {
+          defaults[v.name] = v.defaultValue;
+        }
+      }
+      if (Object.keys(defaults).length > 0) {
+        setInlineVarValues((prev) => ({ ...defaults, ...prev }));
+      }
+    }
+  }, [variables, quickRunMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Initialize form state when version loads
   useEffect(() => {
     if (!version) return;
@@ -188,13 +215,18 @@ export function VersionEditor() {
   const handleRun = useCallback(async () => {
     const isMix = runMode === "mix";
     const effectiveModel = isMix ? slotConfigs[0]?.model ?? "" : selectedModel;
-    if (!versionId || !selectedTestCaseId || !effectiveModel || running) return;
+    const isQuick = quickRunMode;
+
+    if (!versionId || !effectiveModel || running) return;
+    if (!isQuick && !selectedTestCaseId) return;
+
     setRunning(true);
     setError("");
     try {
       const runId = await executeRun({
         versionId: versionId as Id<"promptVersions">,
-        testCaseId: selectedTestCaseId as Id<"testCases">,
+        testCaseId: isQuick ? undefined : (selectedTestCaseId as Id<"testCases">),
+        inlineVariables: isQuick ? inlineVarValues : undefined,
         model: effectiveModel,
         temperature: isMix ? slotConfigs[0]?.temperature ?? 0.7 : temperature,
         maxTokens,
@@ -222,6 +254,8 @@ export function VersionEditor() {
     projectId,
     runMode,
     slotConfigs,
+    quickRunMode,
+    inlineVarValues,
   ]);
 
   // Cmd+S to save, Cmd+Enter to run
@@ -308,7 +342,15 @@ export function VersionEditor() {
   // Determine run button disabled reason
   const runDisabledReason = (() => {
     if (!keyStatus?.hasKey) return "Set your OpenRouter key to run prompts.";
-    if (!selectedTestCaseId) return "Select a test case to run this prompt.";
+    if (quickRunMode) {
+      // Check required variables have values
+      const missingVar = variables?.find(
+        (v) => v.required && !inlineVarValues[v.name]?.trim(),
+      );
+      if (missingVar) return `Fill in required variable "${missingVar.name}".`;
+    } else {
+      if (!selectedTestCaseId) return "Select a test case to run this prompt.";
+    }
     if (runMode === "mix") {
       const missingModel = slotConfigs.find((s) => !s.model);
       if (missingModel) return `Select a model for slot ${missingModel.label}.`;
@@ -654,45 +696,79 @@ export function VersionEditor() {
             Run config
           </h3>
 
-          {/* Test case selector */}
+          {/* Quick run / Test case toggle + inputs */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Test case</Label>
-            <Select
-              value={selectedTestCaseId}
-              onValueChange={(v) => { if (v) setSelectedTestCaseId(v); }}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue
-                  placeholder={
-                    testCases && testCases.length > 0
-                      ? "Select test case"
-                      : "No test cases"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {testCases?.map((tc) => (
-                  <SelectItem key={tc._id} value={tc._id}>
-                    {tc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {testCases && testCases.length === 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                className={cn(
+                  "text-xs font-medium px-2 py-0.5 rounded",
+                  quickRunMode
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setQuickRunMode(true)}
+              >
+                Quick run
+              </button>
+              <button
+                className={cn(
+                  "text-xs font-medium px-2 py-0.5 rounded",
+                  !quickRunMode
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setQuickRunMode(false)}
+              >
+                Test case
+              </button>
+            </div>
+
+            {quickRunMode ? (
+              <QuickRunInputs
+                variables={variables ?? []}
+                values={inlineVarValues}
+                onChange={setInlineVarValues}
+              />
+            ) : (
               <>
-                <OnboardingCallout
-                  calloutKey="onboarding_add_test_case"
-                  prerequisiteDismissed="onboarding_write_template"
+                <Select
+                  value={selectedTestCaseId}
+                  onValueChange={(v) => { if (v) setSelectedTestCaseId(v); }}
                 >
-                  Create a test case with sample inputs, then come back and
-                  click Run to see 3 outputs side by side.
-                </OnboardingCallout>
-                <Link
-                  to={`/orgs/${orgSlug}/projects/${projectId}/test-cases`}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Create a test case
-                </Link>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue
+                      placeholder={
+                        testCases && testCases.length > 0
+                          ? "Select test case"
+                          : "No test cases"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {testCases?.map((tc) => (
+                      <SelectItem key={tc._id} value={tc._id}>
+                        {tc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {testCases && testCases.length === 0 && (
+                  <>
+                    <OnboardingCallout
+                      calloutKey="onboarding_add_test_case"
+                      prerequisiteDismissed="onboarding_write_template"
+                    >
+                      Create a test case with sample inputs, then come back and
+                      click Run to see 3 outputs side by side.
+                    </OnboardingCallout>
+                    <Link
+                      to={`/orgs/${orgSlug}/projects/${projectId}/test-cases`}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Create a test case
+                    </Link>
+                  </>
+                )}
               </>
             )}
           </div>

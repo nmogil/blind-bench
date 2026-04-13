@@ -2,6 +2,21 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth, requireProjectRole } from "./lib/auth";
 
+const tagsValidator = v.optional(
+  v.array(
+    v.union(
+      v.literal("accuracy"),
+      v.literal("tone"),
+      v.literal("length"),
+      v.literal("relevance"),
+      v.literal("safety"),
+      v.literal("format"),
+      v.literal("clarity"),
+      v.literal("other"),
+    ),
+  ),
+);
+
 // ---------------------------------------------------------------------------
 // Output Feedback
 // ---------------------------------------------------------------------------
@@ -15,6 +30,7 @@ export const addOutputFeedback = mutation({
       highlightedText: v.string(),
       comment: v.string(),
     }),
+    tags: tagsValidator,
   },
   handler: async (ctx, args) => {
     const output = await ctx.db.get(args.outputId);
@@ -33,6 +49,7 @@ export const addOutputFeedback = mutation({
       outputId: args.outputId,
       userId,
       annotationData: args.annotationData,
+      tags: args.tags,
     });
   },
 });
@@ -74,6 +91,7 @@ export const updateOutputFeedback = mutation({
   args: {
     feedbackId: v.id("outputFeedback"),
     comment: v.string(),
+    tags: tagsValidator,
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
@@ -81,9 +99,12 @@ export const updateOutputFeedback = mutation({
     if (!fb) throw new Error("Feedback not found");
     if (fb.userId !== userId) throw new Error("Permission denied");
 
-    await ctx.db.patch(args.feedbackId, {
+    const updates: Record<string, unknown> = {
       annotationData: { ...fb.annotationData, comment: args.comment },
-    });
+    };
+    if (args.tags !== undefined) updates.tags = args.tags;
+
+    await ctx.db.patch(args.feedbackId, updates);
   },
 });
 
@@ -116,6 +137,7 @@ export const addPromptFeedback = mutation({
       highlightedText: v.string(),
       comment: v.string(),
     }),
+    tags: tagsValidator,
   },
   handler: async (ctx, args) => {
     const version = await ctx.db.get(args.promptVersionId);
@@ -131,6 +153,7 @@ export const addPromptFeedback = mutation({
       userId,
       targetField: args.targetField,
       annotationData: args.annotationData,
+      tags: args.tags,
     });
   },
 });
@@ -170,6 +193,7 @@ export const updatePromptFeedback = mutation({
   args: {
     feedbackId: v.id("promptFeedback"),
     comment: v.string(),
+    tags: tagsValidator,
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
@@ -177,9 +201,12 @@ export const updatePromptFeedback = mutation({
     if (!fb) throw new Error("Feedback not found");
     if (fb.userId !== userId) throw new Error("Permission denied");
 
-    await ctx.db.patch(args.feedbackId, {
+    const updates: Record<string, unknown> = {
       annotationData: { ...fb.annotationData, comment: args.comment },
-    });
+    };
+    if (args.tags !== undefined) updates.tags = args.tags;
+
+    await ctx.db.patch(args.feedbackId, updates);
   },
 });
 
@@ -209,6 +236,7 @@ export const addOutputFeedbackByToken = mutation({
       highlightedText: v.string(),
       comment: v.string(),
     }),
+    tags: tagsValidator,
   },
   handler: async (ctx, args) => {
     // Resolve token
@@ -235,6 +263,69 @@ export const addOutputFeedbackByToken = mutation({
       outputId: output._id,
       userId,
       annotationData: args.annotationData,
+      tags: args.tags,
     });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Tag distribution aggregation (M11)
+// ---------------------------------------------------------------------------
+
+export const getTagDistribution = query({
+  args: { versionId: v.id("promptVersions") },
+  handler: async (ctx, args) => {
+    const version = await ctx.db.get(args.versionId);
+    if (!version) return {};
+
+    await requireProjectRole(ctx, version.projectId, ["owner", "editor"]);
+
+    const counts: Record<string, number> = {};
+
+    // Count from output feedback across all runs for this version
+    const runs = await ctx.db
+      .query("promptRuns")
+      .withIndex("by_version", (q) =>
+        q.eq("promptVersionId", args.versionId),
+      )
+      .take(200);
+
+    for (const run of runs) {
+      const outputs = await ctx.db
+        .query("runOutputs")
+        .withIndex("by_run", (q) => q.eq("runId", run._id))
+        .take(10);
+      for (const output of outputs) {
+        const feedback = await ctx.db
+          .query("outputFeedback")
+          .withIndex("by_output", (q) => q.eq("outputId", output._id))
+          .take(200);
+        for (const fb of feedback) {
+          if (fb.tags) {
+            for (const tag of fb.tags) {
+              counts[tag] = (counts[tag] ?? 0) + 1;
+            }
+          }
+        }
+      }
+    }
+
+    // Count from prompt feedback
+    const promptFb = await ctx.db
+      .query("promptFeedback")
+      .withIndex("by_version", (q) =>
+        q.eq("promptVersionId", args.versionId),
+      )
+      .take(200);
+
+    for (const fb of promptFb) {
+      if (fb.tags) {
+        for (const tag of fb.tags) {
+          counts[tag] = (counts[tag] ?? 0) + 1;
+        }
+      }
+    }
+
+    return counts;
   },
 });

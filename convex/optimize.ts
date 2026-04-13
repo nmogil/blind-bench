@@ -43,7 +43,7 @@ export const requestOptimization = mutation({
       throw new Error("An optimization is already in progress for this project.");
     }
 
-    // Check that feedback exists
+    // Check that feedback exists (annotations, preferences, or run comments)
     const promptFb = await ctx.db
       .query("promptFeedback")
       .withIndex("by_version", (q) =>
@@ -51,7 +51,7 @@ export const requestOptimization = mutation({
       )
       .take(1);
 
-    // For output feedback, check runs for this version
+    // For output feedback + preferences + comments, check runs for this version
     const runs = await ctx.db
       .query("promptRuns")
       .withIndex("by_version", (q) =>
@@ -59,26 +59,44 @@ export const requestOptimization = mutation({
       )
       .take(200);
 
-    let hasOutputFeedback = false;
+    let hasFeedback = promptFb.length > 0;
     for (const run of runs) {
-      if (hasOutputFeedback) break;
+      if (hasFeedback) break;
+
+      // Check output annotations
       const outputs = await ctx.db
         .query("runOutputs")
         .withIndex("by_run", (q) => q.eq("runId", run._id))
         .take(10);
       for (const output of outputs) {
+        if (hasFeedback) break;
         const fb = await ctx.db
           .query("outputFeedback")
           .withIndex("by_output", (q) => q.eq("outputId", output._id))
           .take(1);
-        if (fb.length > 0) {
-          hasOutputFeedback = true;
-          break;
-        }
+        if (fb.length > 0) { hasFeedback = true; break; }
+      }
+
+      // Check preference ratings
+      if (!hasFeedback) {
+        const prefs = await ctx.db
+          .query("outputPreferences")
+          .withIndex("by_run", (q) => q.eq("runId", run._id))
+          .take(1);
+        if (prefs.length > 0) hasFeedback = true;
+      }
+
+      // Check run comments
+      if (!hasFeedback) {
+        const comments = await ctx.db
+          .query("runComments")
+          .withIndex("by_run", (q) => q.eq("runId", run._id))
+          .take(1);
+        if (comments.length > 0) hasFeedback = true;
       }
     }
 
-    if (promptFb.length === 0 && !hasOutputFeedback) {
+    if (!hasFeedback) {
       throw new Error("No feedback to optimize from. Add feedback first.");
     }
 
@@ -179,6 +197,17 @@ export const acceptOptimization = mutation({
       reviewedAt: Date.now(),
       resultingVersionId: newVersionId,
     });
+
+    // M10: Notify evaluators that their feedback was used
+    await ctx.scheduler.runAfter(
+      0,
+      internal.evaluatorNotifications.notifyEvaluators,
+      {
+        projectId: request.projectId,
+        type: "feedback_used" as const,
+        message: "Your feedback helped improve the prompt. A new version was created.",
+      },
+    );
 
     return newVersionId;
   },
@@ -342,7 +371,7 @@ export const countFeedbackForVersion = query({
   args: { versionId: v.id("promptVersions") },
   handler: async (ctx, args) => {
     const version = await ctx.db.get(args.versionId);
-    if (!version) return { outputFeedbackCount: 0, promptFeedbackCount: 0, total: 0 };
+    if (!version) return { outputFeedbackCount: 0, promptFeedbackCount: 0, preferenceCount: 0, commentCount: 0, total: 0 };
 
     await requireProjectRole(ctx, version.projectId, ["owner", "editor"]);
 
@@ -354,8 +383,11 @@ export const countFeedbackForVersion = query({
       )
       .take(200);
 
-    // Count output feedback across all runs for this version
+    // Count output feedback + preferences + comments across all runs
     let outputFeedbackCount = 0;
+    let preferenceCount = 0;
+    let commentCount = 0;
+
     const runs = await ctx.db
       .query("promptRuns")
       .withIndex("by_version", (q) =>
@@ -375,12 +407,28 @@ export const countFeedbackForVersion = query({
           .take(200);
         outputFeedbackCount += fb.length;
       }
+
+      // Count preferences for this run
+      const prefs = await ctx.db
+        .query("outputPreferences")
+        .withIndex("by_run", (q) => q.eq("runId", run._id))
+        .take(200);
+      preferenceCount += prefs.length;
+
+      // Count comments for this run
+      const comments = await ctx.db
+        .query("runComments")
+        .withIndex("by_run", (q) => q.eq("runId", run._id))
+        .take(100);
+      commentCount += comments.length;
     }
 
     return {
       outputFeedbackCount,
       promptFeedbackCount: promptFb.length,
-      total: outputFeedbackCount + promptFb.length,
+      preferenceCount,
+      commentCount,
+      total: outputFeedbackCount + promptFb.length + preferenceCount + commentCount,
     };
   },
 });

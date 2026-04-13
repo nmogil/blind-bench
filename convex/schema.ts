@@ -114,7 +114,9 @@ const schema = defineSchema({
   promptRuns: defineTable({
     projectId: v.id("projects"),
     promptVersionId: v.id("promptVersions"),
-    testCaseId: v.id("testCases"),
+    testCaseId: v.optional(v.id("testCases")),
+    // M12: Quick run — inline variables when no test case
+    inlineVariables: v.optional(v.record(v.string(), v.string())),
     model: v.string(),
     temperature: v.number(),
     maxTokens: v.optional(v.number()),
@@ -168,6 +170,21 @@ const schema = defineSchema({
       highlightedText: v.string(),
       comment: v.string(),
     }),
+    // M11: optional feedback tags
+    tags: v.optional(
+      v.array(
+        v.union(
+          v.literal("accuracy"),
+          v.literal("tone"),
+          v.literal("length"),
+          v.literal("relevance"),
+          v.literal("safety"),
+          v.literal("format"),
+          v.literal("clarity"),
+          v.literal("other"),
+        ),
+      ),
+    ),
   })
     .index("by_output", ["outputId"])
     .index("by_user", ["userId"]),
@@ -185,6 +202,21 @@ const schema = defineSchema({
       highlightedText: v.string(),
       comment: v.string(),
     }),
+    // M11: optional feedback tags
+    tags: v.optional(
+      v.array(
+        v.union(
+          v.literal("accuracy"),
+          v.literal("tone"),
+          v.literal("length"),
+          v.literal("relevance"),
+          v.literal("safety"),
+          v.literal("format"),
+          v.literal("clarity"),
+          v.literal("other"),
+        ),
+      ),
+    ),
   })
     .index("by_version", ["promptVersionId"])
     .index("by_user", ["userId"]),
@@ -197,6 +229,82 @@ const schema = defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_run", ["runId"]),
+
+  // M10: Run Comments (general run-level feedback)
+  runComments: defineTable({
+    runId: v.id("promptRuns"),
+    userId: v.id("users"),
+    comment: v.string(),
+  })
+    .index("by_run", ["runId"])
+    .index("by_run_user", ["runId", "userId"]),
+
+  // M10: Output Preferences (preference ranking)
+  outputPreferences: defineTable({
+    runId: v.id("promptRuns"),
+    outputId: v.id("runOutputs"),
+    userId: v.id("users"),
+    rating: v.union(
+      v.literal("best"),
+      v.literal("acceptable"),
+      v.literal("weak"),
+    ),
+  })
+    .index("by_run_user", ["runId", "userId"])
+    .index("by_output", ["outputId"])
+    .index("by_run", ["runId"]),
+
+  // M10: Evaluator Notifications
+  evaluatorNotifications: defineTable({
+    userId: v.id("users"),
+    projectId: v.id("projects"),
+    type: v.union(v.literal("new_run"), v.literal("feedback_used")),
+    message: v.string(),
+    read: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_read", ["userId", "read"]),
+
+  // M11: AI Feedback Digests
+  feedbackDigests: defineTable({
+    projectId: v.id("projects"),
+    promptVersionId: v.id("promptVersions"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    summary: v.optional(v.string()),
+    themes: v.optional(
+      v.array(
+        v.object({
+          title: v.string(),
+          severity: v.union(
+            v.literal("high"),
+            v.literal("medium"),
+            v.literal("low"),
+          ),
+          description: v.string(),
+          feedbackCount: v.number(),
+        }),
+      ),
+    ),
+    preferenceBreakdown: v.optional(
+      v.object({
+        totalRatings: v.number(),
+        bestCount: v.number(),
+        acceptableCount: v.number(),
+        weakCount: v.number(),
+      }),
+    ),
+    recommendations: v.optional(v.array(v.string())),
+    tagSummary: v.optional(v.record(v.string(), v.number())),
+    errorMessage: v.optional(v.string()),
+    requestedById: v.id("users"),
+  })
+    .index("by_version", ["promptVersionId"])
+    .index("by_project_and_status", ["projectId", "status"]),
 
   // M5: Optimization
   optimizationRequests: defineTable({
