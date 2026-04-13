@@ -1,4 +1,5 @@
 import { useQuery } from "convex/react";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { useProject } from "@/contexts/ProjectContext";
 import { EmptyState } from "@/components/EmptyState";
@@ -9,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { FileText } from "lucide-react";
 
 export function ProjectHome() {
+  const { orgSlug } = useParams<{ orgSlug: string }>();
   const { project, projectId, role } = useProject();
   const collaborators = useQuery(api.projects.listCollaborators, { projectId });
 
@@ -65,12 +67,12 @@ export function ProjectHome() {
           </div>
         )}
         {role === "owner" && (
-          <a
-            href="settings/collaborators"
+          <Link
+            to={`/orgs/${orgSlug}/projects/${projectId}/settings/collaborators`}
             className="mt-3 block text-xs text-primary hover:underline"
           >
             Manage collaborators
-          </a>
+          </Link>
         )}
       </div>
     </div>
