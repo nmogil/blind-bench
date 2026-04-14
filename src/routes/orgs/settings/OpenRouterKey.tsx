@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { Navigate } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
@@ -36,7 +36,7 @@ export function OpenRouterKey() {
 function OpenRouterKeyForm() {
   const { orgId } = useOrg();
   const keyStatus = useQuery(api.openRouterKeys.hasKey, { orgId });
-  const setKeyMutation = useMutation(api.openRouterKeys.setKey);
+  const setKeyAction = useAction(api.openRouterKeys.setKey);
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -58,7 +58,7 @@ function OpenRouterKeyForm() {
     setError("");
     setSuccess(false);
     try {
-      await setKeyMutation({ orgId, key: key.trim() });
+      await setKeyAction({ orgId, key: key.trim() });
       setKey("");
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);

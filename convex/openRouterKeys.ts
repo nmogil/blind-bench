@@ -1,20 +1,71 @@
 import { v } from "convex/values";
-import { mutation, query, internalQuery } from "./_generated/server";
+import { action, query, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 import { requireOrgRole } from "./lib/auth";
 import { encrypt, decrypt } from "./lib/crypto";
 
-export const setKey = mutation({
+export const verifyOrgOwner = internalQuery({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    const { userId } = await requireOrgRole(ctx, args.orgId, ["owner"]);
+    return userId;
+  },
+});
+
+export const storeEncryptedKey = internalMutation({
+  args: {
+    orgId: v.id("organizations"),
+    encryptedKey: v.string(),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("openRouterKeys")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.orgId))
+      .unique();
+
+    const isRotation = !!existing;
+    const now = Date.now();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        encryptedKey: args.encryptedKey,
+        lastRotatedAt: now,
+        createdById: args.userId,
+      });
+    } else {
+      await ctx.db.insert("openRouterKeys", {
+        organizationId: args.orgId,
+        encryptedKey: args.encryptedKey,
+        lastRotatedAt: now,
+        createdById: args.userId,
+      });
+    }
+
+    await ctx.scheduler.runAfter(0, internal.analyticsActions.track, {
+      event: "api key configured",
+      distinctId: args.userId as string,
+      properties: { org_id: args.orgId as string, is_rotation: isRotation },
+    });
+  },
+});
+
+export const setKey = action({
   args: {
     orgId: v.id("organizations"),
     key: v.string(),
   },
   handler: async (ctx, args) => {
-    const { userId } = await requireOrgRole(ctx, args.orgId, ["owner"]);
-
     if (!args.key.trim()) {
       throw new Error("API key cannot be empty");
     }
+
+    // Auth check via internal query (actions can't use ctx.db directly)
+    const userId: Id<"users"> = await ctx.runQuery(
+      internal.openRouterKeys.verifyOrgOwner,
+      { orgId: args.orgId },
+    );
 
     const secret = process.env.OPENROUTER_KEY_ENCRYPTION_SECRET;
     if (!secret) {
@@ -22,33 +73,11 @@ export const setKey = mutation({
     }
 
     const encryptedKey = await encrypt(args.key, secret);
-    const now = Date.now();
 
-    const existing = await ctx.db
-      .query("openRouterKeys")
-      .withIndex("by_org", (q) => q.eq("organizationId", args.orgId))
-      .unique();
-
-    const isRotation = !!existing;
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        encryptedKey,
-        lastRotatedAt: now,
-        createdById: userId,
-      });
-    } else {
-      await ctx.db.insert("openRouterKeys", {
-        organizationId: args.orgId,
-        encryptedKey,
-        lastRotatedAt: now,
-        createdById: userId,
-      });
-    }
-
-    await ctx.scheduler.runAfter(0, internal.analyticsActions.track, {
-      event: "api key configured",
-      distinctId: userId as string,
-      properties: { org_id: args.orgId as string, is_rotation: isRotation },
+    await ctx.runMutation(internal.openRouterKeys.storeEncryptedKey, {
+      orgId: args.orgId,
+      encryptedKey,
+      userId,
     });
   },
 });
