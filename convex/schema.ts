@@ -421,6 +421,16 @@ const schema = defineSchema({
     .index("by_link", ["shareableLinkId"])
     .index("by_session", ["shareableLinkId", "sessionId"]),
 
+  // Landing page: anonymous demo votes
+  demoVotes: defineTable({
+    choice: v.union(v.literal("A"), v.literal("B")),
+  }),
+
+  demoVoteStats: defineTable({
+    countA: v.number(),
+    countB: v.number(),
+  }),
+
   // M8: AI Run Assistant — post-run insights
   runInsights: defineTable({
     runId: v.id("promptRuns"),
