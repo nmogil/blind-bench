@@ -126,7 +126,7 @@ export function TestCaseEditor() {
         <h2 className="text-sm font-medium">Variable values</h2>
         {variables.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No variables defined for this project yet. Add variables first.
+            No variables defined for this prompt yet. Add variables first.
           </p>
         ) : (
           <div className="space-y-3">

@@ -63,7 +63,7 @@ export function WelcomeCard({ onCreateProject }: WelcomeCardProps) {
         </div>
 
         <Button className="mt-6" onClick={onCreateProject}>
-          Create your first project
+          Create your first prompt
         </Button>
       </CardContent>
     </Card>

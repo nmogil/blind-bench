@@ -70,7 +70,7 @@ export function NewProjectDialog({
       resetState();
       navigate(`/orgs/${org.slug}/projects/${projectId}`);
     } catch (err) {
-      setError(friendlyError(err, "Failed to create project."));
+      setError(friendlyError(err, "Failed to create prompt."));
     } finally {
       setSaving(false);
     }
@@ -97,7 +97,7 @@ export function NewProjectDialog({
         `/orgs/${org.slug}/projects/${result.projectId}/versions/${result.versionId}`,
       );
     } catch (err) {
-      setError(friendlyError(err, "Failed to create project."));
+      setError(friendlyError(err, "Failed to create prompt."));
     } finally {
       setSaving(false);
     }
@@ -108,7 +108,7 @@ export function NewProjectDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {step === "info" ? "New project" : "Paste your prompt"}
+            {step === "info" ? "New prompt" : "Paste your prompt"}
           </DialogTitle>
         </DialogHeader>
 
@@ -120,7 +120,7 @@ export function NewProjectDialog({
                 id="project-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My prompt project"
+                placeholder="My prompt"
                 autoFocus
               />
             </div>
@@ -130,7 +130,7 @@ export function NewProjectDialog({
                 id="project-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What this project is about"
+                placeholder="What this prompt is about"
               />
             </div>
             <div>
@@ -139,7 +139,7 @@ export function NewProjectDialog({
                   checked={seedSample}
                   onCheckedChange={(checked) => setSeedSample(!!checked)}
                 />
-                <span className="text-sm">Start with a sample project</span>
+                <span className="text-sm">Start with a sample prompt</span>
               </label>
               <p className="mt-1 ml-6 text-xs text-muted-foreground">
                 Includes a sample prompt, variable, and test case so you can try

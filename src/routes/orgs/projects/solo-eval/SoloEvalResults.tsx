@@ -205,7 +205,7 @@ export function SoloEvalResults() {
           </Button>
         </Link>
         <Link to={basePath}>
-          <Button variant="outline">Back to Project</Button>
+          <Button variant="outline">Back to Prompt</Button>
         </Link>
       </div>
     </div>

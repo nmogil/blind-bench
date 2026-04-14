@@ -26,7 +26,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { key: "Enter", label: "Enter", description: "Open focused item", contexts: ["org-home", "versions", "test-cases"] },
 
   // Go-to sequences
-  { key: "G then P", label: "G P", description: "Go to projects", contexts: ["project"] },
+  { key: "G then P", label: "G P", description: "Go to prompts", contexts: ["project"] },
   { key: "G then R", label: "G R", description: "Go to runs", contexts: ["project"] },
   { key: "G then T", label: "G T", description: "Go to test cases", contexts: ["project"] },
   { key: "G then V", label: "G V", description: "Go to versions", contexts: ["project"] },

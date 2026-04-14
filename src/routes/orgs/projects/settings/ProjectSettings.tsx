@@ -68,9 +68,9 @@ export function ProjectSettings() {
     <div className="flex">
       <ProjectSettingsNav />
       <div className="p-6 max-w-2xl flex-1">
-      <h1 className="text-2xl font-bold">Project settings</h1>
+      <h1 className="text-2xl font-bold">Prompt settings</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manage project details.
+        Manage prompt details.
       </p>
 
       <form onSubmit={handleSave} className="mt-6 space-y-4">
@@ -88,7 +88,7 @@ export function ProjectSettings() {
             id="project-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What this project is about"
+            placeholder="What this prompt is about"
           />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -106,10 +106,10 @@ export function ProjectSettings() {
         </CardHeader>
         <CardContent>
           <Button variant="destructive" onClick={handleDelete}>
-            Delete project
+            Delete prompt
           </Button>
           <p className="mt-2 text-xs text-muted-foreground">
-            This will permanently delete the project and all its data.
+            This will permanently delete the prompt and all its data.
           </p>
         </CardContent>
       </Card>

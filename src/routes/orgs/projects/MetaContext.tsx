@@ -34,7 +34,7 @@ interface QAPair {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "What domain does this project operate in?",
+  "What domain does this prompt operate in?",
   "What tone should the model use?",
   "Who is the end user?",
   "What should the model never do?",
@@ -154,7 +154,7 @@ export function MetaContext() {
         <EmptyState
           icon={MessageSquare}
           heading="No meta context"
-          description="Answer questions about your project's domain, audience, and tone. When you ask the AI to optimize your prompt later, these answers guide the rewrite so it stays on-target."
+          description="Answer questions about your prompt's domain, audience, and tone. When you ask the AI to optimize your prompt later, these answers guide the rewrite so it stays on-target."
           action={{ label: "Add question", onClick: () => addQuestion() }}
         />
       ) : (
@@ -262,7 +262,7 @@ function SortableQAPair({
         <Input
           value={pair.question}
           onChange={(e) => onUpdate(pair.id, "question", e.target.value)}
-          placeholder="What domain does this project operate in?"
+          placeholder="What domain does this prompt operate in?"
           className="font-medium"
         />
         <Textarea

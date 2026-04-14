@@ -84,7 +84,7 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search projects, versions, actions..." />
+      <CommandInput placeholder="Search prompts, versions, actions..." />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
 
@@ -92,7 +92,7 @@ export function CommandPalette() {
         <CommandGroup heading="Actions">
           <CommandItem onSelect={() => go(basePath)}>
             <FolderOpen className="mr-2 h-4 w-4" />
-            Go to projects
+            Go to prompts
             <CommandShortcut>G P</CommandShortcut>
           </CommandItem>
           {projectPath && canBrowseProject && (
@@ -155,7 +155,7 @@ export function CommandPalette() {
 
         {/* Projects */}
         {projects && projects.length > 0 && (
-          <CommandGroup heading="Projects">
+          <CommandGroup heading="Prompts">
             {projects.map((p) => (
               <CommandItem
                 key={p._id}

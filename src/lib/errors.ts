@@ -9,7 +9,7 @@ const friendlyMessages: Record<string, string> = {
   "Cannot remove the sole owner":
     "You can't remove the only owner. Transfer ownership first.",
   "Cannot remove the sole project owner":
-    "You can't remove the only project owner. Transfer ownership first.",
+    "You can't remove the only prompt owner. Transfer ownership first.",
   "User must be a member of the organization before being added to a project":
     "This person must be an organization member first.",
   "User is not a member of this organization": "Member not found.",
@@ -37,7 +37,7 @@ const friendlyMessages: Record<string, string> = {
   "Encryption not configured":
     "Encryption is not configured. Contact your administrator.",
   "An optimization is already in progress":
-    "An optimization is already running for this project. Wait for it to finish.",
+    "An optimization is already running for this prompt. Wait for it to finish.",
   "No feedback to optimize from":
     "No feedback to optimize from. Add feedback first.",
   "Cannot cancel a running optimization":

@@ -86,7 +86,7 @@ export function ProjectHome() {
             <div className="rounded-lg border bg-green-50/50 dark:bg-green-950/10 p-4">
               <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
                 <CheckCircle2 className="h-5 w-5" />
-                <span className="font-medium">Project is set up</span>
+                <span className="font-medium">Prompt is set up</span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 You're ready to write, run, and iterate on your prompt.

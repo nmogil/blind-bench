@@ -300,7 +300,7 @@ function TestCasePreview({
       {variables.length === 0 &&
       Object.keys(testCase.variableValues).length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No variables defined for this project yet.
+          No variables defined for this prompt yet.
         </p>
       ) : (
         <Table>

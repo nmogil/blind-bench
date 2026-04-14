@@ -88,7 +88,7 @@ export function OptimizeConfirmationDialog({
               <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-800 dark:text-amber-300">
                 No meta-context set. Meta-context helps ground the rewrite in
-                your project's intent. You can set it up first, or continue
+                your prompt's intent. You can set it up first, or continue
                 without it.
               </p>
             </div>

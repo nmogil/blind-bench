@@ -43,7 +43,7 @@ export function ProjectCollaborators() {
       <div className="p-6 max-w-3xl flex-1">
         <h1 className="text-2xl font-bold">Collaborators</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage who can access this project and their roles.
+          Manage who can access this prompt and their roles.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Evaluators can only see blinded outputs and leave feedback. They cannot
@@ -223,7 +223,7 @@ function CollaboratorTable({ projectId }: { projectId: Id<"projects"> }) {
                   onClick={() => {
                     if (
                       confirm(
-                        `Remove ${c.name ?? c.email} from this project?`,
+                        `Remove ${c.name ?? c.email} from this prompt?`,
                       )
                     ) {
                       void remove({ projectId, userId: c.userId });

@@ -562,10 +562,10 @@ export function CycleCreator() {
             <div className="rounded-lg border border-dashed p-6 text-center">
               <Users className="mx-auto h-8 w-8 text-muted-foreground/40" />
               <p className="mt-2 text-sm font-medium text-muted-foreground">
-                No evaluators on this project
+                No evaluators on this prompt
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Invite collaborators with the "evaluator" role in project
+                Invite collaborators with the "evaluator" role in prompt
                 settings, then come back to assign them.
               </p>
             </div>

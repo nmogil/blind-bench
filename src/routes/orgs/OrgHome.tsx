@@ -17,7 +17,7 @@ export function OrgHome() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">{org.name}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Your projects</p>
+      <p className="mt-1 text-sm text-muted-foreground">Your prompts</p>
 
       <div className="mt-4">
         <WelcomeCard onCreateProject={openNewProjectDialog} />
@@ -33,8 +33,8 @@ export function OrgHome() {
         ) : projects.length === 0 ? (
           <EmptyState
             icon={FolderOpen}
-            heading="No projects yet"
-            description="A project holds one prompt and all its versions, test cases, and run history. Create one to get started."
+            heading="No prompts yet"
+            description="A prompt holds all its versions, test cases, and run history. Create one to get started."
           />
         ) : (
           <div className="divide-y rounded-lg border">

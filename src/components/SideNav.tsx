@@ -25,7 +25,7 @@ export function SideNav({ onNewProject }: SideNavProps) {
     <nav className="flex w-56 shrink-0 flex-col gap-1 border-r p-3">
       <div className="flex items-center justify-between px-2 pb-1">
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Projects
+          Prompts
         </span>
         <button
           onClick={onNewProject}
@@ -45,7 +45,7 @@ export function SideNav({ onNewProject }: SideNavProps) {
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <p className="px-2 text-xs text-muted-foreground">No projects yet</p>
+        <p className="px-2 text-xs text-muted-foreground">No prompts yet</p>
       ) : (
         projects.map((p) => (
           <NavLink
