@@ -508,7 +508,7 @@ export function VersionEditor() {
               <span className="text-xs font-normal">(optional)</span>
             </button>
             {systemExpanded && (
-              <div className="mt-2">
+              <div className="mt-2 max-h-[400px] overflow-y-auto">
                 {feedbackMode ? (
                   <AnnotatedEditor
                     content={systemMessage}
