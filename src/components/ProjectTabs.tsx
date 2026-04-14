@@ -1,75 +1,74 @@
-import { NavLink, useParams } from "react-router-dom";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { NavLink, useParams, useLocation } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import { cn } from "@/lib/utils";
+import { Settings } from "lucide-react";
 
 const tabs = [
-  { label: "Home", path: "", end: true, primary: true },
-  { label: "Versions", path: "versions", primary: true },
-  { label: "Test Cases", path: "test-cases", primary: true },
-  { label: "Variables", path: "variables", primary: true },
-  { label: "Runs", path: "runs", primary: false },
-  { label: "Cycles", path: "cycles", primary: false },
-  { label: "Compare", path: "compare", primary: false },
-  { label: "Solo Eval", path: "solo-eval", primary: false },
-  { label: "Meta Context", path: "meta-context", primary: false },
-  { label: "Settings", path: "settings", end: false, primary: false },
+  { label: "Editor", path: "versions" },
+  { label: "Run", path: "run" },
+  { label: "Evaluate", path: "evaluate" },
+  { label: "History", path: "history" },
 ];
 
 export function ProjectTabs() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const { projectId, role } = useProject();
+  const location = useLocation();
   const basePath = `/orgs/${orgSlug}/projects/${projectId}`;
 
-  const openCycleCount = useQuery(
-    api.reviewCycles.countOpenForProject,
-    role !== "evaluator" ? { projectId } : "skip",
-  );
-
   return (
-    <div className="flex items-center gap-1 border-b px-4 overflow-x-auto">
-      {tabs.map((tab) => {
-        // Owner-only tabs
-        if (
-          (tab.label === "Settings" || tab.label === "Meta Context") &&
-          role !== "owner"
-        )
-          return null;
-        // Owner/editor only — evaluators cannot use solo eval or cycles
-        if (
-          (tab.label === "Solo Eval" || tab.label === "Cycles") &&
-          role === "evaluator"
-        )
-          return null;
+    <div className="flex items-center border-b px-4">
+      <div className="flex items-center gap-1 flex-1 overflow-x-auto">
+        {tabs.map((tab) => {
+          // Evaluators: hide Run and Editor tabs
+          if (role === "evaluator" && (tab.label === "Run" || tab.label === "Editor"))
+            return null;
+          // Evaluate tab: visible to owner + editor only
+          if (tab.label === "Evaluate" && role === "evaluator")
+            return null;
 
-        return (
-          <NavLink
-            key={tab.label}
-            to={tab.path ? `${basePath}/${tab.path}` : basePath}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                "inline-flex items-center gap-1.5 px-3 py-2.5 text-sm transition-colors border-b-2",
-                isActive
-                  ? "border-primary text-foreground font-medium"
-                  : tab.primary
-                    ? "border-transparent text-muted-foreground hover:text-foreground"
-                    : "border-transparent text-muted-foreground/60 hover:text-muted-foreground",
-              )
-            }
-          >
-            {tab.label}
-            {tab.label === "Cycles" &&
-              openCycleCount &&
-              openCycleCount.count > 0 && (
-                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
-                  {openCycleCount.count}
-                </span>
-              )}
-          </NavLink>
-        );
-      })}
+          const to = `${basePath}/${tab.path}`;
+
+          // Editor tab: match both /versions and /versions/:versionId
+          const isActive =
+            tab.path === "versions"
+              ? location.pathname.startsWith(`${basePath}/versions`)
+              : location.pathname.startsWith(to);
+
+          return (
+            <NavLink
+              key={tab.label}
+              to={to}
+              className={() =>
+                cn(
+                  "inline-flex items-center px-3 py-2.5 text-sm transition-colors border-b-2",
+                  isActive
+                    ? "border-primary text-foreground font-medium"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )
+              }
+            >
+              {tab.label}
+            </NavLink>
+          );
+        })}
+      </div>
+      {role === "owner" && (
+        <NavLink
+          to={`${basePath}/settings`}
+          className={({ isActive }) =>
+            cn(
+              "ml-2 rounded-md p-1.5 transition-colors",
+              isActive
+                ? "text-foreground bg-accent"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+            )
+          }
+          title="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </NavLink>
+      )}
     </div>
   );
 }

@@ -17,7 +17,6 @@ const OrgHome = lazy(() => import("./routes/orgs/OrgHome").then(m => ({ default:
 const OrgSettings = lazy(() => import("./routes/orgs/settings/OrgSettings").then(m => ({ default: m.OrgSettings })));
 const OrgMembers = lazy(() => import("./routes/orgs/settings/OrgMembers").then(m => ({ default: m.OrgMembers })));
 const OpenRouterKey = lazy(() => import("./routes/orgs/settings/OpenRouterKey").then(m => ({ default: m.OpenRouterKey })));
-const ProjectHome = lazy(() => import("./routes/orgs/projects/ProjectHome").then(m => ({ default: m.ProjectHome })));
 const ProjectSettings = lazy(() => import("./routes/orgs/projects/settings/ProjectSettings").then(m => ({ default: m.ProjectSettings })));
 const ProjectCollaborators = lazy(() => import("./routes/orgs/projects/settings/ProjectCollaborators").then(m => ({ default: m.ProjectCollaborators })));
 const Variables = lazy(() => import("./routes/orgs/projects/Variables").then(m => ({ default: m.Variables })));
@@ -46,6 +45,8 @@ const CyclesList = lazy(() => import("./routes/orgs/projects/cycles/CyclesList")
 const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreator").then(m => ({ default: m.CycleCreator })));
 const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail").then(m => ({ default: m.CycleDetail })));
 const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/VersionDashboard").then(m => ({ default: m.VersionDashboard })));
+const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
+const HistoryPage = lazy(() => import("./routes/orgs/projects/HistoryPage").then(m => ({ default: m.HistoryPage })));
 
 export function App() {
   return (
@@ -66,7 +67,7 @@ export function App() {
             <Route path="settings/members" element={<OrgMembers />} />
             <Route path="settings/openrouter-key" element={<OpenRouterKey />} />
             <Route path="projects/:projectId" element={<ProjectLayout />}>
-              <Route index element={<ProjectHome />} />
+              <Route index element={<Navigate to="versions" replace />} />
               <Route path="variables" element={<Variables />} />
               <Route path="test-cases" element={<TestCases />} />
               <Route
@@ -105,6 +106,8 @@ export function App() {
                 path="solo-eval/:sessionId/results"
                 element={<SoloEvalResults />}
               />
+              <Route path="evaluate" element={<EvaluatePage />} />
+              <Route path="history" element={<HistoryPage />} />
               <Route path="meta-context" element={<MetaContext />} />
               <Route path="settings" element={<ProjectSettings />} />
               <Route
