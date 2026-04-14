@@ -1,17 +1,24 @@
 import { useQuery } from "convex/react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
 import { RunStatusPill } from "@/components/RunStatusPill";
 import { Skeleton } from "@/components/ui/skeleton";
+import { buttonVariants } from "@/components/ui/button";
+import { GitCompareArrows, Play } from "lucide-react";
 
 export function RunsList() {
   const { projectId } = useProject();
   const { orgSlug } = useParams<{ orgSlug: string }>();
+  const [searchParams] = useSearchParams();
 
   // Get all versions to query runs
   const versions = useQuery(api.versions.list, { projectId });
+
+  // Check for multi-version comparison context from RunConfigurator
+  const compareParam = searchParams.get("compare");
+  const compareVersionIds = compareParam ? compareParam.split(",") : [];
 
   if (versions === undefined) {
     return (
@@ -24,12 +31,55 @@ export function RunsList() {
     );
   }
 
+  // Resolve compared version numbers for the banner
+  const compareVersionLabels = compareVersionIds
+    .map((id) => {
+      const v = versions.find((ver) => ver._id === id);
+      return v ? `v${v.versionNumber}` : null;
+    })
+    .filter(Boolean);
+
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold">Runs</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        View runs across all versions. Start a run from the version editor.
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Runs</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View and manage runs across all versions.
+          </p>
+        </div>
+        <Link
+          to={`/orgs/${orgSlug}/projects/${projectId}/run`}
+          className={buttonVariants({ size: "sm" })}
+        >
+          <Play className="mr-1.5 h-3.5 w-3.5" />
+          New Run
+        </Link>
+      </div>
+
+      {/* Cycle CTA banner — shown when runs were triggered for multiple versions */}
+      {compareVersionIds.length >= 2 && (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <GitCompareArrows className="h-5 w-5 text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-medium">
+                Comparing {compareVersionLabels.join(" vs ")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Once runs complete, create a review cycle to get blind
+                evaluations.
+              </p>
+            </div>
+          </div>
+          <Link
+            to={`/orgs/${orgSlug}/projects/${projectId}/cycles/new?primaryVersionId=${compareVersionIds[0]}&controlVersionId=${compareVersionIds[1]}`}
+            className={buttonVariants({ size: "sm" })}
+          >
+            Create Review Cycle
+          </Link>
+        </div>
+      )}
 
       <div className="mt-6 space-y-2">
         {versions.length === 0 ? (
@@ -70,7 +120,14 @@ function RunsContent({
   if (showHint) {
     return (
       <p className="text-sm text-muted-foreground">
-        No runs yet. Open a version and click "Run prompt" to see results here.
+        No runs yet.{" "}
+        <Link
+          to={`/orgs/${orgSlug}/projects/${projectId}/run`}
+          className="text-primary hover:underline"
+        >
+          Configure a new run
+        </Link>{" "}
+        to see results here.
       </p>
     );
   }

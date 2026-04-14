@@ -48,6 +48,9 @@ export function CycleCreator() {
   const prefilledVersionId = searchParams.get("primaryVersionId") as
     | Id<"promptVersions">
     | null;
+  const prefilledControlId = searchParams.get("controlVersionId") as
+    | Id<"promptVersions">
+    | null;
 
   // Queries
   const versions = useQuery(api.versions.list, { projectId });
@@ -74,7 +77,9 @@ export function CycleCreator() {
   const [primaryVersionId, setPrimaryVersionId] = useState<string>(
     prefilledVersionId ?? "",
   );
-  const [controlVersionId, setControlVersionId] = useState<string>("");
+  const [controlVersionId, setControlVersionId] = useState<string>(
+    prefilledControlId ?? "",
+  );
   const [useAutoPool, setUseAutoPool] = useState(true);
   const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(
     new Set(),

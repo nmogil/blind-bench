@@ -113,6 +113,11 @@ export function ProjectHome() {
                 sublabel={`${versions!.length} version${versions!.length === 1 ? "" : "s"}`}
               />
               <QuickLink
+                to={`/orgs/${orgSlug}/projects/${projectId}/run`}
+                label="Configure a new run"
+                sublabel="Run your prompt across test cases and models"
+              />
+              <QuickLink
                 to={`/orgs/${orgSlug}/projects/${projectId}/compare`}
                 label="Compare versions"
                 sublabel="Run versions side-by-side"

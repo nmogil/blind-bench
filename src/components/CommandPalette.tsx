@@ -112,6 +112,13 @@ export function CommandPalette() {
                 <CommandShortcut>G T</CommandShortcut>
               </CommandItem>
               <CommandItem
+                onSelect={() => go(`${projectPath}/run`)}
+              >
+                <Play className="mr-2 h-4 w-4" />
+                New run
+                <CommandShortcut>G N</CommandShortcut>
+              </CommandItem>
+              <CommandItem
                 onSelect={() => go(`${projectPath}/runs`)}
               >
                 <Play className="mr-2 h-4 w-4" />

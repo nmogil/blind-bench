@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 export function CompareView() {
   const { projectId } = useProject();
   const { orgId } = useOrg();
+  const { orgSlug } = useParams<{ orgSlug: string }>();
 
   // Selections
   const [selectedTestCaseId, setSelectedTestCaseId] = useState("");
@@ -161,6 +163,20 @@ export function CompareView() {
           <Play className="h-3 w-3" />
           {running ? "Running..." : anyMissing ? "Run comparison" : "Re-run all"}
         </Button>
+      </div>
+
+      {/* Cross-link to RunConfigurator */}
+      <div className="px-4 py-1.5 border-b bg-muted/30">
+        <p className="text-xs text-muted-foreground">
+          Quick comparison for a single test case.{" "}
+          <Link
+            to={`/orgs/${orgSlug}/projects/${projectId}/run`}
+            className="text-primary hover:underline"
+          >
+            Use the Run Configurator
+          </Link>{" "}
+          for batch runs across multiple test cases.
+        </p>
       </div>
 
       {/* Main content */}

@@ -41,6 +41,7 @@ const Denied = lazy(() => import("./routes/errors/Denied").then(m => ({ default:
 const QuickCompare = lazy(() => import("./routes/compare/QuickCompare").then(m => ({ default: m.QuickCompare })));
 const ShareableEvalView = lazy(() => import("./routes/share/ShareableEvalView").then(m => ({ default: m.ShareableEvalView })));
 const CycleShareableEvalView = lazy(() => import("./routes/share/CycleShareableEvalView").then(m => ({ default: m.CycleShareableEvalView })));
+const RunConfigurator = lazy(() => import("./routes/orgs/projects/RunConfigurator").then(m => ({ default: m.RunConfigurator })));
 const CyclesList = lazy(() => import("./routes/orgs/projects/cycles/CyclesList").then(m => ({ default: m.CyclesList })));
 const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreator").then(m => ({ default: m.CycleCreator })));
 const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail").then(m => ({ default: m.CycleDetail })));
@@ -81,6 +82,7 @@ export function App() {
                 path="versions/:versionId/dashboard"
                 element={<VersionDashboard />}
               />
+              <Route path="run" element={<RunConfigurator />} />
               <Route path="runs" element={<RunsList />} />
               <Route path="runs/:runId" element={<RunView />} />
               <Route
