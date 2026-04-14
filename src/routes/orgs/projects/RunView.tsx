@@ -16,6 +16,7 @@ import { RunCommentList } from "@/components/RunCommentList";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
 import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { cn } from "@/lib/utils";
+import { sanitizeStoredError } from "@/lib/errors";
 
 function formatTime(ts: number | undefined): string {
   if (!ts) return "—";
@@ -124,8 +125,8 @@ export function RunView() {
             run.status === "failed" ? "text-destructive" : "text-amber-700 dark:text-amber-400",
           )}>
             {run.status === "completed"
-              ? `Some outputs failed: ${run.errorMessage}`
-              : run.errorMessage}
+              ? `Some outputs failed: ${sanitizeStoredError(run.errorMessage)}`
+              : sanitizeStoredError(run.errorMessage)}
           </p>
         </div>
       )}

@@ -5,6 +5,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import { Share2, Copy, Check, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 export function ShareLinkButton({ runId }: { runId: Id<"promptRuns"> }) {
   const [open, setOpen] = useState(false);
@@ -19,9 +20,7 @@ export function ShareLinkButton({ runId }: { runId: Id<"promptRuns"> }) {
       await createLink({ runId });
       setOpen(true);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to create shareable link",
-      );
+      toast.error(friendlyError(err, "Failed to create shareable link."));
     }
   }
 
@@ -32,9 +31,7 @@ export function ShareLinkButton({ runId }: { runId: Id<"promptRuns"> }) {
       setOpen(false);
       toast.success("Link deactivated");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to deactivate link",
-      );
+      toast.error(friendlyError(err, "Failed to deactivate link."));
     }
   }
 

@@ -5,6 +5,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { sanitizeStoredError } from "@/lib/errors";
 
 interface InsightsPanelProps {
   runId: Id<"promptRuns">;
@@ -34,7 +35,7 @@ export function InsightsPanel({ runId }: InsightsPanelProps) {
     return (
       <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
         <p className="text-xs text-destructive">
-          Failed to generate insights: {insights.errorMessage ?? "Unknown error"}
+          Failed to generate insights: {sanitizeStoredError(insights.errorMessage)}
         </p>
       </div>
     );

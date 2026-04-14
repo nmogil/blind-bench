@@ -130,8 +130,9 @@ export const executeRunAction = internalAction({
 
     if (failures.length > 0) {
       const firstError = failures[0]!.reason;
-      const errorMessage =
-        firstError instanceof Error ? firstError.message : String(firstError);
+      const errorMessage = (
+        firstError instanceof Error ? firstError.message : String(firstError)
+      ).slice(0, 500);
       const errorObj = firstError instanceof Error ? firstError : new Error(errorMessage);
       await captureException(errorObj, run.triggeredById as string, {
         function: "executeRunAction",

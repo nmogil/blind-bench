@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { friendlyError } from "@/lib/errors";
+import { friendlyError, sanitizeStoredError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -267,7 +267,7 @@ function ErrorView({
           </div>
           <p className="text-sm font-medium">Optimization failed</p>
           <p className="text-sm text-muted-foreground">
-            {optimization.errorMessage ?? "An unknown error occurred."}
+            {sanitizeStoredError(optimization.errorMessage)}
           </p>
           <Button onClick={handleRetry} disabled={retrying}>
             <RotateCcw className="mr-1.5 h-3.5 w-3.5" />

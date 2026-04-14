@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { friendlyError } from "@/lib/errors";
 
 export function SoloEvalSetup() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
@@ -80,7 +81,7 @@ export function SoloEvalSetup() {
         `/orgs/${orgSlug}/projects/${projectId}/solo-eval/${sessionId}`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create session");
+      setError(friendlyError(e, "Failed to create session."));
     } finally {
       setCreating(false);
     }

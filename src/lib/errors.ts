@@ -66,6 +66,28 @@ const friendlyMessages: Record<string, string> = {
     "This link has reached its response limit.",
   "You have already submitted a response":
     "You've already submitted your evaluation for this link.",
+  "Can only share completed runs":
+    "Only completed runs can be shared.",
+  "Link not found":
+    "Shareable link not found.",
+  "Run not found":
+    "Run not found.",
+  "Can only add attachments to draft versions":
+    "Attachments can only be added to draft versions.",
+  "Attachment not found":
+    "Attachment not found.",
+  "A digest is already being generated":
+    "A digest is already being generated. Please wait.",
+  "Session not found":
+    "Evaluation session not found.",
+  "Session is not active":
+    "This evaluation session is no longer active.",
+  "No more outputs to rate":
+    "No more outputs to rate in this session.",
+  "Suggestion request not found":
+    "Suggestion request not found.",
+  "Provide a test case or inline variable values":
+    "Provide a test case or inline variable values.",
 };
 
 /**
@@ -92,6 +114,8 @@ export function friendlyError(err: unknown, fallback = "Something went wrong. Pl
     "The optimizer returned the same prompt",
     "The optimizer's reasoning was not grounded",
     "Slot ",
+    "Need at least",
+    "You already have an active solo eval session",
   ];
   for (const prefix of passThroughPrefixes) {
     if (raw.includes(prefix)) {
@@ -109,4 +133,50 @@ export function friendlyError(err: unknown, fallback = "Something went wrong. Pl
   }
 
   return fallback;
+}
+
+/**
+ * Sanitize a persisted errorMessage from an async backend action before
+ * displaying it in the UI. These messages come from raw exception catches
+ * (OpenRouter API errors, JSON parse failures, etc.) and may contain
+ * API keys, request IDs, or overly technical details.
+ */
+export function sanitizeStoredError(
+  message: string | undefined | null,
+  fallback = "An unexpected error occurred.",
+): string {
+  if (!message) return fallback;
+
+  // Strip any leaked API keys (OpenRouter sk-or-..., generic sk-...)
+  let cleaned = message.replace(/\bsk-[a-zA-Z0-9_-]{8,}\b/g, "[redacted]");
+
+  // Strip Convex request ID wrappers if they somehow got stored
+  cleaned = cleaned.replace(
+    /\[CONVEX [A-Z]\([^\)]+\)\]\s*\[Request ID: [^\]]+\]\s*(Server Error\s*)?(Uncaught Error:\s*)?/g,
+    "",
+  );
+
+  // Map known API error patterns to friendly messages
+  const apiPatterns: [RegExp, string][] = [
+    [/401\s*(Unauthorized)?/i, "API key was rejected. Check your key in org settings."],
+    [/403\s*(Forbidden)?/i, "Access denied by the AI provider. Check your API key permissions."],
+    [/429\s*(Too Many Requests|Rate limit)/i, "Rate limit reached. Wait a moment and try again."],
+    [/502|503|504/i, "The AI provider is temporarily unavailable. Try again shortly."],
+    [/timeout|timed?\s*out|ETIMEDOUT/i, "The request timed out. Try again or use a faster model."],
+    [/context.{0,5}length|token.{0,5}limit|too.{0,5}long/i, "The input was too long for the selected model. Try a shorter prompt or a model with a larger context window."],
+    [/invalid.*json|JSON\.parse|Unexpected token/i, "The AI returned an invalid response. Try again."],
+  ];
+
+  for (const [pattern, friendly] of apiPatterns) {
+    if (pattern.test(cleaned)) {
+      return friendly;
+    }
+  }
+
+  // Cap length and return the cleaned message
+  if (cleaned.length > 200) {
+    cleaned = cleaned.slice(0, 200) + "…";
+  }
+
+  return cleaned;
 }

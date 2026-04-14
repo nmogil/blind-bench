@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Sparkles, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { friendlyError, sanitizeStoredError } from "@/lib/errors";
 
 interface FeedbackDigestProps {
   versionId: Id<"promptVersions">;
@@ -30,7 +31,7 @@ export function FeedbackDigest({ versionId, compact = false }: FeedbackDigestPro
     try {
       await requestDigest({ versionId });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to request digest.");
+      setError(friendlyError(err, "Failed to request digest."));
     } finally {
       setRequesting(false);
     }
@@ -96,7 +97,7 @@ export function FeedbackDigest({ versionId, compact = false }: FeedbackDigestPro
           <AlertCircle className="h-4 w-4" />
           Digest failed
         </div>
-        <p className="text-xs text-muted-foreground">{digest.errorMessage}</p>
+        <p className="text-xs text-muted-foreground">{sanitizeStoredError(digest.errorMessage)}</p>
         <Button size="sm" variant="outline" onClick={handleRequest}>
           Try again
         </Button>

@@ -33,7 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { friendlyError } from "@/lib/errors";
+import { friendlyError, sanitizeStoredError } from "@/lib/errors";
 import { stripExif } from "@/lib/stripExif";
 import {
   ArrowLeft,
@@ -921,7 +921,7 @@ export function VersionEditor() {
               {/* Suggestion error */}
               {suggestions?.status === "failed" && suggestions.errorMessage && (
                 <p className="text-[10px] text-destructive">
-                  {suggestions.errorMessage}
+                  {sanitizeStoredError(suggestions.errorMessage)}
                 </p>
               )}
 
