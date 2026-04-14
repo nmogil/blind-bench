@@ -41,7 +41,7 @@ export function RatingButtons({
 }) {
   return (
     <div
-      className="flex items-center gap-1.5"
+      className="flex items-center gap-1.5 shrink-0"
       role="radiogroup"
       aria-label="Rate this output"
     >

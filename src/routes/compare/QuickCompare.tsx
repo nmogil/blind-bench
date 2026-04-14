@@ -290,7 +290,7 @@ function EvalPhase({
             key={label}
             className="flex flex-col gap-3 rounded-lg border border-border p-4"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <BlindLabelBadge label={label} />
               <RatingButtons
                 currentRating={ratings[label] ?? null}

@@ -303,7 +303,7 @@ function OutputCard({
       )}
     >
       {/* Sticky header */}
-      <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-card/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border/50 bg-card/95 backdrop-blur-sm">
         <BlindLabelBadge label={blindLabel} />
         <RatingButtons currentRating={currentRating} onRate={onRate} />
       </div>
