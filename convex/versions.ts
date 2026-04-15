@@ -81,10 +81,20 @@ export const create = mutation({
       .take(200);
     const variableNames = variables.map((v) => v.name);
 
-    // Validate templates
-    validateTemplate(args.userMessageTemplate, variableNames);
-    if (args.systemMessage) {
-      validateTemplate(args.systemMessage, variableNames);
+    // Validate templates and auto-create unknown variables
+    const unknownFromUser = validateTemplate(args.userMessageTemplate, variableNames);
+    const unknownFromSystem = args.systemMessage
+      ? validateTemplate(args.systemMessage, variableNames)
+      : [];
+    const allUnknown = [...new Set([...unknownFromUser, ...unknownFromSystem])];
+    const maxOrder = variables.reduce((max, v) => Math.max(max, v.order), -1);
+    for (let i = 0; i < allUnknown.length; i++) {
+      await ctx.db.insert("projectVariables", {
+        projectId: args.projectId,
+        name: allUnknown[i]!,
+        required: true,
+        order: maxOrder + 1 + i,
+      });
     }
 
     // Compute next version number and archive existing current version
@@ -137,14 +147,25 @@ export const update = mutation({
       .take(200);
     const variableNames = variables.map((v) => v.name);
 
-    // Validate any updated templates
+    // Validate templates and auto-create unknown variables
     const templateToValidate =
       args.userMessageTemplate ?? version.userMessageTemplate;
-    validateTemplate(templateToValidate, variableNames);
+    const unknownFromUser = validateTemplate(templateToValidate, variableNames);
 
     const systemToValidate = args.systemMessage ?? version.systemMessage;
-    if (systemToValidate) {
-      validateTemplate(systemToValidate, variableNames);
+    const unknownFromSystem = systemToValidate
+      ? validateTemplate(systemToValidate, variableNames)
+      : [];
+
+    const allUnknown = [...new Set([...unknownFromUser, ...unknownFromSystem])];
+    const maxOrder = variables.reduce((max, v) => Math.max(max, v.order), -1);
+    for (let i = 0; i < allUnknown.length; i++) {
+      await ctx.db.insert("projectVariables", {
+        projectId: version.projectId,
+        name: allUnknown[i]!,
+        required: true,
+        order: maxOrder + 1 + i,
+      });
     }
 
     const updates: Record<string, string | undefined> = {};

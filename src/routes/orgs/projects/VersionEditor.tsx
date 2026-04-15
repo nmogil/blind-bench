@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
@@ -6,6 +6,7 @@ import { Id, Doc } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
 import { PromptEditor } from "@/components/tiptap/PromptEditor";
 import { AnnotatedEditor } from "@/components/tiptap/AnnotatedEditor";
+import { detectVariables } from "@/lib/detectVariables";
 import { AddVariableDialog } from "@/components/AddVariableDialog";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
 import { RunStatusPill } from "@/components/RunStatusPill";
@@ -38,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
 
 export function VersionEditor() {
-  const { projectId, project } = useProject();
+  const { projectId, project, role: projectRole } = useProject();
   const { orgSlug, versionId } = useParams<{
     orgSlug: string;
     versionId: string;
@@ -93,6 +94,11 @@ export function VersionEditor() {
   );
   const [optimizeDialogOpen, setOptimizeDialogOpen] = useState(false);
 
+  // Meta context
+  const metaContext = useQuery(api.projects.getMetaContext, { projectId });
+  const setMetaContextMut = useMutation(api.projects.setMetaContext);
+  const [metaExpanded, setMetaExpanded] = useState(false);
+
   // Cycle integration
   const cycleData = useQuery(
     api.reviewCycles.hasDataForVersion,
@@ -116,6 +122,19 @@ export function VersionEditor() {
 
   const isDraft = version?.status === "draft";
   const isReadOnly = !isDraft;
+
+  // Detect new variables in the editor content
+  const existingVarNames = useMemo(
+    () => new Set(variables?.map((v) => v.name) ?? []),
+    [variables],
+  );
+  const newVarNames = useMemo(() => {
+    const fromUser = detectVariables(userTemplate);
+    const fromSystem = detectVariables(systemMessage);
+    return [...new Set([...fromUser, ...fromSystem])].filter(
+      (name) => !existingVarNames.has(name),
+    );
+  }, [userTemplate, systemMessage, existingVarNames]);
 
   // Initialize form state when version loads
   useEffect(() => {
@@ -486,6 +505,17 @@ export function VersionEditor() {
               </p>
             )}
           </div>
+
+          {/* Meta Context */}
+          <MetaContextSection
+            metaContext={metaContext ?? []}
+            isOwner={projectRole === "owner"}
+            expanded={metaExpanded}
+            onToggle={() => setMetaExpanded((p) => !p)}
+            onSave={async (pairs) => {
+              await setMetaContextMut({ projectId, metaContext: pairs });
+            }}
+          />
         </div>
 
         {/* Center — Prompt editors + attachments */}
@@ -611,6 +641,27 @@ export function VersionEditor() {
             </div>
           </div>
 
+          {/* New variable detection bar */}
+          {isDraft && newVarNames.length > 0 && (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <span className="flex-1">
+                New variables detected:{" "}
+                {newVarNames.map((name) => (
+                  <code
+                    key={name}
+                    className="mx-0.5 rounded bg-muted px-1 py-0.5 text-xs font-mono"
+                  >
+                    {`{{${name}}}`}
+                  </code>
+                ))}
+                <span className="text-muted-foreground">
+                  {" "}
+                  — will be created on save
+                </span>
+              </span>
+            </div>
+          )}
+
           {/* Prompt attachments */}
           {isDraft && (
             <div className="space-y-2">
@@ -733,5 +784,200 @@ function VariableSidebarItem({
         )}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MetaContextSection — collapsible section in the sidebar
+// ---------------------------------------------------------------------------
+
+const SUGGESTED_META_QUESTIONS = [
+  "What domain does this prompt operate in?",
+  "What tone should the model use?",
+  "Who is the end user?",
+  "What should the model never do?",
+];
+
+function MetaContextSection({
+  metaContext,
+  isOwner,
+  expanded,
+  onToggle,
+  onSave,
+}: {
+  metaContext: Array<{ id: string; question: string; answer: string }>;
+  isOwner: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onSave: (pairs: Array<{ id: string; question: string; answer: string }>) => Promise<void>;
+}) {
+  const [localPairs, setLocalPairs] = useState<
+    Array<{ id: string; question: string; answer: string }>
+  >([]);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Sync from query when not editing
+  useEffect(() => {
+    if (!editing) {
+      setLocalPairs(metaContext);
+    }
+  }, [metaContext, editing]);
+
+  function startEditing() {
+    setLocalPairs(metaContext);
+    setEditing(true);
+  }
+
+  function addQuestion(question = "") {
+    setLocalPairs((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), question, answer: "" },
+    ]);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await onSave(localPairs.filter((p) => p.question || p.answer));
+      setEditing(false);
+    } catch {
+      // Error handled by parent mutation
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const count = metaContext.length;
+
+  return (
+    <div className="space-y-2 pt-2 border-t">
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h4 className="text-xs font-medium text-muted-foreground uppercase">
+          Meta Context
+        </h4>
+        {expanded ? (
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        )}
+      </button>
+
+      {!expanded && (
+        <p className="text-[10px] text-muted-foreground">
+          {count === 0
+            ? "No context set"
+            : `${count} question${count === 1 ? "" : "s"} answered`}
+        </p>
+      )}
+
+      {expanded && (
+        <div className="space-y-2">
+          {editing ? (
+            <>
+              {localPairs.map((pair, i) => (
+                <div key={pair.id} className="space-y-1 rounded border p-2">
+                  <input
+                    value={pair.question}
+                    onChange={(e) => {
+                      const updated = [...localPairs];
+                      updated[i] = { ...pair, question: e.target.value };
+                      setLocalPairs(updated);
+                    }}
+                    placeholder="Question"
+                    className="w-full text-xs font-medium bg-transparent outline-none"
+                  />
+                  <textarea
+                    value={pair.answer}
+                    onChange={(e) => {
+                      const updated = [...localPairs];
+                      updated[i] = { ...pair, answer: e.target.value };
+                      setLocalPairs(updated);
+                    }}
+                    placeholder="Answer..."
+                    rows={2}
+                    className="w-full text-xs bg-transparent outline-none resize-none"
+                  />
+                  <button
+                    onClick={() =>
+                      setLocalPairs((p) => p.filter((_, j) => j !== i))
+                    }
+                    className="text-[10px] text-destructive hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {/* Suggested questions */}
+              {SUGGESTED_META_QUESTIONS.filter(
+                (q) => !localPairs.some((p) => p.question === q),
+              ).length > 0 && (
+                <div className="space-y-0.5">
+                  {SUGGESTED_META_QUESTIONS.filter(
+                    (q) => !localPairs.some((p) => p.question === q),
+                  ).map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => addQuestion(q)}
+                      className="block w-full text-left text-[10px] text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-muted/50"
+                    >
+                      + {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-1">
+                <Button
+                  size="xs"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setEditing(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {metaContext.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Add context about your prompt to help the optimizer understand
+                  your goals.
+                </p>
+              ) : (
+                metaContext.map((pair) => (
+                  <div key={pair.id} className="text-xs space-y-0.5">
+                    <p className="font-medium text-muted-foreground truncate">
+                      {pair.question}
+                    </p>
+                    <p className="truncate">{pair.answer || "—"}</p>
+                  </div>
+                ))
+              )}
+              {isOwner && (
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={startEditing}
+                  className="w-full"
+                >
+                  {metaContext.length === 0 ? "Add context" : "Edit"}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

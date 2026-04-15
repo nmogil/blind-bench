@@ -99,18 +99,19 @@ export function validateOptimizerOutput(
 
   // 3 & 4. Unknown variable / Unsupported template syntax (via validateTemplate)
   try {
-    validateTemplate(newUserTemplate as string, variableNames);
-    if (resolvedSystemMessage) {
-      validateTemplate(resolvedSystemMessage, variableNames);
+    const unknownFromUser = validateTemplate(newUserTemplate as string, variableNames);
+    const unknownFromSystem = resolvedSystemMessage
+      ? validateTemplate(resolvedSystemMessage, variableNames)
+      : [];
+    const allUnknown = [...new Set([...unknownFromUser, ...unknownFromSystem])];
+    if (allUnknown.length > 0) {
+      return {
+        ok: false,
+        error: `The optimizer referenced unknown variable \`{{${allUnknown[0]}}}\`.`,
+      };
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.startsWith("Unknown variable")) {
-      return {
-        ok: false,
-        error: `The optimizer referenced unknown variable ${msg.replace("Unknown variable ", "")}.`,
-      };
-    }
     if (msg === "Unsupported template syntax") {
       return {
         ok: false,

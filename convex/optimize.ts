@@ -199,9 +199,19 @@ export const acceptOptimization = mutation({
       .take(200);
     const variableNames = variables.map((v) => v.name);
 
-    validateTemplate(request.generatedUserTemplate, variableNames);
-    if (request.generatedSystemMessage) {
-      validateTemplate(request.generatedSystemMessage, variableNames);
+    const unknownFromUser = validateTemplate(request.generatedUserTemplate, variableNames);
+    const unknownFromSystem = request.generatedSystemMessage
+      ? validateTemplate(request.generatedSystemMessage, variableNames)
+      : [];
+    const allUnknown = [...new Set([...unknownFromUser, ...unknownFromSystem])];
+    const maxVarOrder = variables.reduce((max, v) => Math.max(max, v.order), -1);
+    for (let i = 0; i < allUnknown.length; i++) {
+      await ctx.db.insert("projectVariables", {
+        projectId: request.projectId,
+        name: allUnknown[i]!,
+        required: true,
+        order: maxVarOrder + 1 + i,
+      });
     }
 
     // Compute next version number
@@ -319,9 +329,19 @@ export const editAndAcceptOptimization = mutation({
       .take(200);
     const variableNames = variables.map((v) => v.name);
 
-    validateTemplate(args.userTemplate, variableNames);
-    if (args.systemMessage) {
-      validateTemplate(args.systemMessage, variableNames);
+    const unknownFromUser2 = validateTemplate(args.userTemplate, variableNames);
+    const unknownFromSystem2 = args.systemMessage
+      ? validateTemplate(args.systemMessage, variableNames)
+      : [];
+    const allUnknown2 = [...new Set([...unknownFromUser2, ...unknownFromSystem2])];
+    const maxVarOrder2 = variables.reduce((max, v) => Math.max(max, v.order), -1);
+    for (let i = 0; i < allUnknown2.length; i++) {
+      await ctx.db.insert("projectVariables", {
+        projectId: request.projectId,
+        name: allUnknown2[i]!,
+        required: true,
+        order: maxVarOrder2 + 1 + i,
+      });
     }
 
     // Compute next version number

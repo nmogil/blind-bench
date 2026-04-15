@@ -19,8 +19,6 @@ import {
   FlaskConical,
   Play,
   Plus,
-  GitCompareArrows,
-  Sparkles,
   Settings,
 } from "lucide-react";
 
@@ -126,22 +124,10 @@ export function CommandPalette() {
                 <CommandShortcut>G R</CommandShortcut>
               </CommandItem>
               <CommandItem
-                onSelect={() => go(`${projectPath}/compare`)}
-              >
-                <GitCompareArrows className="mr-2 h-4 w-4" />
-                Compare versions
-              </CommandItem>
-              <CommandItem
                 onSelect={() => go(`${projectPath}/variables`)}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Variables
-              </CommandItem>
-              <CommandItem
-                onSelect={() => go(`${projectPath}/meta-context`)}
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Meta context
               </CommandItem>
             </>
           )}

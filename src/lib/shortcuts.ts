@@ -17,8 +17,8 @@ export const SHORTCUTS: ShortcutDef[] = [
   { key: "⌘R", label: "⌘R", description: "Request optimization", contexts: ["version-editor"] },
 
   // Annotatable views
-  { key: "C", label: "C", description: "Comment on selection", contexts: ["run-view", "eval", "compare"] },
-  { key: "J / K", label: "J / K", description: "Next / previous output", contexts: ["run-view", "eval", "compare"] },
+  { key: "C", label: "C", description: "Comment on selection", contexts: ["run-view", "eval"] },
+  { key: "J / K", label: "J / K", description: "Next / previous output", contexts: ["run-view", "eval"] },
 
   // List views
   { key: "N", label: "N", description: "New item", contexts: ["org-home", "versions", "test-cases", "variables"] },

@@ -10,6 +10,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 // Hardcoded fallback models — mirrors src/lib/models.ts
 const FALLBACK_MODELS = [
+  { modelId: "anthropic/claude-opus-4", name: "Claude Opus 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true, promptPricing: 15, completionPricing: 75 },
   { modelId: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true, promptPricing: 3, completionPricing: 15 },
   { modelId: "anthropic/claude-haiku-4", name: "Claude Haiku 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true, promptPricing: 0.8, completionPricing: 4 },
   { modelId: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", provider: "Google", contextWindow: 1000000, supportsVision: true, promptPricing: 0.15, completionPricing: 0.6 },
@@ -134,13 +135,13 @@ export const refreshAction = internalAction({
           name: m.name,
           provider,
           contextWindow: m.context_length ?? 0,
-          supportsVision: m.architecture?.modality === "text+image->text",
+          supportsVision: (m.architecture?.modality ?? "").includes("image"),
           promptPricing: Math.round(promptPrice * 100) / 100,
           completionPricing: Math.round(completionPrice * 100) / 100,
           lastRefreshedAt: Date.now(),
         };
       })
-      // Filter out models with zero pricing (likely free/broken entries)
+      // Keep models that have any pricing — only exclude if BOTH prompt and completion are zero
       .filter((m) => m.promptPricing > 0 || m.completionPricing > 0);
 
     // Batch upsert in chunks

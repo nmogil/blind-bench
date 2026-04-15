@@ -24,11 +24,9 @@ const TestCases = lazy(() => import("./routes/orgs/projects/TestCases").then(m =
 const TestCaseEditor = lazy(() => import("./routes/orgs/projects/TestCaseEditor").then(m => ({ default: m.TestCaseEditor })));
 const Versions = lazy(() => import("./routes/orgs/projects/Versions").then(m => ({ default: m.Versions })));
 const VersionEditor = lazy(() => import("./routes/orgs/projects/VersionEditor").then(m => ({ default: m.VersionEditor })));
-const MetaContext = lazy(() => import("./routes/orgs/projects/MetaContext").then(m => ({ default: m.MetaContext })));
 const RunView = lazy(() => import("./routes/orgs/projects/RunView").then(m => ({ default: m.RunView })));
 const RunsList = lazy(() => import("./routes/orgs/projects/RunsList").then(m => ({ default: m.RunsList })));
 const OptimizationReview = lazy(() => import("./routes/orgs/projects/OptimizationReview").then(m => ({ default: m.OptimizationReview })));
-const CompareView = lazy(() => import("./routes/orgs/projects/CompareView").then(m => ({ default: m.CompareView })));
 const SoloEvalSetup = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalSetup").then(m => ({ default: m.SoloEvalSetup })));
 const SoloEvalActive = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalActive").then(m => ({ default: m.SoloEvalActive })));
 const SoloEvalResults = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalResults").then(m => ({ default: m.SoloEvalResults })));
@@ -90,7 +88,6 @@ export function App() {
                 path="optimizations/:requestId"
                 element={<OptimizationReview />}
               />
-              <Route path="compare" element={<CompareView />} />
               <Route path="cycles" element={<CyclesList />} />
               <Route path="cycles/new" element={<CycleCreator />} />
               <Route
@@ -108,7 +105,6 @@ export function App() {
               />
               <Route path="evaluate" element={<EvaluatePage />} />
               <Route path="history" element={<HistoryPage />} />
-              <Route path="meta-context" element={<MetaContext />} />
               <Route path="settings" element={<ProjectSettings />} />
               <Route
                 path="settings/collaborators"

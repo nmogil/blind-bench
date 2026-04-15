@@ -13,6 +13,7 @@ export { MODELS as FALLBACK_MODELS };
 
 export const MODELS: OpenRouterModel[] = [
   // Anthropic
+  { id: "anthropic/claude-opus-4", name: "Claude Opus 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true },
   { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true },
   { id: "anthropic/claude-haiku-4", name: "Claude Haiku 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true },
   // Google

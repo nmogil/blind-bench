@@ -7,6 +7,7 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useModelCatalog, type CatalogModel } from "@/hooks/useModelCatalog";
+import { usePersistedRunConfig } from "@/hooks/usePersistedRunConfig";
 import { ModelPicker } from "@/components/ModelPicker";
 import { SlotConfigurator, type SlotConfig } from "@/components/SlotConfigurator";
 import { SuggestionCards } from "@/components/SuggestionCards";
@@ -140,6 +141,8 @@ export function RunConfigurator() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { initial: persistedConfig, save: saveRunConfig } =
+    usePersistedRunConfig(projectId);
 
   // --- Queries ---
   const versions = useQuery(api.versions.list, { projectId });
@@ -182,16 +185,26 @@ export function RunConfigurator() {
   const [inlineFormError, setInlineFormError] = useState("");
   const [creatingTestCase, setCreatingTestCase] = useState(false);
 
-  // --- Step 3: Model configuration ---
-  const [runMode, setRunMode] = useState<"uniform" | "mix">("uniform");
-  const [selectedModel, setSelectedModel] = useState("");
-  const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(1024);
-  const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>([
-    { label: "A", model: "", temperature: 0.7 },
-    { label: "B", model: "", temperature: 0.7 },
-    { label: "C", model: "", temperature: 0.7 },
-  ]);
+  // --- Step 3: Model configuration (initialized from persisted config) ---
+  const [runMode, setRunMode] = useState<"uniform" | "mix">(
+    persistedConfig?.runMode ?? "uniform",
+  );
+  const [selectedModel, setSelectedModel] = useState(
+    persistedConfig?.model ?? "",
+  );
+  const [temperature, setTemperature] = useState(
+    persistedConfig?.temperature ?? 0.7,
+  );
+  const [maxTokens, setMaxTokens] = useState(
+    persistedConfig?.maxTokens ?? 1024,
+  );
+  const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>(
+    persistedConfig?.slotConfigs ?? [
+      { label: "A", model: "", temperature: 0.7 },
+      { label: "B", model: "", temperature: 0.7 },
+      { label: "C", model: "", temperature: 0.7 },
+    ],
+  );
 
   // AI suggestions (mix mode only, uses first selected version)
   const suggestions = useQuery(
@@ -200,6 +213,14 @@ export function RunConfigurator() {
       ? { versionId: primaryVersionId as Id<"promptVersions"> }
       : "skip",
   );
+
+  // Clear persisted model if it no longer exists in the catalog
+  useEffect(() => {
+    if (catalogModels.length > 0 && selectedModel) {
+      const exists = catalogModels.some((m) => m.id === selectedModel);
+      if (!exists) setSelectedModel("");
+    }
+  }, [catalogModels, selectedModel]);
 
   // --- Step 4: Execution ---
   const [running, setRunning] = useState(false);
@@ -499,6 +520,15 @@ export function RunConfigurator() {
       return;
     }
 
+    // Persist model config for next visit
+    saveRunConfig({
+      model: selectedModel,
+      temperature,
+      maxTokens,
+      runMode,
+      slotConfigs: runMode === "mix" ? slotConfigs : undefined,
+    });
+
     if (runIds.length === 1) {
       navigate(`/orgs/${orgSlug}/projects/${projectId}/runs/${runIds[0]}`);
     } else {
@@ -520,6 +550,7 @@ export function RunConfigurator() {
     temperature,
     maxTokens,
     executeRun,
+    saveRunConfig,
     navigate,
     orgSlug,
     projectId,

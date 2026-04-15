@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
-import { EmptyState } from "@/components/EmptyState";
+import { useOrg } from "@/contexts/OrgContext";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
 import { RollbackConfirmationDialog } from "@/components/RollbackConfirmationDialog";
 import { Button } from "@/components/ui/button";
@@ -16,16 +16,32 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { friendlyError } from "@/lib/errors";
-import { GitBranch, Plus, RotateCcw, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Circle,
+  FlaskConical,
+  FileText,
+  Key,
+  Lightbulb,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Versions() {
   const { projectId } = useProject();
+  const { orgId, role: orgRole } = useOrg();
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const navigate = useNavigate();
   const versions = useQuery(api.versions.list, { projectId });
   const createVersion = useMutation(api.versions.create);
   const deleteVersion = useMutation(api.versions.deleteVersion);
+
+  // Setup checklist queries (only needed when versions list is empty)
+  const keyStatus = useQuery(api.openRouterKeys.hasKey, { orgId });
+  const testCases = useQuery(api.testCases.list, { projectId });
 
   const [error, setError] = useState("");
   const [rollbackTarget, setRollbackTarget] = useState<{
@@ -89,10 +105,14 @@ export function Versions() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {versions.length === 0 ? (
-        <EmptyState
-          icon={GitBranch}
-          heading="No versions"
-          description="Each version is a snapshot of your prompt. Create a draft, edit it, then promote it to active when you're happy."
+        <SetupChecklist
+          orgSlug={orgSlug!}
+          projectId={projectId}
+          isOwner={orgRole === "owner"}
+          hasKey={keyStatus?.hasKey ?? false}
+          hasTestCases={(testCases?.length ?? 0) > 0}
+          testCaseCount={testCases?.length ?? 0}
+          onCreateDraft={handleNewDraft}
         />
       ) : (
         <div className="max-w-2xl">
@@ -228,6 +248,191 @@ export function Versions() {
           currentHeadNumber={headVersion.versionNumber}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Setup checklist — shown when the project has no versions yet
+// ---------------------------------------------------------------------------
+
+function SetupChecklist({
+  orgSlug,
+  projectId,
+  isOwner,
+  hasKey,
+  hasTestCases,
+  testCaseCount,
+  onCreateDraft,
+}: {
+  orgSlug: string;
+  projectId: string;
+  isOwner: boolean;
+  hasKey: boolean;
+  hasTestCases: boolean;
+  testCaseCount: number;
+  onCreateDraft: () => void;
+}) {
+  const steps = [
+    ...(isOwner
+      ? [{ key: "api-key", done: hasKey }]
+      : []),
+    { key: "prompt", done: false },
+    { key: "test-cases", done: hasTestCases },
+  ];
+  const nextStep = steps.find((s) => !s.done)?.key ?? null;
+
+  return (
+    <div className="max-w-lg space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Get started by setting up your prompt:
+      </p>
+
+      <div className="space-y-1">
+        {isOwner && (
+          <SetupStep
+            done={hasKey}
+            isNext={nextStep === "api-key"}
+            icon={Key}
+            label="Set up your OpenRouter API key"
+            sublabel="Required to run prompts against LLM models"
+            to={`/orgs/${orgSlug}/settings/openrouter-key`}
+            doneLabel="API key configured"
+          />
+        )}
+        <button
+          onClick={onCreateDraft}
+          className={cn(
+            "flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
+            nextStep === "prompt"
+              ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
+              : "border-border hover:bg-muted/50",
+          )}
+        >
+          <div className="mt-0.5">
+            <Circle
+              className={cn(
+                "h-5 w-5",
+                nextStep === "prompt"
+                  ? "text-primary"
+                  : "text-muted-foreground/40",
+              )}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Write your first prompt
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Create a prompt template with {"{{variables}}"} for dynamic parts
+            </p>
+          </div>
+          {nextStep === "prompt" && (
+            <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          )}
+        </button>
+        <SetupStep
+          done={hasTestCases}
+          isNext={nextStep === "test-cases"}
+          icon={FlaskConical}
+          label="Add test cases"
+          sublabel="Provide input values to test your prompt with"
+          to={`/orgs/${orgSlug}/projects/${projectId}/run`}
+          doneLabel={`${testCaseCount} test case${testCaseCount === 1 ? "" : "s"}`}
+        />
+      </div>
+
+      <HowItWorks />
+    </div>
+  );
+}
+
+function SetupStep({
+  done,
+  isNext,
+  icon: Icon,
+  label,
+  sublabel,
+  to,
+  doneLabel,
+}: {
+  done: boolean;
+  isNext: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  sublabel: string;
+  to: string;
+  doneLabel: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        "flex items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
+        done
+          ? "border-green-200 bg-green-50/50 dark:border-green-900/40 dark:bg-green-950/10"
+          : isNext
+            ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
+            : "border-border hover:bg-muted/50",
+      )}
+    >
+      <div className="mt-0.5">
+        {done ? (
+          <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+        ) : (
+          <Circle
+            className={cn(
+              "h-5 w-5",
+              isNext ? "text-primary" : "text-muted-foreground/40",
+            )}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <Icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              done
+                ? "text-green-600 dark:text-green-400"
+                : "text-muted-foreground",
+            )}
+          />
+          <span
+            className={cn(
+              "text-sm font-medium",
+              done && "text-green-700 dark:text-green-400",
+            )}
+          >
+            {done ? doneLabel : label}
+          </span>
+        </div>
+        {!done && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{sublabel}</p>
+        )}
+      </div>
+      {isNext && !done && (
+        <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      )}
+    </Link>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <div className="rounded-lg border border-dashed p-4">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <Lightbulb className="h-4 w-4 text-muted-foreground" />
+        How it works
+      </div>
+      <ol className="mt-2 space-y-1.5 text-xs text-muted-foreground list-decimal list-inside">
+        <li>Write a prompt template with {"{{variables}}"}</li>
+        <li>Select test cases and models on the Run page, then execute</li>
+        <li>Evaluate outputs blind, get feedback, iterate</li>
+      </ol>
     </div>
   );
 }
