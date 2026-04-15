@@ -1,9 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
-import { generateToken } from "./lib/evalTokens";
+import { generateToken } from "./lib/crypto";
 
 const SHAREABLE_LINK_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
 const REMINDER_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -12,38 +11,16 @@ const MAX_REMINDERS = 3;
 export const sendInvitations = mutation({
   args: {
     emails: v.array(v.string()),
-    cycleId: v.optional(v.id("reviewCycles")),
-    runId: v.optional(v.id("promptRuns")),
+    cycleId: v.id("reviewCycles"),
   },
   handler: async (ctx, args) => {
-    if (!args.cycleId && !args.runId) {
-      throw new Error("Either cycleId or runId is required");
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle) throw new Error("Cycle not found");
+    if (cycle.status !== "open") {
+      throw new Error("Can only send invitations for open cycles");
     }
-    if (args.cycleId && args.runId) {
-      throw new Error("Provide only one of cycleId or runId");
-    }
-
-    const linkType = args.cycleId ? ("cycle" as const) : ("run" as const);
-    let projectId: Id<"projects">;
-    let projectName: string;
-    let cycleName: string | undefined;
-
-    if (args.cycleId) {
-      const cycle = await ctx.db.get(args.cycleId);
-      if (!cycle) throw new Error("Cycle not found");
-      if (cycle.status !== "open") {
-        throw new Error("Can only send invitations for open cycles");
-      }
-      projectId = cycle.projectId;
-      cycleName = cycle.name;
-    } else {
-      const run = await ctx.db.get(args.runId!);
-      if (!run) throw new Error("Run not found");
-      if (run.status !== "completed") {
-        throw new Error("Can only send invitations for completed runs");
-      }
-      projectId = run.projectId;
-    }
+    const projectId = cycle.projectId;
+    const cycleName = cycle.name;
 
     const { userId } = await requireProjectRole(ctx, projectId, [
       "owner",
@@ -51,7 +28,7 @@ export const sendInvitations = mutation({
     ]);
 
     const project = await ctx.db.get(projectId);
-    projectName = project?.name ?? "Unknown";
+    const projectName = project?.name ?? "Unknown";
 
     let sent = 0;
     let skipped = 0;
@@ -61,19 +38,12 @@ export const sendInvitations = mutation({
       if (!email) continue;
 
       // Check for existing invitation
-      const existing = args.cycleId
-        ? await ctx.db
-            .query("evalInvitations")
-            .withIndex("by_email_and_cycle", (q) =>
-              q.eq("email", email).eq("cycleId", args.cycleId!),
-            )
-            .first()
-        : await ctx.db
-            .query("evalInvitations")
-            .withIndex("by_email_and_run", (q) =>
-              q.eq("email", email).eq("runId", args.runId!),
-            )
-            .first();
+      const existing = await ctx.db
+        .query("evalInvitations")
+        .withIndex("by_email_and_cycle", (q) =>
+          q.eq("email", email).eq("cycleId", args.cycleId),
+        )
+        .first();
 
       if (existing) {
         if (existing.status === "responded") {
@@ -81,30 +51,16 @@ export const sendInvitations = mutation({
           continue;
         }
         // Re-send: refresh TTL on existing link and resend email
-        if (linkType === "cycle") {
-          const link = await ctx.db
-            .query("cycleShareableLinks")
-            .withIndex("by_token", (q) =>
-              q.eq("token", existing.shareableLinkId),
-            )
-            .first();
-          if (link) {
-            await ctx.db.patch(link._id, {
-              expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
-            });
-          }
-        } else {
-          const link = await ctx.db
-            .query("shareableEvalLinks")
-            .withIndex("by_token", (q) =>
-              q.eq("token", existing.shareableLinkId),
-            )
-            .first();
-          if (link) {
-            await ctx.db.patch(link._id, {
-              expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
-            });
-          }
+        const link = await ctx.db
+          .query("cycleShareableLinks")
+          .withIndex("by_token", (q) =>
+            q.eq("token", existing.shareableLinkId),
+          )
+          .first();
+        if (link) {
+          await ctx.db.patch(link._id, {
+            expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
+          });
         }
 
         await ctx.scheduler.runAfter(
@@ -115,7 +71,6 @@ export const sendInvitations = mutation({
             projectName,
             cycleName,
             token: existing.shareableLinkId,
-            linkType,
           },
         );
         sent++;
@@ -125,40 +80,25 @@ export const sendInvitations = mutation({
       // Create new per-email shareable link
       const token = generateToken();
 
-      if (linkType === "cycle") {
-        await ctx.db.insert("cycleShareableLinks", {
-          token,
-          cycleId: args.cycleId!,
-          projectId,
-          createdById: userId,
-          expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
-          maxResponses: 1,
-          responseCount: 0,
-          active: true,
-          purpose: "invitation",
-        });
-      } else {
-        await ctx.db.insert("shareableEvalLinks", {
-          token,
-          runId: args.runId!,
-          projectId,
-          createdById: userId,
-          expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
-          maxResponses: 1,
-          responseCount: 0,
-          active: true,
-          purpose: "invitation",
-        });
-      }
+      await ctx.db.insert("cycleShareableLinks", {
+        token,
+        cycleId: args.cycleId,
+        projectId,
+        createdById: userId,
+        expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
+        maxResponses: 1,
+        responseCount: 0,
+        active: true,
+        purpose: "invitation",
+      });
 
       // Create invitation record
       await ctx.db.insert("evalInvitations", {
         email,
         projectId,
         cycleId: args.cycleId,
-        runId: args.runId,
         shareableLinkId: token,
-        linkType,
+        linkType: "cycle",
         invitedById: userId,
         invitedAt: Date.now(),
         status: "pending",
@@ -174,7 +114,6 @@ export const sendInvitations = mutation({
           projectName,
           cycleName,
           token,
-          linkType,
         },
       );
 
@@ -187,35 +126,18 @@ export const sendInvitations = mutation({
 
 export const getInvitations = query({
   args: {
-    cycleId: v.optional(v.id("reviewCycles")),
-    runId: v.optional(v.id("promptRuns")),
+    cycleId: v.id("reviewCycles"),
   },
   handler: async (ctx, args) => {
-    if (!args.cycleId && !args.runId) return [];
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle) return [];
 
-    let projectId: Id<"projects">;
+    await requireProjectRole(ctx, cycle.projectId, ["owner", "editor"]);
 
-    if (args.cycleId) {
-      const cycle = await ctx.db.get(args.cycleId);
-      if (!cycle) return [];
-      projectId = cycle.projectId;
-    } else {
-      const run = await ctx.db.get(args.runId!);
-      if (!run) return [];
-      projectId = run.projectId;
-    }
-
-    await requireProjectRole(ctx, projectId, ["owner", "editor"]);
-
-    const invitations = args.cycleId
-      ? await ctx.db
-          .query("evalInvitations")
-          .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId!))
-          .take(200)
-      : await ctx.db
-          .query("evalInvitations")
-          .withIndex("by_run", (q) => q.eq("runId", args.runId!))
-          .take(200);
+    const invitations = await ctx.db
+      .query("evalInvitations")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .take(200);
 
     return invitations.map((inv) => ({
       _id: inv._id,
@@ -253,30 +175,16 @@ export const sendInvitationReminder = mutation({
     }
 
     // Refresh link TTL
-    if (invitation.linkType === "cycle") {
-      const link = await ctx.db
-        .query("cycleShareableLinks")
-        .withIndex("by_token", (q) =>
-          q.eq("token", invitation.shareableLinkId),
-        )
-        .first();
-      if (link) {
-        await ctx.db.patch(link._id, {
-          expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
-        });
-      }
-    } else {
-      const link = await ctx.db
-        .query("shareableEvalLinks")
-        .withIndex("by_token", (q) =>
-          q.eq("token", invitation.shareableLinkId),
-        )
-        .first();
-      if (link) {
-        await ctx.db.patch(link._id, {
-          expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
-        });
-      }
+    const link = await ctx.db
+      .query("cycleShareableLinks")
+      .withIndex("by_token", (q) =>
+        q.eq("token", invitation.shareableLinkId),
+      )
+      .first();
+    if (link) {
+      await ctx.db.patch(link._id, {
+        expiresAt: Date.now() + SHAREABLE_LINK_TTL_MS,
+      });
     }
 
     await ctx.db.patch(args.invitationId, {
@@ -299,7 +207,6 @@ export const sendInvitationReminder = mutation({
         projectName: project?.name ?? "Unknown",
         cycleName,
         token: invitation.shareableLinkId,
-        linkType: invitation.linkType,
       },
     );
   },
@@ -307,42 +214,23 @@ export const sendInvitationReminder = mutation({
 
 export const sendReminderToAllPending = mutation({
   args: {
-    cycleId: v.optional(v.id("reviewCycles")),
-    runId: v.optional(v.id("promptRuns")),
+    cycleId: v.id("reviewCycles"),
   },
   handler: async (ctx, args) => {
-    if (!args.cycleId && !args.runId) {
-      throw new Error("Either cycleId or runId is required");
-    }
-
-    let projectId: Id<"projects">;
-    let cycleName: string | undefined;
-
-    if (args.cycleId) {
-      const cycle = await ctx.db.get(args.cycleId);
-      if (!cycle) throw new Error("Cycle not found");
-      projectId = cycle.projectId;
-      cycleName = cycle.name;
-    } else {
-      const run = await ctx.db.get(args.runId!);
-      if (!run) throw new Error("Run not found");
-      projectId = run.projectId;
-    }
+    const cycle = await ctx.db.get(args.cycleId);
+    if (!cycle) throw new Error("Cycle not found");
+    const projectId = cycle.projectId;
+    const cycleName = cycle.name;
 
     await requireProjectRole(ctx, projectId, ["owner", "editor"]);
 
     const project = await ctx.db.get(projectId);
     const projectName = project?.name ?? "Unknown";
 
-    const invitations = args.cycleId
-      ? await ctx.db
-          .query("evalInvitations")
-          .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId!))
-          .take(200)
-      : await ctx.db
-          .query("evalInvitations")
-          .withIndex("by_run", (q) => q.eq("runId", args.runId!))
-          .take(200);
+    const invitations = await ctx.db
+      .query("evalInvitations")
+      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
+      .take(200);
 
     const now = Date.now();
     let sentCount = 0;
@@ -353,26 +241,14 @@ export const sendReminderToAllPending = mutation({
       if (inv.lastReminderSentAt && now - inv.lastReminderSentAt < REMINDER_COOLDOWN_MS) continue;
 
       // Refresh link TTL
-      if (inv.linkType === "cycle") {
-        const link = await ctx.db
-          .query("cycleShareableLinks")
-          .withIndex("by_token", (q) => q.eq("token", inv.shareableLinkId))
-          .first();
-        if (link) {
-          await ctx.db.patch(link._id, {
-            expiresAt: now + SHAREABLE_LINK_TTL_MS,
-          });
-        }
-      } else {
-        const link = await ctx.db
-          .query("shareableEvalLinks")
-          .withIndex("by_token", (q) => q.eq("token", inv.shareableLinkId))
-          .first();
-        if (link) {
-          await ctx.db.patch(link._id, {
-            expiresAt: now + SHAREABLE_LINK_TTL_MS,
-          });
-        }
+      const link = await ctx.db
+        .query("cycleShareableLinks")
+        .withIndex("by_token", (q) => q.eq("token", inv.shareableLinkId))
+        .first();
+      if (link) {
+        await ctx.db.patch(link._id, {
+          expiresAt: now + SHAREABLE_LINK_TTL_MS,
+        });
       }
 
       await ctx.db.patch(inv._id, {
@@ -388,7 +264,6 @@ export const sendReminderToAllPending = mutation({
           projectName,
           cycleName,
           token: inv.shareableLinkId,
-          linkType: inv.linkType,
         },
       );
 

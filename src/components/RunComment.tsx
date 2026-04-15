@@ -6,50 +6,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, ChevronRight, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface RunCommentAuthProps {
-  mode: "auth";
+interface RunCommentProps {
   runId: Id<"promptRuns">;
 }
 
-interface RunCommentEvalProps {
-  mode: "eval";
-  opaqueToken: string;
-}
-
-type RunCommentProps = RunCommentAuthProps | RunCommentEvalProps;
-
-export function RunComment(props: RunCommentProps) {
-  if (props.mode === "auth") {
-    return <AuthRunComment runId={props.runId} />;
-  }
-  return <EvalRunComment opaqueToken={props.opaqueToken} />;
-}
-
-function AuthRunComment({ runId }: { runId: Id<"promptRuns"> }) {
+export function RunComment({ runId }: RunCommentProps) {
   const existing = useQuery(api.runComments.getMyComment, { runId });
   const upsert = useMutation(api.runComments.upsertComment);
 
   const save = useCallback(
     (value: string) => upsert({ runId, comment: value }),
     [runId, upsert],
-  );
-
-  return (
-    <RunCommentEditor
-      initialComment={existing?.comment ?? null}
-      loading={existing === undefined}
-      onSave={save}
-    />
-  );
-}
-
-function EvalRunComment({ opaqueToken }: { opaqueToken: string }) {
-  const existing = useQuery(api.runComments.getMyCommentByToken, { opaqueToken });
-  const upsert = useMutation(api.runComments.upsertCommentByToken);
-
-  const save = useCallback(
-    (value: string) => upsert({ opaqueToken, comment: value }),
-    [opaqueToken, upsert],
   );
 
   return (

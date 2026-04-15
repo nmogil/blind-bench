@@ -55,6 +55,14 @@ export async function encrypt(plaintext: string, secret: string): Promise<string
   return toBase64(combined);
 }
 
+/** Generate a URL-safe random token that cannot contain Convex IDs as substrings. */
+export function generateToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  // Convert to hex — contains only [0-9a-f], safe from Convex ID substrings
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function decrypt(encrypted: string, secret: string): Promise<string> {
   const combined = fromBase64(encrypted);
   const iv = combined.slice(0, IV_LENGTH);

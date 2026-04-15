@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import { requireProjectRole, requireAuth } from "./lib/auth";
 import { fisherYatesShuffle } from "./lib/shuffle";
 import { getCycleBlindLabels } from "./lib/slotConfig";
-import { generateToken } from "./lib/evalTokens";
+import { generateToken } from "./lib/crypto";
 import { resolveCycleEvalToken } from "./lib/cycleEvalTokens";
 import { Id } from "./_generated/dataModel";
 

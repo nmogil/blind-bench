@@ -223,52 +223,6 @@ export const deletePromptFeedback = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Evaluator-safe output feedback (via opaque token, no outputId exposed)
-// ---------------------------------------------------------------------------
-
-export const addOutputFeedbackByToken = mutation({
-  args: {
-    opaqueToken: v.string(),
-    blindLabel: v.string(),
-    annotationData: v.object({
-      from: v.number(),
-      to: v.number(),
-      highlightedText: v.string(),
-      comment: v.string(),
-    }),
-    tags: tagsValidator,
-  },
-  handler: async (ctx, args) => {
-    // Resolve token
-    const tokenDoc = await ctx.db
-      .query("evalTokens")
-      .withIndex("by_token", (q) => q.eq("token", args.opaqueToken))
-      .unique();
-    if (!tokenDoc) throw new Error("Invalid eval token");
-
-    const { userId } = await requireProjectRole(ctx, tokenDoc.projectId, [
-      "evaluator",
-    ]);
-
-    // Find the output by run + blind label
-    const outputs = await ctx.db
-      .query("runOutputs")
-      .withIndex("by_run", (q) => q.eq("runId", tokenDoc.runId))
-      .take(10);
-
-    const output = outputs.find((o) => o.blindLabel === args.blindLabel);
-    if (!output) throw new Error("Output not found");
-
-    return await ctx.db.insert("outputFeedback", {
-      outputId: output._id,
-      userId,
-      annotationData: args.annotationData,
-      tags: args.tags,
-    });
-  },
-});
-
-// ---------------------------------------------------------------------------
 // Tag distribution aggregation (M11)
 // ---------------------------------------------------------------------------
 

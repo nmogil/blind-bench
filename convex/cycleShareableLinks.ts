@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
-import { generateToken } from "./lib/evalTokens";
+import { generateToken } from "./lib/crypto";
 
 const SHAREABLE_LINK_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
 

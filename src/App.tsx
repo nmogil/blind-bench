@@ -31,12 +31,10 @@ const SoloEvalSetup = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEv
 const SoloEvalActive = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalActive").then(m => ({ default: m.SoloEvalActive })));
 const SoloEvalResults = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalResults").then(m => ({ default: m.SoloEvalResults })));
 const EvalInbox = lazy(() => import("./routes/eval/EvalInbox").then(m => ({ default: m.EvalInbox })));
-const BlindEvalView = lazy(() => import("./routes/eval/BlindEvalView").then(m => ({ default: m.BlindEvalView })));
 const CycleEvalView = lazy(() => import("./routes/eval/CycleEvalView").then(m => ({ default: m.CycleEvalView })));
 const NotFound = lazy(() => import("./routes/errors/NotFound").then(m => ({ default: m.NotFound })));
 const Denied = lazy(() => import("./routes/errors/Denied").then(m => ({ default: m.Denied })));
 const QuickCompare = lazy(() => import("./routes/compare/QuickCompare").then(m => ({ default: m.QuickCompare })));
-const ShareableEvalView = lazy(() => import("./routes/share/ShareableEvalView").then(m => ({ default: m.ShareableEvalView })));
 const CycleShareableEvalView = lazy(() => import("./routes/share/CycleShareableEvalView").then(m => ({ default: m.CycleShareableEvalView })));
 const RunConfigurator = lazy(() => import("./routes/orgs/projects/RunConfigurator").then(m => ({ default: m.RunConfigurator })));
 const CyclesList = lazy(() => import("./routes/orgs/projects/cycles/CyclesList").then(m => ({ default: m.CyclesList })));
@@ -54,7 +52,6 @@ export function App() {
       <Routes>
         <Route path="/auth/sign-in" element={<AuthGatePublic />} />
         <Route path="/compare" element={<QuickCompare />} />
-        <Route path="/s/:token" element={<ShareableEvalView />} />
         <Route path="/s/cycle/:token" element={<CycleShareableEvalView />} />
         <Route element={<AuthGateProtected />}>
           <Route path="/" element={<RootRedirect />} />
@@ -114,7 +111,6 @@ export function App() {
           </Route>
           <Route path="/eval" element={<EvalLayout />}>
             <Route index element={<EvalInbox />} />
-            <Route path=":opaqueRunToken" element={<BlindEvalView />} />
             <Route
               path="cycle/:cycleEvalToken"
               element={<CycleEvalView />}

@@ -81,19 +81,6 @@ async function seedFeedbackEnv() {
       outputContent: "Hello World! This is a test output.",
     });
 
-    // Mint eval token
-    const tokenBytes = new Uint8Array(16);
-    crypto.getRandomValues(tokenBytes);
-    const token = Array.from(tokenBytes, (b) =>
-      b.toString(16).padStart(2, "0"),
-    ).join("");
-    await ctx.db.insert("evalTokens", {
-      token,
-      runId,
-      projectId,
-      expiresAt: Date.now() + 3600000,
-    });
-
     return {
       ownerUserId,
       evaluatorUserId,
@@ -103,7 +90,6 @@ async function seedFeedbackEnv() {
       versionId,
       runId,
       outputId,
-      token,
     };
   });
 
@@ -124,24 +110,6 @@ async function seedFeedbackEnv() {
 }
 
 describe("Feedback Permissions", () => {
-  test("evaluator can create output feedback via token", async () => {
-    const { ids, asEvaluator } = await seedFeedbackEnv();
-    const feedbackId = await asEvaluator.mutation(
-      api.feedback.addOutputFeedbackByToken,
-      {
-        opaqueToken: ids.token,
-        blindLabel: "A",
-        annotationData: {
-          from: 0,
-          to: 5,
-          highlightedText: "Hello",
-          comment: "Good start",
-        },
-      },
-    );
-    expect(feedbackId).toBeDefined();
-  });
-
   test("evaluator cannot create prompt feedback", async () => {
     const { ids, asEvaluator } = await seedFeedbackEnv();
     await expect(

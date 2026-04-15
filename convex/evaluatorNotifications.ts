@@ -91,7 +91,7 @@ export const markAllRead = mutation({
 export const notifyEvaluators = internalMutation({
   args: {
     projectId: v.id("projects"),
-    type: v.union(v.literal("new_run"), v.literal("feedback_used")),
+    type: v.literal("feedback_used"),
     message: v.string(),
   },
   handler: async (ctx, args) => {

@@ -14,7 +14,6 @@ import { PreferenceAggregate } from "@/components/PreferenceAggregate";
 import { RunComment } from "@/components/RunComment";
 import { RunCommentList } from "@/components/RunCommentList";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
-import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { cn } from "@/lib/utils";
 import { sanitizeStoredError } from "@/lib/errors";
 
@@ -103,7 +102,6 @@ export function RunView() {
         </div>
         {run.status === "completed" && (
           <div className="flex items-center gap-2">
-            <ShareLinkButton runId={runId as Id<"promptRuns">} />
             <FeedbackSheet
               runId={runId as Id<"promptRuns">}
               versionId={run.promptVersionId}
@@ -191,7 +189,6 @@ export function RunView() {
                 {run.status === "completed" && (
                   <div className="flex items-center justify-between px-1">
                     <PreferenceRating
-                      mode="auth"
                       outputId={output._id}
                       runId={runId as Id<"promptRuns">}
                     />
@@ -209,7 +206,7 @@ export function RunView() {
         {/* General run comments */}
         {run.status === "completed" && (
           <div className="space-y-3">
-            <RunComment mode="auth" runId={runId as Id<"promptRuns">} />
+            <RunComment runId={runId as Id<"promptRuns">} />
             <RunCommentList runId={runId as Id<"promptRuns">} />
           </div>
         )}

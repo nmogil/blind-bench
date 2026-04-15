@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
-import { resolveEvalToken } from "./lib/evalTokens";
 
 // ---------------------------------------------------------------------------
 // Authenticated mutations (owner/editor/evaluator with direct access)
@@ -42,48 +41,6 @@ export const upsertComment = mutation({
 
     return await ctx.db.insert("runComments", {
       runId: args.runId,
-      userId,
-      comment: args.comment,
-    });
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Token-based mutation (evaluators via opaque eval token)
-// ---------------------------------------------------------------------------
-
-export const upsertCommentByToken = mutation({
-  args: {
-    opaqueToken: v.string(),
-    comment: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const resolved = await resolveEvalToken(ctx, args.opaqueToken);
-    if (!resolved) throw new Error("Invalid eval token");
-
-    const { userId } = await requireProjectRole(ctx, resolved.projectId, [
-      "evaluator",
-    ]);
-
-    const existing = await ctx.db
-      .query("runComments")
-      .withIndex("by_run_user", (q) =>
-        q.eq("runId", resolved.runId).eq("userId", userId),
-      )
-      .unique();
-
-    if (args.comment === "") {
-      if (existing) await ctx.db.delete(existing._id);
-      return null;
-    }
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { comment: args.comment });
-      return existing._id;
-    }
-
-    return await ctx.db.insert("runComments", {
-      runId: resolved.runId,
       userId,
       comment: args.comment,
     });
@@ -157,27 +114,3 @@ export const listForRun = query({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Token-based queries (evaluators via opaque eval token)
-// ---------------------------------------------------------------------------
-
-export const getMyCommentByToken = query({
-  args: { opaqueToken: v.string() },
-  handler: async (ctx, args) => {
-    const resolved = await resolveEvalToken(ctx, args.opaqueToken);
-    if (!resolved) return null;
-
-    const { userId } = await requireProjectRole(ctx, resolved.projectId, [
-      "evaluator",
-    ]);
-
-    const comment = await ctx.db
-      .query("runComments")
-      .withIndex("by_run_user", (q) =>
-        q.eq("runId", resolved.runId).eq("userId", userId),
-      )
-      .unique();
-
-    return comment ? { comment: comment.comment, createdAt: comment._creationTime } : null;
-  },
-});

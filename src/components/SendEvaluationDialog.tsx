@@ -98,24 +98,18 @@ export function SendEvaluationDialog({
     setEmails((prev) => prev.filter((e) => e !== email));
   };
 
-  const resolveTarget = (): {
-    cycleId?: Id<"reviewCycles">;
-    runId?: Id<"promptRuns">;
-  } => {
-    const target = preselectedCycleId
-      ? `cycle:${preselectedCycleId}`
-      : selectedTarget;
-    if (!target) return {};
-    const [type, id] = target.split(":");
-    if (type === "cycle") return { cycleId: id as Id<"reviewCycles"> };
-    if (type === "run") return { runId: id as Id<"promptRuns"> };
-    return {};
+  const resolveCycleId = (): Id<"reviewCycles"> | null => {
+    if (preselectedCycleId) return preselectedCycleId;
+    if (!selectedTarget) return null;
+    const [type, id] = selectedTarget.split(":");
+    if (type === "cycle") return id as Id<"reviewCycles">;
+    return null;
   };
 
   const handleSubmit = async () => {
-    const target = resolveTarget();
-    if (!target.cycleId && !target.runId) {
-      setError("Select what to evaluate");
+    const cycleId = resolveCycleId();
+    if (!cycleId) {
+      setError("Select a review cycle");
       return;
     }
     if (emails.length === 0) {
@@ -128,7 +122,7 @@ export function SendEvaluationDialog({
     try {
       const result = await sendInvitations({
         emails,
-        ...target,
+        cycleId,
       });
       const parts: string[] = [];
       if (result.sent > 0)
@@ -173,7 +167,7 @@ export function SendEvaluationDialog({
                 }}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a cycle or run" />
+                  <SelectValue placeholder="Select a review cycle" />
                 </SelectTrigger>
                 <SelectContent>
                   {openCycles.length > 0 && (

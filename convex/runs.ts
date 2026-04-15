@@ -7,7 +7,6 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
-import { resolveEvalToken, mintEvalToken } from "./lib/evalTokens";
 import { getBlindLabels, validateSlotConfigs } from "./lib/slotConfig";
 
 const CONCURRENT_CAP = 10;
@@ -330,57 +329,6 @@ export const compareAcrossVersions = query({
   },
 });
 
-// --- Evaluator-facing query (SECURITY BOUNDARY) ---
-
-export const getOutputsForEvaluator = query({
-  args: { opaqueToken: v.string() },
-  handler: async (ctx, args) => {
-    const resolved = await resolveEvalToken(ctx, args.opaqueToken);
-    if (!resolved) throw new Error("Invalid eval token");
-
-    await requireProjectRole(ctx, resolved.projectId, ["evaluator"]);
-
-    const run = await ctx.db.get(resolved.runId);
-    if (!run || run.status !== "completed") {
-      throw new Error("Run not available");
-    }
-
-    const project = await ctx.db.get(resolved.projectId);
-
-    const outputs = await ctx.db
-      .query("runOutputs")
-      .withIndex("by_run", (q) => q.eq("runId", resolved.runId))
-      .take(10);
-
-    const result = [];
-    for (const output of outputs) {
-      const feedback = await ctx.db
-        .query("outputFeedback")
-        .withIndex("by_output", (q) => q.eq("outputId", output._id))
-        .take(200);
-
-      result.push({
-        blindLabel: output.blindLabel,
-        outputContent: output.outputContent,
-        annotations: feedback.map((fb) => ({
-          from: fb.annotationData.from,
-          to: fb.annotationData.to,
-          highlightedText: fb.annotationData.highlightedText,
-          comment: fb.annotationData.comment,
-          createdAt: fb._creationTime,
-        })),
-      });
-    }
-
-    // SECURITY: Return ONLY blindLabel, outputContent, annotations + project name
-    // No _id, runId, versionId, promptTokens, latencyMs, model, temperature
-    return {
-      projectName: project?.name ?? "Unknown",
-      outputs: result.sort((a, b) => a.blindLabel.localeCompare(b.blindLabel)),
-    };
-  },
-});
-
 // --- Internal functions (called by the streaming action) ---
 
 export const getRunContext = internalQuery({
@@ -465,35 +413,19 @@ export const updateRunStatus = internalMutation({
     if (args.completedAt !== undefined) updates.completedAt = args.completedAt;
     await ctx.db.patch(args.runId, updates);
 
-    // Mint eval token when run completes so evaluators can access it
+    // Auto-trigger post-run insights for mix-mode runs
     if (args.status === "completed") {
       const run = await ctx.db.get(args.runId);
-      if (run) {
-        await mintEvalToken(ctx, args.runId, run.projectId);
-
-        // Auto-trigger post-run insights for mix-mode runs
-        if (run.mode === "mix") {
-          const insightId = await ctx.db.insert("runInsights", {
-            runId: args.runId,
-            projectId: run.projectId,
-            status: "pending",
-          });
-          await ctx.scheduler.runAfter(
-            0,
-            internal.runInsightsActions.generateInsightsAction,
-            { insightId, runId: args.runId },
-          );
-        }
-
-        // M10: Notify evaluators about the new run
+      if (run && run.mode === "mix") {
+        const insightId = await ctx.db.insert("runInsights", {
+          runId: args.runId,
+          projectId: run.projectId,
+          status: "pending",
+        });
         await ctx.scheduler.runAfter(
           0,
-          internal.evaluatorNotifications.notifyEvaluators,
-          {
-            projectId: run.projectId,
-            type: "new_run" as const,
-            message: "New outputs are ready for your review.",
-          },
+          internal.runInsightsActions.generateInsightsAction,
+          { insightId, runId: args.runId },
         );
       }
     }

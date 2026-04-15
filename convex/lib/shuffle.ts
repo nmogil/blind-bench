@@ -1,6 +1,6 @@
 /**
  * Cryptographically random Fisher-Yates shuffle.
- * Uses crypto.getRandomValues (same pattern as evalTokens.ts).
+ * Uses crypto.getRandomValues.
  * Must run server-side so the client never sees the original ordering.
  */
 export function fisherYatesShuffle<T>(array: T[]): T[] {

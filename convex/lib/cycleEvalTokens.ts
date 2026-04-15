@@ -1,6 +1,6 @@
 import { MutationCtx, QueryCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
-import { generateToken } from "./evalTokens";
+import { generateToken } from "./crypto";
 
 const CYCLE_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 

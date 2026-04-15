@@ -12,13 +12,9 @@ export const sendInvitationEmail = internalAction({
     projectName: v.string(),
     cycleName: v.optional(v.string()),
     token: v.string(),
-    linkType: v.union(v.literal("cycle"), v.literal("run")),
   },
   handler: async (_ctx, args) => {
-    const shareableUrl =
-      args.linkType === "cycle"
-        ? `${SITE_URL}/s/cycle/${args.token}`
-        : `${SITE_URL}/s/${args.token}`;
+    const shareableUrl = `${SITE_URL}/s/cycle/${args.token}`;
 
     if (!process.env.RESEND_API_KEY) {
       console.log(
@@ -54,13 +50,9 @@ export const sendInvitationReminderEmail = internalAction({
     projectName: v.string(),
     cycleName: v.optional(v.string()),
     token: v.string(),
-    linkType: v.union(v.literal("cycle"), v.literal("run")),
   },
   handler: async (_ctx, args) => {
-    const shareableUrl =
-      args.linkType === "cycle"
-        ? `${SITE_URL}/s/cycle/${args.token}`
-        : `${SITE_URL}/s/${args.token}`;
+    const shareableUrl = `${SITE_URL}/s/cycle/${args.token}`;
 
     if (!process.env.RESEND_API_KEY) {
       console.log(

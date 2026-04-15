@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
-import { resolveEvalToken } from "./lib/evalTokens";
 
 const ratingValidator = v.union(
   v.literal("best"),
@@ -104,87 +103,6 @@ export const clearRating = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Token-based mutations (evaluators via opaque eval token)
-// ---------------------------------------------------------------------------
-
-export const rateOutputByToken = mutation({
-  args: {
-    opaqueToken: v.string(),
-    blindLabel: v.string(),
-    rating: ratingValidator,
-  },
-  handler: async (ctx, args) => {
-    const resolved = await resolveEvalToken(ctx, args.opaqueToken);
-    if (!resolved) throw new Error("Invalid eval token");
-
-    const { userId } = await requireProjectRole(ctx, resolved.projectId, [
-      "evaluator",
-    ]);
-
-    // Find the output by run + blind label
-    const outputs = await ctx.db
-      .query("runOutputs")
-      .withIndex("by_run", (q) => q.eq("runId", resolved.runId))
-      .take(10);
-
-    const output = outputs.find((o) => o.blindLabel === args.blindLabel);
-    if (!output) throw new Error("Output not found");
-
-    // Upsert
-    const existing = await ctx.db
-      .query("outputPreferences")
-      .withIndex("by_output", (q) => q.eq("outputId", output._id))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .unique();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, { rating: args.rating });
-      return existing._id;
-    }
-
-    return await ctx.db.insert("outputPreferences", {
-      runId: resolved.runId,
-      outputId: output._id,
-      userId,
-      rating: args.rating,
-    });
-  },
-});
-
-export const clearRatingByToken = mutation({
-  args: {
-    opaqueToken: v.string(),
-    blindLabel: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const resolved = await resolveEvalToken(ctx, args.opaqueToken);
-    if (!resolved) throw new Error("Invalid eval token");
-
-    const { userId } = await requireProjectRole(ctx, resolved.projectId, [
-      "evaluator",
-    ]);
-
-    const outputs = await ctx.db
-      .query("runOutputs")
-      .withIndex("by_run", (q) => q.eq("runId", resolved.runId))
-      .take(10);
-
-    const output = outputs.find((o) => o.blindLabel === args.blindLabel);
-    if (!output) throw new Error("Output not found");
-
-    const existing = await ctx.db
-      .query("outputPreferences")
-      .withIndex("by_output", (q) => q.eq("outputId", output._id))
-      .filter((q) => q.eq(q.field("userId"), userId))
-      .unique();
-
-    if (existing) {
-      await ctx.db.delete(existing._id);
-    }
-  },
-});
-
-// ---------------------------------------------------------------------------
 // Authenticated queries (owner/editor)
 // ---------------------------------------------------------------------------
 
@@ -251,40 +169,3 @@ export const aggregateForRun = query({
   },
 });
 
-// ---------------------------------------------------------------------------
-// Token-based queries (evaluators via opaque eval token)
-// ---------------------------------------------------------------------------
-
-export const getMyRatingsByToken = query({
-  args: { opaqueToken: v.string() },
-  handler: async (ctx, args) => {
-    const resolved = await resolveEvalToken(ctx, args.opaqueToken);
-    if (!resolved) return [];
-
-    const { userId } = await requireProjectRole(ctx, resolved.projectId, [
-      "evaluator",
-    ]);
-
-    const prefs = await ctx.db
-      .query("outputPreferences")
-      .withIndex("by_run_user", (q) =>
-        q.eq("runId", resolved.runId).eq("userId", userId),
-      )
-      .take(20);
-
-    // Look up blind labels — do NOT return outputId to evaluators
-    const outputs = await ctx.db
-      .query("runOutputs")
-      .withIndex("by_run", (q) => q.eq("runId", resolved.runId))
-      .take(10);
-
-    const outputIdToLabel = new Map(
-      outputs.map((o) => [o._id as string, o.blindLabel]),
-    );
-
-    return prefs.map((p) => ({
-      blindLabel: outputIdToLabel.get(p.outputId as string) ?? "",
-      rating: p.rating,
-    }));
-  },
-});
