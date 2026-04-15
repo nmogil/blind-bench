@@ -19,12 +19,14 @@ export const createCycleShareableLink = mutation({
 
     await requireProjectRole(ctx, cycle.projectId, ["owner", "editor"]);
 
-    // Check for existing active link
+    // Check for existing active general link (exclude per-email invitation links)
     const existing = await ctx.db
       .query("cycleShareableLinks")
       .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-      .take(10);
-    const activeLink = existing.find((l) => l.active);
+      .take(100);
+    const activeLink = existing.find(
+      (l) => l.active && l.purpose !== "invitation",
+    );
     if (activeLink) {
       throw new Error(
         "An active shareable link already exists for this cycle",
@@ -162,6 +164,22 @@ export const submitAnonymousCyclePreferences = mutation({
     await ctx.db.patch(link._id, {
       responseCount: link.responseCount + 1,
     });
+
+    // Mark email invitation as responded if this is a per-email link
+    if (link.purpose === "invitation") {
+      const invitation = await ctx.db
+        .query("evalInvitations")
+        .withIndex("by_shareable_link", (q) =>
+          q.eq("shareableLinkId", link.token),
+        )
+        .first();
+      if (invitation && invitation.status === "pending") {
+        await ctx.db.patch(invitation._id, {
+          status: "responded",
+          respondedAt: Date.now(),
+        });
+      }
+    }
   },
 });
 

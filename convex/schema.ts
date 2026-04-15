@@ -435,6 +435,7 @@ const schema = defineSchema({
     maxResponses: v.optional(v.number()),
     responseCount: v.number(),
     active: v.boolean(),
+    purpose: v.optional(v.literal("invitation")),
   })
     .index("by_token", ["token"])
     .index("by_run", ["runId"]),
@@ -634,9 +635,31 @@ const schema = defineSchema({
     maxResponses: v.optional(v.number()),
     responseCount: v.number(),
     active: v.boolean(),
+    purpose: v.optional(v.literal("invitation")),
   })
     .index("by_token", ["token"])
     .index("by_cycle", ["cycleId"]),
+
+  // Email invitations for anonymous evaluation via shareable links.
+  evalInvitations: defineTable({
+    email: v.string(),
+    projectId: v.id("projects"),
+    cycleId: v.optional(v.id("reviewCycles")),
+    runId: v.optional(v.id("promptRuns")),
+    shareableLinkId: v.string(),
+    linkType: v.union(v.literal("cycle"), v.literal("run")),
+    invitedById: v.id("users"),
+    invitedAt: v.number(),
+    status: v.union(v.literal("pending"), v.literal("responded")),
+    respondedAt: v.optional(v.number()),
+    lastReminderSentAt: v.optional(v.number()),
+    reminderCount: v.number(),
+  })
+    .index("by_cycle", ["cycleId"])
+    .index("by_run", ["runId"])
+    .index("by_email_and_cycle", ["email", "cycleId"])
+    .index("by_email_and_run", ["email", "runId"])
+    .index("by_shareable_link", ["shareableLinkId"]),
 });
 
 export default schema;

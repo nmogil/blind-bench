@@ -22,7 +22,9 @@ import {
   Bell,
   Link2,
   Trash2,
+  Mail,
 } from "lucide-react";
+import { SendEvaluationDialog } from "@/components/SendEvaluationDialog";
 import { cn } from "@/lib/utils";
 import { friendlyError } from "@/lib/errors";
 import { toast } from "sonner";
@@ -56,8 +58,17 @@ export function CycleDetail() {
     api.cycleShareableLinks.deactivateCycleShareableLink,
   );
   const toggleSoloEval = useMutation(api.reviewCycles.toggleSoloEval);
+  const sendInvitationReminder = useMutation(
+    api.evalInvitations.sendInvitationReminder,
+  );
+
+  const invitations = useQuery(
+    api.evalInvitations.getInvitations,
+    cycleId ? { cycleId: cycleId as Id<"reviewCycles"> } : "skip",
+  );
 
   const [closing, setClosing] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(
@@ -298,6 +309,14 @@ export function CycleDetail() {
               <Button
                 size="sm"
                 variant="outline"
+                onClick={() => setSendDialogOpen(true)}
+              >
+                <Mail className="h-3.5 w-3.5 mr-1.5" />
+                Send Evaluation
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={copyEvalLink}
               >
                 {copiedToken ? (
@@ -465,6 +484,73 @@ export function CycleDetail() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+      {/* Email Invitees Section */}
+      {(cycle.status === "open" || cycle.status === "closed") &&
+        invitations &&
+        invitations.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold">
+                Email Invitees{" "}
+                <span className="font-normal text-muted-foreground">
+                  — {invitations.filter((i) => i.status === "responded").length}{" "}
+                  of {invitations.length} responded
+                </span>
+              </h3>
+            </div>
+            <div className="rounded-lg border divide-y">
+              {invitations.map((inv) => (
+                <div
+                  key={inv._id}
+                  className="flex items-center justify-between px-4 py-3"
+                >
+                  <span className="text-sm truncate">{inv.email}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "text-[10px]",
+                        inv.status === "responded" &&
+                          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+                      )}
+                    >
+                      {inv.status}
+                    </Badge>
+                    {cycle.status === "open" && inv.status === "pending" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        disabled={inv.reminderCount >= MAX_REMINDERS}
+                        title={
+                          inv.reminderCount >= MAX_REMINDERS
+                            ? "Maximum reminders sent"
+                            : "Send reminder email"
+                        }
+                        onClick={async () => {
+                          try {
+                            await sendInvitationReminder({
+                              invitationId: inv._id,
+                            });
+                            toast.success(`Reminder sent to ${inv.email}`);
+                          } catch (e) {
+                            toast.error(
+                              friendlyError(e, "Failed to send reminder."),
+                            );
+                          }
+                        }}
+                      >
+                        <Bell className="h-3 w-3 mr-1" />
+                        ({inv.reminderCount}/{MAX_REMINDERS})
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -667,6 +753,13 @@ export function CycleDetail() {
           </p>
         </div>
       )}
+
+      <SendEvaluationDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        projectId={projectId}
+        preselectedCycleId={cycleId as Id<"reviewCycles">}
+      />
     </div>
   );
 }

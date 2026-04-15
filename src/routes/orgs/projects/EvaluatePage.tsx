@@ -1,15 +1,19 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { useProject } from "@/contexts/ProjectContext";
 import { CycleStatusPill } from "@/components/CycleStatusPill";
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SendEvaluationDialog } from "@/components/SendEvaluationDialog";
 import {
   ArrowRight,
   ClipboardCheck,
   Layers,
+  Mail,
   Plus,
   Star,
 } from "lucide-react";
@@ -17,6 +21,7 @@ import {
 export function EvaluatePage() {
   const { projectId, role } = useProject();
   const { orgSlug } = useParams<{ orgSlug: string }>();
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const cycles = useQuery(
     api.reviewCycles.list,
@@ -92,13 +97,25 @@ export function EvaluatePage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Evaluate</h1>
-        <Link
-          to={`${basePath}/cycles/new`}
-          className={buttonVariants({ size: "sm" })}
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          New cycle
-        </Link>
+        <div className="flex items-center gap-2">
+          {openCycles.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSendDialogOpen(true)}
+            >
+              <Mail className="h-3.5 w-3.5 mr-1.5" />
+              Send evaluation
+            </Button>
+          )}
+          <Link
+            to={`${basePath}/cycles/new`}
+            className={buttonVariants({ size: "sm" })}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            New cycle
+          </Link>
+        </div>
       </div>
 
       {!hasAnything ? (
@@ -242,6 +259,13 @@ export function EvaluatePage() {
           )}
         </div>
       )}
+
+      <SendEvaluationDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        projectId={projectId}
+        showTargetPicker
+      />
     </div>
   );
 }

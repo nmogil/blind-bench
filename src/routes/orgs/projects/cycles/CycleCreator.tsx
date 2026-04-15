@@ -21,11 +21,13 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronRight,
+  Mail,
   Shuffle,
   Users,
   Play,
   AlertCircle,
   Sparkles,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { friendlyError } from "@/lib/errors";
@@ -72,6 +74,7 @@ export function CycleCreator() {
   const startCycle = useMutation(api.reviewCycles.start);
   const updateName = useMutation(api.reviewCycles.updateName);
   const toggleSoloEval = useMutation(api.reviewCycles.toggleSoloEval);
+  const sendInvitations = useMutation(api.evalInvitations.sendInvitations);
 
   // State
   const [step, setStep] = useState<Step>("versions");
@@ -90,6 +93,8 @@ export function CycleCreator() {
     Set<string>
   >(new Set());
   const [cycleName, setCycleName] = useState("");
+  const [inviteeEmails, setInviteeEmails] = useState<string[]>([]);
+  const [emailInputValue, setEmailInputValue] = useState("");
   const [, setCreatedCycleId] = useState<
     Id<"reviewCycles"> | null
   >(null);
@@ -216,6 +221,11 @@ export function CycleCreator() {
       // Step 6: Toggle solo eval if requested
       if (includeSoloEval) {
         await toggleSoloEval({ cycleId, includeSoloEval: true });
+      }
+
+      // Step 7: Send email invitations if any
+      if (inviteeEmails.length > 0) {
+        await sendInvitations({ emails: inviteeEmails, cycleId });
       }
 
       // Navigate to cycle detail
@@ -612,6 +622,106 @@ export function CycleCreator() {
             </div>
           )}
 
+          {/* Email invitees — no account needed */}
+          <div className="mt-4">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Invite by Email
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Send evaluation links to anyone — no account needed.
+            </p>
+            <div className="mt-2 rounded-md border border-input bg-transparent px-3 py-2 min-h-[42px] flex flex-wrap gap-1.5 items-center focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+              {inviteeEmails.map((email) => (
+                <span
+                  key={email}
+                  className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+                >
+                  {email}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setInviteeEmails((prev) =>
+                        prev.filter((e) => e !== email),
+                      )
+                    }
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              <Input
+                type="email"
+                placeholder={
+                  inviteeEmails.length === 0
+                    ? "name@example.com"
+                    : "Add another..."
+                }
+                value={emailInputValue}
+                onChange={(e) => setEmailInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === "Enter" ||
+                    e.key === "," ||
+                    e.key === "Tab"
+                  ) {
+                    e.preventDefault();
+                    const email = emailInputValue.trim().toLowerCase();
+                    if (
+                      email &&
+                      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+                      !inviteeEmails.includes(email)
+                    ) {
+                      setInviteeEmails((prev) => [...prev, email]);
+                    }
+                    setEmailInputValue("");
+                  }
+                  if (
+                    e.key === "Backspace" &&
+                    emailInputValue === "" &&
+                    inviteeEmails.length > 0
+                  ) {
+                    setInviteeEmails((prev) => prev.slice(0, -1));
+                  }
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData("text");
+                  const parts = text
+                    .split(/[,;\s\n]+/)
+                    .filter(Boolean)
+                    .map((s) => s.trim().toLowerCase())
+                    .filter(
+                      (s) =>
+                        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) &&
+                        !inviteeEmails.includes(s),
+                    );
+                  if (parts.length > 0) {
+                    setInviteeEmails((prev) => [...prev, ...parts]);
+                  }
+                }}
+                onBlur={() => {
+                  const email = emailInputValue.trim().toLowerCase();
+                  if (
+                    email &&
+                    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+                    !inviteeEmails.includes(email)
+                  ) {
+                    setInviteeEmails((prev) => [...prev, email]);
+                  }
+                  setEmailInputValue("");
+                }}
+                className="flex-1 min-w-[140px] border-0 p-0 h-auto text-sm shadow-none focus-visible:ring-0"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Separate multiple emails with commas or Enter
+            </p>
+          </div>
+
           <div className="flex gap-2">
             <Button variant="outline" onClick={goBack} className="flex-1">
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -619,7 +729,9 @@ export function CycleCreator() {
             </Button>
             <Button
               onClick={goNext}
-              disabled={selectedEvaluatorIds.size === 0}
+              disabled={
+                selectedEvaluatorIds.size === 0 && inviteeEmails.length === 0
+              }
               className="flex-1"
             >
               Next: Review
@@ -674,6 +786,8 @@ export function CycleCreator() {
                 <span className="text-muted-foreground">Evaluators:</span>{" "}
                 <span className="font-medium">
                   {selectedEvaluatorIds.size}
+                  {inviteeEmails.length > 0 &&
+                    ` + ${inviteeEmails.length} email`}
                 </span>
               </div>
             </div>

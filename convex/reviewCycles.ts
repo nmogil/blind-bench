@@ -431,17 +431,6 @@ export const start = mutation({
       throw new Error("Add at least one output before starting the cycle");
     }
 
-    // Verify at least 1 evaluator
-    const evaluators = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-      .take(1);
-    if (evaluators.length === 0) {
-      throw new Error(
-        "Assign at least one evaluator before starting the cycle",
-      );
-    }
-
     // Verify no other open cycle for this primaryVersionId
     const openCycles = await ctx.db
       .query("reviewCycles")
@@ -1108,12 +1097,14 @@ export const get = query({
       .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
       .take(1);
 
-    // Get shareable link if exists
+    // Get shareable link if exists (exclude per-email invitation links)
     const shareableLink = await ctx.db
       .query("cycleShareableLinks")
       .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-      .take(1);
-    const activeLink = shareableLink.find((l) => l.active);
+      .take(100);
+    const activeLink = shareableLink.find(
+      (l) => l.active && l.purpose !== "invitation",
+    );
 
     return {
       _id: cycle._id,

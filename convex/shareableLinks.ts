@@ -19,12 +19,14 @@ export const createShareableLink = mutation({
 
     await requireProjectRole(ctx, run.projectId, ["owner", "editor"]);
 
-    // Check for existing active link
-    const existing = await ctx.db
+    // Check for existing active general link (exclude per-email invitation links)
+    const existingLinks = await ctx.db
       .query("shareableEvalLinks")
       .withIndex("by_run", (q) => q.eq("runId", runId))
-      .filter((q) => q.eq(q.field("active"), true))
-      .first();
+      .take(100);
+    const existing = existingLinks.find(
+      (l) => l.active && l.purpose !== "invitation",
+    );
     if (existing) return existing.token;
 
     const token = generateToken();
@@ -72,13 +74,15 @@ export const getShareableLinkForRun = query({
 
     await requireProjectRole(ctx, run.projectId, ["owner", "editor"]);
 
-    const link = await ctx.db
+    const links = await ctx.db
       .query("shareableEvalLinks")
       .withIndex("by_run", (q) => q.eq("runId", runId))
-      .filter((q) => q.eq(q.field("active"), true))
-      .first();
+      .take(100);
+    const link = links.find(
+      (l) => l.active && l.purpose !== "invitation",
+    );
 
-    return link;
+    return link ?? null;
   },
 });
 
@@ -203,5 +207,21 @@ export const submitAnonymousPreferences = mutation({
     await ctx.db.patch(link._id, {
       responseCount: link.responseCount + 1,
     });
+
+    // Mark email invitation as responded if this is a per-email link
+    if (link.purpose === "invitation") {
+      const invitation = await ctx.db
+        .query("evalInvitations")
+        .withIndex("by_shareable_link", (q) =>
+          q.eq("shareableLinkId", link.token),
+        )
+        .first();
+      if (invitation && invitation.status === "pending") {
+        await ctx.db.patch(invitation._id, {
+          status: "responded",
+          respondedAt: Date.now(),
+        });
+      }
+    }
   },
 });
