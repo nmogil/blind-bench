@@ -65,8 +65,8 @@ export function RunView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between border-b px-5 py-4">
+        <div className="flex items-center gap-4">
           <Link
             to={`/orgs/${orgSlug}/projects/${projectId}/versions/${run.promptVersionId}`}
             className="text-muted-foreground hover:text-foreground"
@@ -74,13 +74,13 @@ export function RunView() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="text-sm font-medium">
                 Run &middot; Version {run.versionNumber ?? "?"}
               </span>
               <RunStatusPill status={run.status} />
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
               <span>
                 {run.isQuickRun
                   ? <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 text-[10px] font-medium">Quick run</span>
