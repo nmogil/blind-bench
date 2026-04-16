@@ -1,0 +1,116 @@
+---
+// Replaces the former Differentiators feature cards. Promises a comparison
+// in the section headline ("What Blind Bench does that others don't") and
+// now actually delivers one — named alternatives, named failure modes.
+
+const rows = [
+  {
+    tried: 'Prompt tools',
+    examples: 'Promptfoo, PromptLayer',
+    gap: 'Edits prompts. No humans in the loop.',
+    bb: 'One-link feedback from real humans.',
+  },
+  {
+    tried: 'Eval tools',
+    examples: 'LangSmith, HumanLoop',
+    gap: 'Measures performance. No qualitative feedback.',
+    bb: 'Annotations, not just scores.',
+  },
+  {
+    tried: 'Google Docs / Slack',
+    examples: 'or email threads',
+    gap: 'No blinding. Feedback scattered. Nothing applies it.',
+    bb: 'Blind by default. Feedback becomes edits.',
+  },
+];
+---
+
+<section class="bg-muted/30 py-16 lg:py-24">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <h2 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        What Blind Bench does that others don&rsquo;t.
+      </h2>
+      <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+        Prompt tools edit. Eval tools measure. Blind Bench gets real humans in
+        the loop &mdash; and turns their feedback into edits.
+      </p>
+    </div>
+
+    <!-- Desktop: three-column comparison table.
+         Mobile: stacked cards. -->
+    <div class="reveal-scale mt-12">
+      <!-- Desktop layout -->
+      <div
+        class="hidden overflow-hidden rounded-2xl border border-border bg-card lg:block"
+      >
+        <!-- Header row -->
+        <div
+          class="grid grid-cols-[1.1fr_1.4fr_1fr] border-b border-border bg-muted/40"
+        >
+          <div class="px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+            You tried...
+          </div>
+          <div class="px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+            What went wrong
+          </div>
+          <div class="border-l border-border bg-primary/5 px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-primary">
+            Blind Bench
+          </div>
+        </div>
+
+        <!-- Body rows -->
+        {
+          rows.map((r, i) => (
+            <div
+              class={`grid grid-cols-[1.1fr_1.4fr_1fr] ${i < rows.length - 1 ? 'border-b border-border' : ''}`}
+            >
+              <div class="px-5 py-5">
+                <p class="text-sm font-semibold text-foreground">{r.tried}</p>
+                <p class="mt-1 text-xs text-muted-foreground">{r.examples}</p>
+              </div>
+              <div class="px-5 py-5 text-sm leading-relaxed text-muted-foreground">
+                {r.gap}
+              </div>
+              <div class="border-l border-border bg-primary/5 px-5 py-5 text-sm leading-relaxed text-foreground">
+                {r.bb}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <!-- Mobile layout: stacked cards -->
+      <div class="space-y-5 lg:hidden">
+        {
+          rows.map((r) => (
+            <div class="overflow-hidden rounded-xl border border-border bg-card">
+              <div class="border-b border-border bg-muted/40 px-4 py-3">
+                <p class="text-sm font-semibold text-foreground">{r.tried}</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">{r.examples}</p>
+              </div>
+              <dl class="divide-y divide-border">
+                <div class="px-4 py-3">
+                  <dt class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    What went wrong
+                  </dt>
+                  <dd class="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {r.gap}
+                  </dd>
+                </div>
+                <div class="bg-primary/5 px-4 py-3">
+                  <dt class="font-mono text-[10px] uppercase tracking-widest text-primary">
+                    Blind Bench
+                  </dt>
+                  <dd class="mt-1 text-sm leading-relaxed text-foreground">
+                    {r.bb}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>

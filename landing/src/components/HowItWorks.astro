@@ -1,40 +1,35 @@
 ---
 import StepCard from './StepCard.astro';
-import ArrowRight from '../icons/ArrowRight.astro';
 import Pencil from '../icons/Pencil.astro';
-import Play from '../icons/Play.astro';
 import Share from '../icons/Share.astro';
 import Sparkles from '../icons/Sparkles.astro';
 
-// Step colors use CSS custom properties for theme-aware differentiation.
+// Three steps — the actual pitch. Create+Run fold into Set up; the pitch
+// (share + apply) maps onto ProductDemo and OptimizerDiff as proof below.
 const steps = [
   {
     number: 1,
-    title: 'Create',
-    description: 'Write your prompt. Define variables. Build a real test suite.',
+    title: 'Set up',
+    description:
+      'Write your prompt. Pick models to compare. Five minutes.',
     Icon: Pencil,
     color: 'var(--step-1)',
   },
   {
     number: 2,
-    title: 'Run',
-    description: 'Fan out across versions and models. Outputs stream live.',
-    Icon: Play,
+    title: 'Share one link',
+    description:
+      'Experts, teammates, and customers annotate in the browser. No account.',
+    Icon: Share,
     color: 'var(--step-2)',
   },
   {
     number: 3,
-    title: 'Collect feedback',
-    description: 'Share one link. Reviewers annotate in the browser — no account needed.',
-    Icon: Share,
-    color: 'var(--step-3)',
-  },
-  {
-    number: 4,
-    title: 'Apply feedback',
-    description: 'The optimizer rewrites your prompt from the annotations. Every edit cites the comment that drove it.',
+    title: 'Apply the feedback',
+    description:
+      'The optimizer rewrites your prompt from the annotations. Every edit cites the comment that drove it.',
     Icon: Sparkles,
-    color: 'var(--step-4)',
+    color: 'var(--step-3)',
   },
 ];
 ---
@@ -43,7 +38,7 @@ const steps = [
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
     <div class="reveal mx-auto max-w-2xl text-center">
       <h2 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-        The loop
+        How Blind Bench works
       </h2>
       <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
         Collect real feedback. Apply it. Ship a better prompt.
@@ -59,7 +54,7 @@ const steps = [
       </div>
 
       <div
-        class="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8"
+        class="grid grid-cols-1 gap-12 sm:grid-cols-3 lg:gap-10"
       >
         {steps.map(({ Icon, ...rest }, i) => (
           <div class={`reveal reveal-delay-${i + 1}`}>
@@ -69,16 +64,6 @@ const steps = [
           </div>
         ))}
       </div>
-    </div>
-
-    <div class="reveal mt-12 text-center">
-      <a
-        href="https://app.blindbench.dev"
-        class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        Start collecting feedback
-        <ArrowRight class="h-3.5 w-3.5" />
-      </a>
     </div>
   </div>
 </section>

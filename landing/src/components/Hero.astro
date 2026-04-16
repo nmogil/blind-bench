@@ -1,7 +1,6 @@
 ---
 import ArrowRight from '../icons/ArrowRight.astro';
 import ArrowDown from '../icons/ArrowDown.astro';
-import DashboardPreview from './DashboardPreview.astro';
 
 const APP_URL = 'https://app.blindbench.dev';
 ---
@@ -15,7 +14,7 @@ const APP_URL = 'https://app.blindbench.dev';
     <div class="aurora-layer aurora-layer-3"></div>
   </div>
 
-  <div class="mx-auto max-w-5xl px-4 pt-32 pb-20 sm:px-6 lg:px-8 lg:pt-44 lg:pb-24">
+  <div class="mx-auto max-w-5xl px-4 pt-32 pb-28 sm:px-6 lg:px-8 lg:pt-44 lg:pb-40">
     <div class="hero-animate mx-auto max-w-3xl text-center">
       <h1
         class="text-[2.5rem] font-extrabold leading-[1.08] tracking-tighter text-foreground sm:text-5xl lg:text-[3.75rem] xl:text-[4.25rem]"
@@ -40,16 +39,10 @@ const APP_URL = 'https://app.blindbench.dev';
           href="#how-it-works"
           class="inline-flex items-center justify-center rounded-lg px-8 py-3.5 text-base font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          See the loop
+          See how it works
           <ArrowDown class="ml-1.5 h-4 w-4" />
         </a>
       </div>
-
-      <p class="mt-5 text-sm text-muted-foreground">
-        Bring your own OpenRouter key. No per-seat billing. No credit card.
-      </p>
     </div>
-
-    <DashboardPreview />
   </div>
 </section>

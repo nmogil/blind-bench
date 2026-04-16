@@ -1,0 +1,54 @@
+---
+// Audience section: answers "who gives you feedback?" immediately after the
+// problem lands. Was previously buried below Differentiators; promoted here
+// so visitors see the three real-world personas before the demos.
+
+const audiences = [
+  {
+    title: 'Experts',
+    scenario:
+      'Your compliance lawyer gets a link by email, annotates three outputs on her phone, and closes the tab.',
+  },
+  {
+    title: 'Teammates',
+    scenario:
+      'Reviewers see outputs &mdash; not prompts, not authors. Their feedback lands without bias.',
+  },
+  {
+    title: 'Customers',
+    scenario:
+      'Embed an evaluator link in your product or onboarding emails. Real users, real reactions.',
+  },
+];
+---
+
+<section class="py-14 lg:py-20">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <p class="font-mono text-xs tracking-widest text-muted-foreground uppercase">
+        Who gives you feedback
+      </p>
+      <h2 class="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        The people you actually want feedback from.
+      </h2>
+      <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+        Not another account signup. One link, annotated in the browser, closed
+        the tab.
+      </p>
+    </div>
+
+    <dl class="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-8">
+      {
+        audiences.map((a, i) => (
+          <div class={`reveal reveal-delay-${i + 1} rounded-xl border border-border/60 bg-card p-5 sm:p-6`}>
+            <dt class="text-sm font-semibold text-foreground">{a.title}</dt>
+            <dd
+              class="mt-2 text-sm leading-relaxed text-muted-foreground"
+              set:html={a.scenario}
+            />
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>

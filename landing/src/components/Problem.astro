@@ -1,21 +1,52 @@
-<section class="redact-reveal border-y border-border/50 bg-muted/30 py-12 lg:py-16">
-  <div class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
+---
+// Problem section: three lived failure modes instead of abstract claims.
+// Preserves the redact-reveal animation — punchline phrases unblur on scroll.
+
+const scenarios = [
+  {
+    setup: 'You asked your team in Slack.',
+    punchline: 'The thread died on Tuesday.',
+  },
+  {
+    setup: 'You tried a Google Doc.',
+    punchline: 'Feedback is scattered across 12 places.',
+  },
+  {
+    setup: 'You shipped it anyway.',
+    punchline: 'And hoped the prompt held up in prod.',
+  },
+];
+---
+
+<section class="redact-reveal border-y border-border/50 bg-muted/30 py-16 lg:py-20">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
     <h2 class="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
       Getting human feedback on prompts is broken.
     </h2>
 
-    <div class="mt-6 max-w-[65ch] space-y-4 text-base leading-relaxed text-muted-foreground">
-      <p>
-        The only way to know your prompt is good is to put outputs in front of
-        <span class="redacted">real humans</span>.
-      </p>
-      <p>
-        Experts, teammates, customers — <span class="redacted redacted-delay">none of them want to log into another tool</span>.
-      </p>
-      <p class="font-medium text-foreground">
-        So prompts ship on vibes — yours, not the people who actually read the output.
-      </p>
-    </div>
+    <ul class="mt-8 space-y-5 text-base leading-relaxed text-muted-foreground">
+      {
+        scenarios.map((s, i) => (
+          <li class="flex gap-3">
+            <span
+              class="mt-0.5 font-mono text-xs font-medium text-muted-foreground/80"
+              aria-hidden="true"
+            >
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <p>
+              <span class="text-foreground/85">{s.setup}</span>{' '}
+              <span class={`redacted redacted-delay-${i}`}>{s.punchline}</span>
+            </p>
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="mt-8 border-t border-border/60 pt-6 text-base font-medium leading-relaxed text-foreground">
+      So prompts ship on vibes &mdash; yours, not the people who actually read
+      the output.
+    </p>
   </div>
 </section>
 
@@ -26,9 +57,10 @@
     transition: filter 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .redacted-delay {
-    transition-delay: 0.3s;
-  }
+  /* Staggered reveal so the three punchlines land in sequence */
+  .redacted-delay-0 { transition-delay: 0s; }
+  .redacted-delay-1 { transition-delay: 0.15s; }
+  .redacted-delay-2 { transition-delay: 0.3s; }
 
   .redact-reveal.is-visible .redacted {
     filter: blur(0);
