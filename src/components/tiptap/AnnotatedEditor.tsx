@@ -36,6 +36,8 @@ interface AnnotatedEditorProps {
   showAuthor?: boolean;
   canAnnotate?: boolean;
   className?: string;
+  /** Accessible name for the annotatable text. Falls back to a generic label. */
+  ariaLabel?: string;
 }
 
 interface PendingComment {
@@ -53,7 +55,13 @@ export function AnnotatedEditor({
   showAuthor = true,
   canAnnotate = true,
   className,
+  ariaLabel,
 }: AnnotatedEditorProps) {
+  const resolvedAriaLabel =
+    ariaLabel ??
+    (canAnnotate
+      ? "Model output — select text to leave feedback"
+      : "Model output");
   const [commentText, setCommentText] = useState("");
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(
     null,
@@ -89,6 +97,10 @@ export function AnnotatedEditor({
           "prose prose-sm max-w-none focus:outline-none min-h-[200px] px-3 py-2",
           "whitespace-pre-wrap font-mono leading-relaxed text-sm",
         ),
+        role: "textbox",
+        "aria-multiline": "true",
+        "aria-readonly": "true",
+        "aria-label": resolvedAriaLabel,
       },
       handlePaste: () => true,
       handleDrop: () => true,

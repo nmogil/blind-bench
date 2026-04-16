@@ -159,14 +159,16 @@ export function SendEvaluationDialog({
         <div className="space-y-4 py-2">
           {showTargetPicker && (
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">What to evaluate</label>
+              <label htmlFor="send-eval-target" className="text-sm font-medium">
+                What to evaluate
+              </label>
               <Select
                 value={selectedTarget}
                 onValueChange={(v) => {
                   if (v) setSelectedTarget(v);
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="send-eval-target" className="w-full">
                   <SelectValue placeholder="Select a review cycle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -190,7 +192,12 @@ export function SendEvaluationDialog({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Email addresses</label>
+            <label
+              htmlFor="send-eval-emails"
+              className="text-sm font-medium"
+            >
+              Email addresses
+            </label>
             <div className="rounded-md border border-input bg-transparent px-3 py-2 min-h-[42px] flex flex-wrap gap-1.5 items-center focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
               {emails.map((email) => (
                 <span
@@ -201,6 +208,7 @@ export function SendEvaluationDialog({
                   <button
                     type="button"
                     onClick={() => removeEmail(email)}
+                    aria-label={`Remove ${email}`}
                     className="text-muted-foreground hover:text-foreground"
                   >
                     <X className="h-3 w-3" />
@@ -208,6 +216,7 @@ export function SendEvaluationDialog({
                 </span>
               ))}
               <Input
+                id="send-eval-emails"
                 type="email"
                 placeholder={
                   emails.length === 0 ? "name@example.com" : "Add another..."
@@ -222,10 +231,14 @@ export function SendEvaluationDialog({
                 onBlur={() => {
                   if (inputValue.trim()) handleAddEmail(inputValue);
                 }}
+                aria-describedby="send-eval-emails-hint"
                 className="flex-1 min-w-[140px] border-0 p-0 h-auto text-sm shadow-none focus-visible:ring-0"
               />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p
+              id="send-eval-emails-hint"
+              className="text-xs text-muted-foreground"
+            >
               Separate multiple emails with commas or Enter
             </p>
           </div>

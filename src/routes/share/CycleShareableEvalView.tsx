@@ -125,7 +125,14 @@ export function CycleShareableEvalView() {
 
       {/* Progress */}
       <div className="mt-4 flex items-center gap-3">
-        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuenow={ratedCount}
+          aria-valuemin={0}
+          aria-valuemax={outputCount}
+          aria-label={`${ratedCount} of ${outputCount} outputs rated`}
+        >
           <div
             className="h-full bg-primary transition-all duration-300"
             style={{

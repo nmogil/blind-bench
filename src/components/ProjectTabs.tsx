@@ -17,7 +17,10 @@ export function ProjectTabs() {
   const basePath = `/orgs/${orgSlug}/projects/${projectId}`;
 
   return (
-    <div className="flex items-center border-b px-4">
+    <nav
+      aria-label="Project sections"
+      className="flex items-center border-b px-4"
+    >
       <div className="flex items-center gap-1 flex-1 overflow-x-auto">
         {tabs.map((tab) => {
           // Evaluators: hide Run and Editor tabs
@@ -39,6 +42,7 @@ export function ProjectTabs() {
             <NavLink
               key={tab.label}
               to={to}
+              aria-current={isActive ? "page" : undefined}
               className={() =>
                 cn(
                   "inline-flex min-h-11 items-center px-3 py-2.5 text-sm transition-colors border-b-2 sm:min-h-0",
@@ -70,6 +74,6 @@ export function ProjectTabs() {
           <Settings className="h-5 w-5 sm:h-4 sm:w-4" />
         </NavLink>
       )}
-    </div>
+    </nav>
   );
 }

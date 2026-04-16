@@ -25,7 +25,10 @@ export function MobileNavDrawer() {
       </DrawerPrimitive.Trigger>
       <DrawerPrimitive.Portal>
         <DrawerPrimitive.Backdrop className="fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-        <DrawerPrimitive.Popup className="fixed left-0 top-0 z-50 flex h-full w-72 flex-col gap-1 bg-popover p-3 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 outline-hidden duration-200 data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left">
+        <DrawerPrimitive.Popup
+          aria-label="Primary navigation"
+          className="fixed left-0 top-0 z-50 flex h-full w-72 flex-col gap-1 bg-popover p-3 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/10 outline-hidden duration-200 data-open:animate-in data-open:slide-in-from-left data-closed:animate-out data-closed:slide-out-to-left"
+        >
           <div className="flex items-center justify-end pb-1">
             <DrawerPrimitive.Close
               aria-label="Close navigation"
@@ -34,10 +37,12 @@ export function MobileNavDrawer() {
               <XIcon className="h-4 w-4" />
             </DrawerPrimitive.Close>
           </div>
-          <SideNavContent
-            onNewProject={openNewProjectDialog}
-            onNavigate={() => setOpen(false)}
-          />
+          <nav aria-label="Primary" className="flex flex-1 flex-col gap-1">
+            <SideNavContent
+              onNewProject={openNewProjectDialog}
+              onNavigate={() => setOpen(false)}
+            />
+          </nav>
         </DrawerPrimitive.Popup>
       </DrawerPrimitive.Portal>
     </DrawerPrimitive.Root>

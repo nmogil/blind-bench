@@ -57,7 +57,12 @@ export function StreamingOutputPanel({
   }));
 
   return (
-    <div className="flex flex-col rounded-lg border bg-card h-full">
+    <div
+      className="flex flex-col rounded-lg border bg-card h-full"
+      role="status"
+      aria-busy={isStreaming}
+      aria-label={`Output ${output.blindLabel} — ${runStatus}`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <div className="flex items-center gap-2">

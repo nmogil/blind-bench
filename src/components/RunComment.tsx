@@ -85,8 +85,11 @@ function RunCommentEditor({
   return (
     <div className="rounded-lg border bg-card">
       <button
+        type="button"
         className="flex items-center gap-1.5 w-full px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-controls="run-general-notes"
       >
         {expanded ? (
           <ChevronDown className="h-3.5 w-3.5" />
@@ -103,7 +106,7 @@ function RunCommentEditor({
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 space-y-1.5">
+        <div id="run-general-notes" className="px-3 pb-3 space-y-1.5">
           <Textarea
             value={text}
             onChange={(e) => handleChange(e.target.value)}

@@ -523,8 +523,11 @@ export function VersionEditor() {
           {/* System message (collapsible) */}
           <div>
             <button
+              type="button"
               className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
               onClick={() => setSystemExpanded(!systemExpanded)}
+              aria-expanded={systemExpanded}
+              aria-controls="system-message-panel"
             >
               {systemExpanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -535,7 +538,10 @@ export function VersionEditor() {
               <span className="text-xs font-normal">(optional)</span>
             </button>
             {systemExpanded && (
-              <div className="mt-2 max-h-[400px] overflow-y-auto">
+              <div
+                id="system-message-panel"
+                className="mt-2 max-h-[400px] overflow-y-auto"
+              >
                 {feedbackMode ? (
                   <AnnotatedEditor
                     content={systemMessage}

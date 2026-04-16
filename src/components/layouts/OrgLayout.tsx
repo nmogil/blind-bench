@@ -32,7 +32,12 @@ export function OrgLayout() {
 
   if (result === undefined) {
     return (
-      <div className="flex min-h-screen flex-col">
+      <div
+        className="flex min-h-screen flex-col"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading workspace"
+      >
         <div className="flex h-14 items-center border-b px-4">
           <Skeleton className="h-5 w-32" />
         </div>
@@ -47,6 +52,7 @@ export function OrgLayout() {
             <Skeleton className="h-32 w-full" />
           </div>
         </div>
+        <span className="sr-only">Loading workspace…</span>
       </div>
     );
   }

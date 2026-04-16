@@ -80,9 +80,13 @@ function OutputFeedbackSection({
 
   if (!feedback || feedback.length === 0) return null;
 
+  const headingId = `feedback-output-${blindLabel}`;
   return (
-    <div className="space-y-1.5">
-      <h4 className="text-xs font-medium text-muted-foreground">
+    <section aria-labelledby={headingId} className="space-y-1.5">
+      <h4
+        id={headingId}
+        className="text-xs font-medium text-muted-foreground"
+      >
         Output {blindLabel}
       </h4>
       {feedback.map((fb) => (
@@ -94,7 +98,7 @@ function OutputFeedbackSection({
           createdAt={fb._creationTime}
         />
       ))}
-    </div>
+    </section>
   );
 }
 
@@ -119,8 +123,14 @@ function PromptFeedbackList({
   return (
     <div className="space-y-3 mt-3">
       {systemFeedback.length > 0 && (
-        <div className="space-y-1.5">
-          <h4 className="text-xs font-medium text-muted-foreground">
+        <section
+          aria-labelledby="feedback-system-message"
+          className="space-y-1.5"
+        >
+          <h4
+            id="feedback-system-message"
+            className="text-xs font-medium text-muted-foreground"
+          >
             System message
           </h4>
           {systemFeedback.map((fb) => (
@@ -132,11 +142,17 @@ function PromptFeedbackList({
               createdAt={fb._creationTime}
             />
           ))}
-        </div>
+        </section>
       )}
       {userFeedback.length > 0 && (
-        <div className="space-y-1.5">
-          <h4 className="text-xs font-medium text-muted-foreground">
+        <section
+          aria-labelledby="feedback-user-template"
+          className="space-y-1.5"
+        >
+          <h4
+            id="feedback-user-template"
+            className="text-xs font-medium text-muted-foreground"
+          >
             User template
           </h4>
           {userFeedback.map((fb) => (
@@ -148,7 +164,7 @@ function PromptFeedbackList({
               createdAt={fb._creationTime}
             />
           ))}
-        </div>
+        </section>
       )}
     </div>
   );
