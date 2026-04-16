@@ -1,25 +1,28 @@
 ---
 import FeatureCard from './FeatureCard.astro';
+import ArrowRight from '../icons/ArrowRight.astro';
 
-// Lucide icon paths (eye-off, message-square-text, brain-circuit)
 const features = [
   {
+    number: '01',
+    category: 'EVALUATION',
     title: 'Blind evaluation, not just A/B testing',
     description:
       'Evaluators never see which version produced which output. Enforced at the API level, not just the UI. No peeking, no bias.',
-    icon: '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" />',
   },
   {
+    number: '02',
+    category: 'ANNOTATION',
     title: 'Annotate, don\'t just score',
     description:
       'Highlight specific text and comment on what works or doesn\'t. Richer signal than thumbs-up/thumbs-down feeds better optimization.',
-    icon: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><path d="M13 8H7" /><path d="M17 12H7" />',
   },
   {
+    number: '03',
+    category: 'OPTIMIZATION',
     title: 'AI optimization grounded in your feedback',
     description:
       'The optimizer cites your specific annotations when proposing changes. No generic "improvements" — every suggestion traces back to real feedback.',
-    icon: '<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /><path d="M9 13a4.5 4.5 0 0 0 3-4" /><path d="M6.003 5.125A3 3 0 0 0 6.5 6.5" /><path d="M3.477 10.896a4 4 0 0 1 .585-.396" /><path d="M6 18a4 4 0 0 1-1.967-.516" /><path d="M12 13h4" /><path d="M12 18h6a2 2 0 0 1 2 2v1" /><path d="M12 8h8" /><path d="M16 8V5a2 2 0 0 1 2-2" /><circle cx="16" cy="13" r=".5" /><circle cx="18" cy="3" r=".5" /><circle cx="20" cy="21" r=".5" /><circle cx="20" cy="8" r=".5" />',
   },
 ];
 ---
@@ -46,12 +49,10 @@ const features = [
     <div class="reveal mt-10 text-center">
       <a
         href="https://app.blindbench.dev"
-        class="inline-flex items-center gap-1.5 rounded-md py-2 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         See the difference yourself
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-        </svg>
+        <ArrowRight class="h-3.5 w-3.5" />
       </a>
     </div>
   </div>

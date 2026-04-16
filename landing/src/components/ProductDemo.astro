@@ -1,4 +1,7 @@
 ---
+import ArrowRight from '../icons/ArrowRight.astro';
+import User from '../icons/User.astro';
+
 const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
 ---
 
@@ -17,10 +20,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
     <div class="reveal mb-6 rounded-xl border border-border bg-muted/50 p-5">
       <div class="flex items-start gap-3">
         <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber/15">
-          <svg class="h-4 w-4 text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
+          <User class="h-4 w-4 text-amber" />
         </div>
         <div>
           <p class="mb-1 text-xs font-medium text-muted-foreground">Customer message</p>
@@ -53,7 +53,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
           <!-- Output A (secretly: Claude 3.5 Haiku · Prompt v1) -->
           <button
             type="button"
-            class="demo-choice p-5 text-left transition-all duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
+            class="demo-choice p-5 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
             data-choice="A"
             id="choice-a"
           >
@@ -70,7 +70,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
           <!-- Output B (secretly: GPT-4o · Prompt v7) -->
           <button
             type="button"
-            class="demo-choice p-5 text-left transition-all duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
+            class="demo-choice p-5 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
             data-choice="B"
             id="choice-b"
           >
@@ -96,7 +96,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
     </div>
 
     <!-- Reveal section (hidden until vote) -->
-    <div class="mt-8 text-center transition-all duration-500" id="demo-reveal" style="opacity:0;transform:translateY(12px)">
+    <div class="mt-8 text-center transition-[opacity,transform] duration-500" id="demo-reveal" role="status" aria-live="polite" aria-atomic="true" style="opacity:0;transform:translateY(12px)">
       <p class="text-lg font-semibold text-foreground" id="reveal-headline"></p>
       <p class="mt-2 text-sm text-muted-foreground" id="reveal-stats"></p>
       <p class="mx-auto mb-6 mt-6 max-w-lg text-base leading-relaxed text-muted-foreground">
@@ -104,13 +104,10 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
       </p>
       <a
         href="https://app.blindbench.dev"
-        class="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-md transition-all hover:shadow-lg hover:brightness-110"
+        class="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-md transition-[box-shadow,opacity] hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        Start evaluating blind
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14"/>
-          <path d="m12 5 7 7-7 7"/>
-        </svg>
+        Run this on your prompts
+        <ArrowRight class="h-4 w-4" />
       </a>
     </div>
   </div>

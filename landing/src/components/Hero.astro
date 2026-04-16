@@ -1,19 +1,15 @@
 ---
+import ArrowRight from '../icons/ArrowRight.astro';
+import ArrowDown from '../icons/ArrowDown.astro';
+
 const APP_URL = 'https://app.blindbench.dev';
 ---
 
 <section class="relative overflow-hidden">
-  <!-- Decorative gradient — two overlapping blobs for depth -->
-  <div
-    class="pointer-events-none absolute inset-0 -z-10"
-    aria-hidden="true"
-  >
+  <!-- Decorative tint — single radial echoing the OG image treatment -->
+  <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
     <div
-      class="absolute top-[-30%] left-[40%] h-[700px] w-[900px] -translate-x-1/2 rounded-full bg-primary/12 blur-3xl dark:bg-primary/8"
-    >
-    </div>
-    <div
-      class="absolute top-[10%] left-[60%] h-[400px] w-[500px] -translate-x-1/2 rounded-full bg-primary/6 blur-3xl dark:bg-primary/4"
+      class="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,var(--primary)_0%,transparent_55%)] opacity-[0.08] dark:opacity-[0.12]"
     >
     </div>
   </div>
@@ -34,21 +30,17 @@ const APP_URL = 'https://app.blindbench.dev';
       <div class="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
         <a
           href={APP_URL}
-          class="inline-flex items-center justify-center rounded-lg bg-foreground px-8 py-3.5 text-base font-semibold text-background shadow-md transition-all hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          class="inline-flex items-center justify-center rounded-lg bg-foreground px-8 py-3.5 text-base font-semibold text-background shadow-md transition-[box-shadow,opacity] hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          Start evaluating free
-          <svg class="ml-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-          </svg>
+          Try it free
+          <ArrowRight class="ml-2 h-4 w-4" />
         </a>
         <a
           href="#how-it-works"
           class="inline-flex items-center justify-center rounded-lg px-8 py-3.5 text-base font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           See how it works
-          <svg class="ml-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 5v14" /><path d="m19 12-7 7-7-7" />
-          </svg>
+          <ArrowDown class="ml-1.5 h-4 w-4" />
         </a>
       </div>
 

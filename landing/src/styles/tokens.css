@@ -72,7 +72,7 @@
   --amber-foreground: oklch(0.25 0.05 85);
 
   /* Step colors: sequential progression (color-blind safe) */
-  --step-1: oklch(0.55 0.15 195);
+  --step-1: oklch(0.50 0.14 195);
   --step-2: oklch(0.546 0.245 262.881);
   --step-3: oklch(0.50 0.20 285);
   --step-4: oklch(0.55 0.18 310);
@@ -88,7 +88,7 @@
   --secondary: oklch(0.24 0.008 260);
   --secondary-foreground: oklch(0.96 0.005 60);
   --muted: oklch(0.24 0.008 260);
-  --muted-foreground: oklch(0.65 0.01 260);
+  --muted-foreground: oklch(0.70 0.01 260);
   --accent: oklch(0.24 0.008 260);
   --accent-foreground: oklch(0.96 0.005 60);
   --border: oklch(1 0 0 / 10%);

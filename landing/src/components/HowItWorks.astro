@@ -1,15 +1,19 @@
 ---
 import StepCard from './StepCard.astro';
+import ArrowRight from '../icons/ArrowRight.astro';
+import Pencil from '../icons/Pencil.astro';
+import Play from '../icons/Play.astro';
+import EyeOff from '../icons/EyeOff.astro';
+import Sparkles from '../icons/Sparkles.astro';
 
-// Lucide icon paths (pencil, play, eye-off, sparkles)
-// Colors use CSS custom properties for theme-aware step differentiation
+// Step colors use CSS custom properties for theme-aware differentiation.
 const steps = [
   {
     number: 1,
     title: 'Create',
     description:
       'Write your prompt with variables and test cases that cover real scenarios.',
-    icon: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /><path d="m15 5 4 4" />',
+    Icon: Pencil,
     color: 'var(--step-1)',
   },
   {
@@ -17,7 +21,7 @@ const steps = [
     title: 'Run',
     description:
       'Execute against multiple models simultaneously — A/B/C fan-out in one click.',
-    icon: '<polygon points="6 3 20 12 6 21 6 3" />',
+    Icon: Play,
     color: 'var(--step-2)',
   },
   {
@@ -25,7 +29,7 @@ const steps = [
     title: 'Evaluate blind',
     description:
       'Reviewers see outputs labeled A, B, C — never which version or model wrote them.',
-    icon: '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" />',
+    Icon: EyeOff,
     color: 'var(--step-3)',
   },
   {
@@ -33,7 +37,7 @@ const steps = [
     title: 'Optimize',
     description:
       'AI reads your annotations and rewrites the prompt, citing specific feedback.',
-    icon: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /><path d="M20 3v4" /><path d="M22 5h-4" />',
+    Icon: Sparkles,
     color: 'var(--step-4)',
   },
 ];
@@ -61,9 +65,11 @@ const steps = [
       <div
         class="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8"
       >
-        {steps.map((step, i) => (
+        {steps.map(({ Icon, ...rest }, i) => (
           <div class={`reveal reveal-delay-${i + 1}`}>
-            <StepCard {...step} />
+            <StepCard {...rest}>
+              <Icon slot="icon" class="h-4 w-4" />
+            </StepCard>
           </div>
         ))}
       </div>
@@ -72,12 +78,10 @@ const steps = [
     <div class="reveal mt-12 text-center">
       <a
         href="https://app.blindbench.dev"
-        class="inline-flex items-center gap-1.5 rounded-md py-2 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Try the full workflow
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-        </svg>
+        <ArrowRight class="h-3.5 w-3.5" />
       </a>
     </div>
   </div>

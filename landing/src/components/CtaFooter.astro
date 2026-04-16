@@ -1,4 +1,6 @@
 ---
+import ArrowRight from '../icons/ArrowRight.astro';
+
 const APP_URL = 'https://app.blindbench.dev';
 const year = new Date().getFullYear();
 ---
@@ -14,12 +16,10 @@ const year = new Date().getFullYear();
     <div class="mt-8">
       <a
         href={APP_URL}
-        class="inline-flex items-center justify-center rounded-lg bg-foreground px-8 py-3.5 text-base font-semibold text-background shadow-md transition-all hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        class="inline-flex items-center justify-center rounded-lg bg-foreground px-8 py-3.5 text-base font-semibold text-background shadow-md transition-[box-shadow,opacity] hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Start your first blind test
-        <svg class="ml-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-        </svg>
+        <ArrowRight class="ml-2 h-4 w-4" />
       </a>
     </div>
   </div>

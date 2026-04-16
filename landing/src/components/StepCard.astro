@@ -3,11 +3,10 @@ interface Props {
   number: number;
   title: string;
   description: string;
-  icon: string;
   color: string;
 }
 
-const { number, title, description, icon, color } = Astro.props;
+const { number, title, description, color } = Astro.props;
 ---
 
 <div class="relative flex flex-col items-center text-center">
@@ -17,10 +16,8 @@ const { number, title, description, icon, color } = Astro.props;
   >
     {number}
   </div>
-  <div class="mt-4 flex items-center gap-2">
-    <svg class="h-4 w-4" style={`color: ${color};`} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <Fragment set:html={icon} />
-    </svg>
+  <div class="mt-4 flex items-center gap-2" style={`color: ${color};`}>
+    <slot name="icon" />
     <h3 class="text-lg font-semibold text-foreground">{title}</h3>
   </div>
   <p class="mt-2 text-sm leading-relaxed text-muted-foreground">

@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "node scripts/generate-og-image.mjs && astro build",
+    "build:og": "node scripts/generate-og-image.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -16,5 +17,10 @@
     "@vercel/analytics": "^2.0.1",
     "astro": "^6.1.6",
     "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "geist": "^1.7.0",
+    "satori": "^0.26.0"
   }
 }
