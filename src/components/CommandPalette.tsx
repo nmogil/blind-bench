@@ -84,7 +84,20 @@ export function CommandPalette() {
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Search prompts, versions, actions..." />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>
+          <div className="py-6 text-center text-sm">
+            <p className="text-muted-foreground">
+              No matches in this {projectPath ? "prompt" : "workspace"}.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/80">
+              Try a shorter query, or press{" "}
+              <kbd className="rounded border bg-muted px-1 py-0.5 font-mono text-[10px]">
+                Esc
+              </kbd>{" "}
+              to close.
+            </p>
+          </div>
+        </CommandEmpty>
 
         {/* Actions */}
         <CommandGroup heading="Actions">

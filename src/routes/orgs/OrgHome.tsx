@@ -41,6 +41,10 @@ export function OrgHome() {
             icon={FolderOpen}
             heading="No prompts yet"
             description="A prompt holds all its versions, test cases, and run history. Create one to get started."
+            action={{
+              label: "Create prompt",
+              onClick: openNewProjectDialog,
+            }}
           />
         ) : (
           <div className="divide-y rounded-lg border">

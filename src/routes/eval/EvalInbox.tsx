@@ -36,8 +36,12 @@ export function EvalInbox() {
       <div className="flex flex-1 items-center justify-center p-6">
         <EmptyState
           icon={Inbox}
-          heading="You're all caught up"
-          description="Waiting for new evaluations."
+          heading="No pending evaluations"
+          description="You're caught up — nothing waiting for your review. New evaluations will show up here as teams send them."
+          action={{
+            label: "Back to dashboard",
+            onClick: () => navigate("/"),
+          }}
         />
       </div>
     );

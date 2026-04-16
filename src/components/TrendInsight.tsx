@@ -17,11 +17,19 @@ export function TrendInsight({ data }: TrendInsightProps) {
   if (!insight) return null;
 
   return (
-    <p className="text-xs text-muted-foreground italic">{insight}</p>
+    <p className="text-xs text-muted-foreground italic">
+      <span>{insight.fact}</span>{" "}
+      <span className="not-italic">{insight.suggestion}</span>
+    </p>
   );
 }
 
-function computeInsight(data: TrendDataPoint[]): string | null {
+interface Insight {
+  fact: string;
+  suggestion: string;
+}
+
+function computeInsight(data: TrendDataPoint[]): Insight | null {
   // Preference score trend
   const withScores = data.filter((d) => d.preferenceScore !== null);
   if (withScores.length >= 2) {
@@ -29,8 +37,13 @@ function computeInsight(data: TrendDataPoint[]): string | null {
     const last = withScores[withScores.length - 1]!;
     const diff = last.preferenceScore! - first.preferenceScore!;
     if (Math.abs(diff) >= 0.1) {
-      const direction = diff > 0 ? "improved" : "declined";
-      return `Quality ${direction} from v${first.versionNumber} to v${last.versionNumber} (${first.preferenceScore!.toFixed(2)} → ${last.preferenceScore!.toFixed(2)})`;
+      const improved = diff > 0;
+      return {
+        fact: `Quality ${improved ? "improved" : "declined"} from v${first.versionNumber} to v${last.versionNumber} (${first.preferenceScore!.toFixed(2)} → ${last.preferenceScore!.toFixed(2)}).`,
+        suggestion: improved
+          ? `Consider promoting v${last.versionNumber} and running a fresh review cycle.`
+          : `Review what changed between v${first.versionNumber} and v${last.versionNumber}.`,
+      };
     }
   }
 
@@ -40,7 +53,10 @@ function computeInsight(data: TrendDataPoint[]): string | null {
     const last = data[data.length - 1]!;
     if (first.feedbackCount > 0 && last.feedbackCount > first.feedbackCount * 2) {
       const ratio = Math.round(last.feedbackCount / first.feedbackCount);
-      return `Feedback volume increased ${ratio}x from v${first.versionNumber} to v${last.versionNumber}`;
+      return {
+        fact: `Feedback volume increased ${ratio}× from v${first.versionNumber} to v${last.versionNumber}.`,
+        suggestion: `Open v${last.versionNumber}'s dashboard to triage the new comments.`,
+      };
     }
   }
 
@@ -55,13 +71,19 @@ function computeInsight(data: TrendDataPoint[]): string | null {
   }
   const topTag = Object.entries(allTags).sort(([, a], [, b]) => b - a)[0];
   if (topTag && topTag[1] >= 3) {
-    return `Most flagged issue across versions: ${topTag[0]} (${topTag[1]} mentions)`;
+    return {
+      fact: `"${topTag[0]}" is the most flagged issue across versions (${topTag[1]} mentions).`,
+      suggestion: `Target this in the next revision.`,
+    };
   }
 
   // Total feedback summary
   const totalFeedback = data.reduce((sum, d) => sum + d.feedbackCount, 0);
   if (totalFeedback > 0) {
-    return `${totalFeedback} total feedback items across ${data.length} version${data.length !== 1 ? "s" : ""}`;
+    return {
+      fact: `${totalFeedback} total feedback items across ${data.length} version${data.length !== 1 ? "s" : ""}.`,
+      suggestion: `Open a version's dashboard to dig in.`,
+    };
   }
 
   return null;

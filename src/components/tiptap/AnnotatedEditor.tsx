@@ -114,7 +114,10 @@ export function AnnotatedEditor({
     }
   }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Push annotation ranges into the decoration plugin
+  // Push annotation ranges into the decoration plugin.
+  // Ranges change less often than the annotations array reference, so we
+  // dedup via a serialized key to avoid re-dispatching on every parent render.
+  const lastRangesKeyRef = useRef<string>("");
   useEffect(() => {
     if (!editor) return;
     const ranges: AnnotationRange[] = annotations.map((a) => ({
@@ -122,6 +125,11 @@ export function AnnotatedEditor({
       from: a.from,
       to: a.to,
     }));
+    const key = ranges
+      .map((r) => `${r.id ?? ""}:${r.from}-${r.to}`)
+      .join("|");
+    if (key === lastRangesKeyRef.current) return;
+    lastRangesKeyRef.current = key;
     const tr = editor.state.tr.setMeta(annotationPluginKey, ranges);
     editor.view.dispatch(tr);
   }, [editor, annotations]);

@@ -73,12 +73,13 @@ export function OptimizeConfirmationDialog({
 
         <div className="space-y-3 py-2">
           {/* Input preview */}
-          <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
+          <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             <p>
-              Sending: {feedbackCount.outputFeedbackCount} output feedback{" "}
-              {feedbackCount.outputFeedbackCount === 1 ? "item" : "items"},{" "}
-              {feedbackCount.promptFeedbackCount} prompt feedback{" "}
-              {feedbackCount.promptFeedbackCount === 1 ? "item" : "items"}
+              The optimizer will read{" "}
+              <span className="font-medium text-foreground">
+                {formatFeedbackSummary(feedbackCount)}
+              </span>{" "}
+              from v{versionNumber}.
             </p>
           </div>
 
@@ -113,4 +114,24 @@ export function OptimizeConfirmationDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function formatFeedbackSummary(counts: {
+  outputFeedbackCount: number;
+  promptFeedbackCount: number;
+}): string {
+  const parts: string[] = [];
+  if (counts.outputFeedbackCount > 0) {
+    parts.push(
+      `${counts.outputFeedbackCount} note${counts.outputFeedbackCount === 1 ? "" : "s"} on outputs`,
+    );
+  }
+  if (counts.promptFeedbackCount > 0) {
+    parts.push(
+      `${counts.promptFeedbackCount} note${counts.promptFeedbackCount === 1 ? "" : "s"} on the prompt`,
+    );
+  }
+  if (parts.length === 0) return "no feedback yet";
+  if (parts.length === 1) return parts[0]!;
+  return `${parts[0]} and ${parts[1]}`;
 }

@@ -22,9 +22,12 @@ export function TopBar({ variant = "default" }: TopBarProps) {
             <OrgSwitcher />
           </>
         ) : (
-          <span className="text-sm font-semibold">
+          <Link
+            to="/eval"
+            className="text-sm font-semibold hover:text-primary transition-colors"
+          >
             Blind Bench &mdash; Evaluation
-          </span>
+          </Link>
         )}
       </div>
       <div className="flex items-center gap-2">

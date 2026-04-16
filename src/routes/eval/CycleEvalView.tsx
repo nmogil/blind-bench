@@ -170,9 +170,12 @@ export function CycleEvalView() {
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <span className="text-sm font-medium">
-            Evaluation — {data.projectName}
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-medium">{data.cycleName}</span>
+            <span className="text-xs text-muted-foreground">
+              {data.projectName}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">
