@@ -1,0 +1,206 @@
+---
+import ArrowRight from '../icons/ArrowRight.astro';
+
+// Content mirrors the real optimizer fixture in
+// convex/lib/__tests__/optimizerFixtures.ts — the customer-support tone case.
+// Keeping it authentic to what the optimizer actually produces.
+
+const APP_URL = 'https://app.blindbench.dev';
+
+const annotations = [
+  {
+    label: 'A',
+    quote: 'Reads like a corporate form letter.',
+    target: '"Dear valued customer, I appreciate your inquiry."',
+  },
+  {
+    label: 'B',
+    quote: 'Too robotic — "I understand your concern" is filler.',
+    target: '"I understand your concern and will assist you."',
+  },
+];
+---
+
+<section class="py-16 lg:py-24">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+    <div class="reveal mx-auto max-w-2xl text-center">
+      <h2 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        Their feedback becomes your next prompt.
+      </h2>
+      <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+        Two annotations. One optimizer pass. A cleaner system message — with
+        every edit cited to the comment that drove it.
+      </p>
+    </div>
+
+    <div class="reveal-scale mx-auto mt-12 max-w-5xl">
+      <div
+        class="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl ring-1 ring-foreground/5 dark:border-border"
+      >
+        <!-- Window chrome -->
+        <div class="flex items-center gap-2 border-b border-border px-4 py-3">
+          <div class="flex gap-1.5" aria-hidden="true">
+            <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
+            <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
+            <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
+          </div>
+          <div class="ml-4 flex-1">
+            <div
+              class="mx-auto w-fit rounded-md bg-muted px-3 py-1 text-xs text-muted-foreground"
+            >
+              Optimizer &middot; v3 &rarr; v4
+            </div>
+          </div>
+        </div>
+
+        <!-- Three-column grid: before / annotations / after -->
+        <div
+          class="grid grid-cols-1 divide-y divide-border lg:grid-cols-[1fr_minmax(220px,280px)_1fr] lg:divide-x lg:divide-y-0"
+        >
+          <!-- Before: v3 -->
+          <div class="p-5 sm:p-6">
+            <div class="mb-3 flex items-center gap-2">
+              <span
+                class="inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground"
+              >
+                v3
+              </span>
+              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Previous system message
+              </span>
+            </div>
+            <p class="font-mono text-sm leading-relaxed text-foreground/80">
+              You are a <span class="diff-removed">helpful</span> customer
+              support agent. Answer the user&rsquo;s
+              <span class="diff-removed">question</span>.
+            </p>
+          </div>
+
+          <!-- Middle: annotations -->
+          <div class="bg-muted/30 p-5 sm:p-6">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Reviewer annotations
+              </span>
+              <span class="text-[11px] text-muted-foreground">
+                from v3 run
+              </span>
+            </div>
+            <div class="space-y-3">
+              {
+                annotations.map((a) => (
+                  <div class="rounded-lg border border-border bg-card p-3">
+                    <div class="flex items-center gap-2">
+                      <span class="inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold text-foreground">
+                        {a.label}
+                      </span>
+                      <span class="text-[11px] text-muted-foreground">
+                        Output {a.label}
+                      </span>
+                    </div>
+                    <p class="mt-2 text-xs leading-relaxed text-foreground/80">
+                      &ldquo;{a.quote}&rdquo;
+                    </p>
+                    <p class="mt-1.5 truncate font-mono text-[10px] text-muted-foreground">
+                      on {a.target}
+                    </p>
+                  </div>
+                ))
+              }
+            </div>
+            <!-- Arrow hint on desktop -->
+            <div
+              class="mt-4 hidden items-center justify-center gap-2 text-[11px] text-primary lg:flex"
+              aria-hidden="true"
+            >
+              <span>applied</span>
+              <ArrowRight class="h-3 w-3" />
+            </div>
+          </div>
+
+          <!-- After: v4 -->
+          <div class="p-5 sm:p-6">
+            <div class="mb-3 flex items-center gap-2">
+              <span
+                class="inline-flex h-5 w-5 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary"
+              >
+                v4
+              </span>
+              <span class="text-xs font-medium text-primary uppercase tracking-wide">
+                Proposed system message
+              </span>
+            </div>
+            <p class="font-mono text-sm leading-relaxed text-foreground/80">
+              You are a customer support agent. <span class="diff-added">Be friendly and professional — like a helpful coworker, not a corporate robot.</span>
+              <span class="diff-added">Avoid formal openers (&ldquo;Dear valued customer&rdquo;) and form-letter phrases (&ldquo;I understand your concern&rdquo;).</span>
+              <span class="diff-added">Get to the point and be warm.</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Reasoning footer -->
+        <div class="border-t border-border bg-muted/20 px-5 py-4 sm:px-6">
+          <div class="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Why these changes
+          </div>
+          <p class="text-xs leading-relaxed text-foreground/75">
+            Both outputs drifted on tone.
+            <span class="citation">Output A</span>
+            went corporate; <span class="citation">Output B</span> defaulted to
+            empty filler. The rewrite adds explicit prohibitions and a positive
+            anchor (&ldquo;helpful coworker, not a corporate robot&rdquo;).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="reveal mt-10 text-center">
+      <a
+        href={APP_URL}
+        class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Start collecting feedback
+        <ArrowRight class="h-3.5 w-3.5" />
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* Diff highlights — blue/purple scheme matches src/components/PromptDiff.tsx.
+     No red/green per CLAUDE.md color rules. */
+  .diff-removed {
+    background-color: color-mix(in oklch, var(--step-3) 15%, transparent);
+    color: var(--step-3);
+    padding: 0.1em 0.25em;
+    margin: 0 -0.05em;
+    border-radius: 3px;
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in oklch, var(--step-3) 50%, transparent);
+  }
+
+  .diff-added {
+    background-color: color-mix(in oklch, var(--primary) 15%, transparent);
+    color: var(--primary);
+    padding: 0.1em 0.25em;
+    margin: 0 -0.05em;
+    border-radius: 3px;
+  }
+
+  /* Citation badge — amber, matches src/components/ChangesPanel.tsx */
+  .citation {
+    display: inline-block;
+    background-color: color-mix(in oklch, var(--amber) 18%, transparent);
+    color: var(--amber-foreground);
+    padding: 0.05em 0.45em;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.95em;
+  }
+
+  :global(.dark) .citation {
+    color: var(--amber);
+    background-color: color-mix(in oklch, var(--amber) 15%, transparent);
+  }
+</style>

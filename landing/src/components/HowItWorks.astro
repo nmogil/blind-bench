@@ -3,7 +3,7 @@ import StepCard from './StepCard.astro';
 import ArrowRight from '../icons/ArrowRight.astro';
 import Pencil from '../icons/Pencil.astro';
 import Play from '../icons/Play.astro';
-import EyeOff from '../icons/EyeOff.astro';
+import Share from '../icons/Share.astro';
 import Sparkles from '../icons/Sparkles.astro';
 
 // Step colors use CSS custom properties for theme-aware differentiation.
@@ -26,7 +26,7 @@ const steps = [
     number: 3,
     title: 'Collect feedback',
     description: 'Share one link. Reviewers annotate in the browser — no account needed.',
-    Icon: EyeOff,
+    Icon: Share,
     color: 'var(--step-3)',
   },
   {
@@ -39,7 +39,7 @@ const steps = [
 ];
 ---
 
-<section id="how-it-works" class="py-16 lg:py-24">
+<section id="how-it-works" class="scroll-mt-16 py-16 lg:py-24">
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
     <div class="reveal mx-auto max-w-2xl text-center">
       <h2 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
@@ -76,7 +76,7 @@ const steps = [
         href="https://app.blindbench.dev"
         class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        Try the full loop
+        Start collecting feedback
         <ArrowRight class="h-3.5 w-3.5" />
       </a>
     </div>

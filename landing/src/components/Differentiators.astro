@@ -25,6 +25,23 @@ const features = [
       'The optimizer rewrites your prompt from the feedback. Every change cites the comment it came from.',
   },
 ];
+
+// Audience scenarios (merged from the old BuiltForTeams section). Rendered as
+// a full-width row below the three feature cards so the grid stays balanced.
+const audiences = [
+  {
+    title: 'Expert',
+    description: 'Your lawyer or doctor annotates in five minutes.',
+  },
+  {
+    title: 'Teammate',
+    description: 'Evaluators see outputs, not prompts, not authors.',
+  },
+  {
+    title: 'Customer',
+    description: 'Embed evaluator links in your product or emails.',
+  },
+];
 ---
 
 <section class="bg-muted/30 py-16 lg:py-24">
@@ -47,12 +64,29 @@ const features = [
       ))}
     </div>
 
+    <!-- Audience scenarios — full-width row below the features grid -->
+    <div class="reveal mt-12 border-t border-border/60 pt-8 lg:mt-16 lg:pt-10">
+      <p class="mb-5 text-center font-mono text-xs tracking-widest text-muted-foreground">
+        YOUR REVIEWERS
+      </p>
+      <dl class="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-8">
+        {audiences.map((a) => (
+          <div class="text-center sm:text-left">
+            <dt class="text-sm font-semibold text-foreground">{a.title}</dt>
+            <dd class="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {a.description}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+
     <div class="reveal mt-10 text-center">
       <a
         href="https://app.blindbench.dev"
         class="inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        See the loop yourself
+        Start collecting feedback
         <ArrowRight class="h-3.5 w-3.5" />
       </a>
     </div>

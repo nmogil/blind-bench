@@ -1,4 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#2563eb"/>
-  <text x="16" y="22" text-anchor="middle" font-size="18" font-weight="bold" fill="white" font-family="system-ui">B</text>
+  <!-- White background so the mark reads on dark sidebars/tab bars -->
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#ffffff"/>
+  <!-- Left half: filled primary -->
+  <path d="M1 8A7 7 0 0 1 8 1h8v30H8A7 7 0 0 1 1 24Z" fill="#2563eb"/>
+  <!-- Outline -->
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="none" stroke="#2563eb" stroke-width="2.5"/>
+  <!-- Divider -->
+  <line x1="16" y1="1" x2="16" y2="31" stroke="#2563eb" stroke-width="1.5"/>
 </svg>

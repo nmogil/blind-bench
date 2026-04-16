@@ -1,6 +1,7 @@
 ---
 import ArrowRight from '../icons/ArrowRight.astro';
 import ArrowDown from '../icons/ArrowDown.astro';
+import DashboardPreview from './DashboardPreview.astro';
 
 const APP_URL = 'https://app.blindbench.dev';
 ---
@@ -32,7 +33,7 @@ const APP_URL = 'https://app.blindbench.dev';
           href={APP_URL}
           class="inline-flex items-center justify-center rounded-lg bg-foreground px-8 py-3.5 text-base font-semibold text-background shadow-md transition-[box-shadow,opacity] hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          Collect your first feedback
+          Start collecting feedback
           <ArrowRight class="ml-2 h-4 w-4" />
         </a>
         <a
@@ -48,5 +49,7 @@ const APP_URL = 'https://app.blindbench.dev';
         Bring your own OpenRouter key. No per-seat billing. No credit card.
       </p>
     </div>
+
+    <DashboardPreview />
   </div>
 </section>
