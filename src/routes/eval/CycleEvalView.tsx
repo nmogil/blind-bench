@@ -102,7 +102,7 @@ export function CycleEvalView() {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-6 w-64" />
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
@@ -262,7 +262,7 @@ export function CycleEvalView() {
               </div>
 
               {/* Annotatable output */}
-              <div className="flex-1 overflow-y-auto max-h-[400px]">
+              <div className="flex-1 overflow-y-auto sm:max-h-[400px]">
                 <AnnotatedEditor
                   content={output.outputContentSnapshot}
                   annotations={output.annotations.map((a) => ({

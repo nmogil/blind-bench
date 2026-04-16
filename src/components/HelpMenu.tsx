@@ -37,8 +37,8 @@ export function HelpMenu() {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center justify-center rounded-md h-8 w-8 hover:bg-accent transition-colors">
-          <HelpCircle className="h-4 w-4" />
+        <DropdownMenuTrigger className="flex items-center justify-center rounded-md h-11 w-11 hover:bg-accent transition-colors sm:h-8 sm:w-8">
+          <HelpCircle className="h-5 w-5 sm:h-4 sm:w-4" />
           <span className="sr-only">Help</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">

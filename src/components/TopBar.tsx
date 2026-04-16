@@ -3,9 +3,10 @@ import { OrgSwitcher } from "@/components/OrgSwitcher";
 import { UserMenu } from "@/components/UserMenu";
 import { HelpMenu } from "@/components/HelpMenu";
 import { NotificationBell } from "@/components/NotificationBell";
+import { MobileNavDrawer } from "@/components/MobileNavDrawer";
 import { toggleCommandPalette } from "@/lib/commandPaletteState";
 import { toggleCheatSheet } from "@/lib/shortcutCheatSheetState";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, Search } from "lucide-react";
 
 interface TopBarProps {
   variant?: "default" | "evaluator";
@@ -16,7 +17,10 @@ export function TopBar({ variant = "default" }: TopBarProps) {
     <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
       <div className="flex items-center gap-2">
         {variant === "default" ? (
-          <OrgSwitcher />
+          <>
+            <MobileNavDrawer />
+            <OrgSwitcher />
+          </>
         ) : (
           <span className="text-sm font-semibold">
             Blind Bench &mdash; Evaluation
@@ -26,6 +30,16 @@ export function TopBar({ variant = "default" }: TopBarProps) {
       <div className="flex items-center gap-2">
         {variant === "default" && (
           <>
+            {/* Mobile: 44×44 icon button */}
+            <button
+              onClick={() => toggleCommandPalette()}
+              aria-label="Open command palette"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:hidden"
+              title="Command palette"
+            >
+              <Search className="h-5 w-5" />
+            </button>
+            {/* Desktop: labeled button with ⌘K hint */}
             <button
               onClick={() => toggleCommandPalette()}
               className="hidden sm:flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

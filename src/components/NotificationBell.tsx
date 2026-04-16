@@ -43,11 +43,12 @@ export function NotificationBell() {
     <div className="relative" ref={ref}>
       <Button
         variant="ghost"
-        size="icon-sm"
+        size="icon"
         onClick={() => setOpen(!open)}
         aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ""}`}
+        className="h-11 w-11 sm:h-9 sm:w-9"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-5 w-5 sm:h-4 sm:w-4" />
         {count > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
             {count > 9 ? "9+" : count}

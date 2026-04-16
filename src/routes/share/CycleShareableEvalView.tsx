@@ -151,7 +151,7 @@ export function CycleShareableEvalView() {
                 <span className="text-xs text-primary">rated</span>
               )}
             </div>
-            <div className="flex-1 p-3 overflow-y-auto max-h-[300px]">
+            <div className="flex-1 p-3 overflow-y-auto sm:max-h-[300px]">
               <p className="text-sm whitespace-pre-wrap">
                 {output.outputContentSnapshot}
               </p>

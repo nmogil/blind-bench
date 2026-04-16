@@ -35,7 +35,7 @@ export function RatingButtons({
             aria-label={label}
             onClick={() => onRate(value)}
             className={cn(
-              "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+              "inline-flex min-h-11 items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors sm:min-h-0 sm:gap-1 sm:px-2 sm:py-1 sm:text-xs",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               "motion-safe:transition-all motion-safe:duration-150",
               isSelected
@@ -43,7 +43,7 @@ export function RatingButtons({
                 : "border-border text-muted-foreground hover:bg-muted/50",
             )}
           >
-            <Icon className="h-3 w-3" />
+            <Icon className="h-4 w-4 sm:h-3 sm:w-3" />
             {label}
           </button>
         );

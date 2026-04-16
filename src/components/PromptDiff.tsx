@@ -88,7 +88,7 @@ export function PromptDiff({
 
 function SideBySideView({ parts }: { parts: DiffPart[] }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
       {/* Old (removed) */}
       <div className="rounded-md border bg-card p-3 overflow-auto">
         <div className="text-[10px] font-medium text-purple-600 dark:text-purple-400 mb-2 uppercase tracking-wider">

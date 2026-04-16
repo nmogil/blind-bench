@@ -249,7 +249,7 @@ export function VersionEditor() {
       <div className="p-6 space-y-4">
         <Skeleton className="h-6 w-32" />
         <div className="flex gap-4">
-          <Skeleton className="w-[22%] h-96" />
+          <Skeleton className="hidden lg:block w-[22%] h-96" />
           <Skeleton className="flex-1 h-96" />
         </div>
       </div>
@@ -362,8 +362,8 @@ export function VersionEditor() {
 
       {/* Two-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left — Sidebar */}
-        <div className="w-[22%] min-w-[220px] border-r overflow-y-auto p-3 space-y-4">
+        {/* Left — Sidebar (desktop only; hidden below lg to give the editor room on mobile) */}
+        <div className="hidden lg:flex lg:w-[22%] lg:min-w-[220px] flex-col border-r overflow-y-auto p-3 space-y-4">
           {/* Variables */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

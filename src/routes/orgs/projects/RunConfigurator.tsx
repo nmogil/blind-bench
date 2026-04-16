@@ -1136,8 +1136,8 @@ export function RunConfigurator() {
           )}
 
           {summaryRows.length > 0 ? (
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full text-xs">
+            <div className="border rounded-md overflow-x-auto">
+              <table className="w-full min-w-[520px] text-xs">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     {selectedVersionIds.size > 1 && (

@@ -41,7 +41,7 @@ export function ProjectTabs() {
               to={to}
               className={() =>
                 cn(
-                  "inline-flex items-center px-3 py-2.5 text-sm transition-colors border-b-2",
+                  "inline-flex min-h-11 items-center px-3 py-2.5 text-sm transition-colors border-b-2 sm:min-h-0",
                   isActive
                     ? "border-primary text-foreground font-medium"
                     : "border-transparent text-muted-foreground hover:text-foreground",
@@ -58,15 +58,16 @@ export function ProjectTabs() {
           to={`${basePath}/settings`}
           className={({ isActive }) =>
             cn(
-              "ml-2 rounded-md p-1.5 transition-colors",
+              "ml-2 inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors sm:h-auto sm:w-auto sm:p-1.5",
               isActive
                 ? "text-foreground bg-accent"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
             )
           }
           title="Settings"
+          aria-label="Project settings"
         >
-          <Settings className="h-4 w-4" />
+          <Settings className="h-5 w-5 sm:h-4 sm:w-4" />
         </NavLink>
       )}
     </div>
