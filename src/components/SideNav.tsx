@@ -11,7 +11,10 @@ interface SideNavProps {
  */
 export function SideNav({ onNewProject }: SideNavProps) {
   return (
-    <nav className="hidden w-56 shrink-0 flex-col gap-1 border-r p-3 md:flex">
+    <nav
+      aria-label="Primary"
+      className="hidden w-56 shrink-0 flex-col gap-1 border-r p-3 md:flex"
+    >
       <SideNavContent onNewProject={onNewProject} />
     </nav>
   );

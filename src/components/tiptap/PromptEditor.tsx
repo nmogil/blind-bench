@@ -11,6 +11,8 @@ interface PromptEditorProps {
   placeholder?: string;
   validationError?: string;
   className?: string;
+  /** Accessible name for screen readers. Falls back to placeholder, then a generic label. */
+  ariaLabel?: string;
 }
 
 export function PromptEditor({
@@ -20,7 +22,10 @@ export function PromptEditor({
   placeholder,
   validationError,
   className,
+  ariaLabel,
 }: PromptEditorProps) {
+  const resolvedAriaLabel =
+    ariaLabel ?? placeholder ?? "Prompt text editor";
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -50,6 +55,11 @@ export function PromptEditor({
           readOnly && "opacity-60",
         ),
         "data-placeholder": placeholder ?? "",
+        role: "textbox",
+        "aria-multiline": "true",
+        "aria-label": resolvedAriaLabel,
+        "aria-readonly": readOnly ? "true" : "false",
+        "aria-invalid": validationError ? "true" : "false",
       },
     },
   });

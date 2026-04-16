@@ -25,10 +25,16 @@ export function OrgHome() {
 
       <div className="mt-6">
         {projects === undefined ? (
-          <div className="space-y-2">
+          <div
+            className="space-y-2"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading prompts"
+          >
             {[1, 2, 3, 4, 5].map((i) => (
               <Skeleton key={i} className="h-14 w-full" />
             ))}
+            <span className="sr-only">Loading prompts…</span>
           </div>
         ) : projects.length === 0 ? (
           <EmptyState

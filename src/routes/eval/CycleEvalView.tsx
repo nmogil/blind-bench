@@ -195,7 +195,14 @@ export function CycleEvalView() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-muted">
+      <div
+        className="h-1 bg-muted"
+        role="progressbar"
+        aria-valuenow={ratedCount}
+        aria-valuemin={0}
+        aria-valuemax={outputCount}
+        aria-label={`${ratedCount} of ${outputCount} outputs rated`}
+      >
         <div
           className="h-full bg-primary transition-all duration-300"
           style={{

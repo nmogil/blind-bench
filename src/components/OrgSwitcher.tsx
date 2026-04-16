@@ -17,9 +17,15 @@ export function OrgSwitcher() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-semibold hover:bg-accent">
+      <DropdownMenuTrigger
+        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-semibold hover:bg-accent"
+        aria-label={`Current organization: ${org.name}. Switch organization`}
+      >
         {org.name}
-        <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        <ChevronsUpDown
+          className="h-3.5 w-3.5 text-muted-foreground"
+          aria-hidden="true"
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         {orgs?.map(({ org: o }) => (
