@@ -557,7 +557,9 @@ export const setClosedAction = mutation({
         internal.optimizeActions.runOptimizerAction,
         { requestId },
       );
+      return { optimizationRequestId: requestId };
     }
+    return { optimizationRequestId: null };
   },
 });
 
