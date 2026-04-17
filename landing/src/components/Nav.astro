@@ -88,15 +88,15 @@ const APP_URL = 'https://app.blindbench.dev';
 </nav>
 
 <style>
-  /* Declare backdrop-filter on the base nav so Safari reserves a
-     compositing layer from the start (known issue: sticky + newly-applied
-     backdrop-filter fails to paint reliably during scroll). The filter is
-     no-op until data-scrolled flips. translateZ forces layer promotion. */
+  /* Force a stable compositing layer + fresh stacking context so the
+     backdrop-filter toggle (see data-scrolled) re-paints reliably on
+     every scroll direction. Pre-declaring backdrop-filter: blur(0) on the
+     base was caching a stale composited layer on Safari/Chrome — the blur
+     would disappear on the second time we flipped to scrolled. Isolation
+     + translateZ gives layer promotion without the caching trap. */
   .site-nav {
-    backdrop-filter: blur(0px) saturate(100%);
-    -webkit-backdrop-filter: blur(0px) saturate(100%);
     transform: translateZ(0);
-    will-change: backdrop-filter;
+    isolation: isolate;
   }
 
   /* Transparent-over-hero default; flips to frosted glass once user has
@@ -168,6 +168,20 @@ const APP_URL = 'https://app.blindbench.dev';
   const sentinel = document.querySelector<HTMLElement>('[data-nav-sentinel]');
 
   if (nav && sentinel) {
+    function setScrolled(pastHero: boolean) {
+      const next = pastHero ? 'true' : 'false';
+      if (nav!.dataset.scrolled === next) return;
+      nav!.dataset.scrolled = next;
+      // Safari/Chrome sticky+backdrop-filter quirk: toggling the filter
+      // off then on again keeps a stale composited layer. Nudging the
+      // transform forces the browser to re-composite the layer so the
+      // blur re-appears on the second (and nth) re-entry.
+      nav!.style.transform = 'translateZ(0.01px)';
+      requestAnimationFrame(() => {
+        nav!.style.transform = '';
+      });
+    }
+
     const io = new IntersectionObserver(
       ([entry]) => {
         // Sentinel sits at the bottom of the hero. When it's no longer
@@ -175,7 +189,7 @@ const APP_URL = 'https://app.blindbench.dev';
         // past and the nav should go solid.
         const pastHero =
           !entry.isIntersecting && entry.boundingClientRect.top < 0;
-        nav.dataset.scrolled = pastHero ? 'true' : 'false';
+        setScrolled(pastHero);
       },
       { rootMargin: '-56px 0px 0px 0px', threshold: 0 },
     );
