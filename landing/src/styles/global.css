@@ -77,73 +77,6 @@
 .reveal-delay-3 { transition-delay: 200ms; }
 .reveal-delay-4 { transition-delay: 300ms; }
 
-/* ---- Aurora wash (Hero background) ----
-   Three layered radial gradients, each on its own slow drift cycle.
-   Fully GPU-friendly (transform/opacity only), zero JS. */
-
-.aurora-wash {
-  /* Establish a stacking context so layers blend smoothly */
-  isolation: isolate;
-}
-
-.aurora-layer {
-  position: absolute;
-  inset: -25%;
-  border-radius: 50%;
-  filter: blur(64px);
-  will-change: transform, opacity;
-  mix-blend-mode: screen;
-}
-
-.aurora-layer-1 {
-  background: radial-gradient(closest-side, var(--primary) 0%, transparent 70%);
-  opacity: 0.14;
-  top: -30%;
-  left: -10%;
-  width: 70%;
-  height: 90%;
-  animation: aurora-drift-a 22s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
-}
-
-.aurora-layer-2 {
-  background: radial-gradient(closest-side, var(--step-3) 0%, transparent 70%);
-  opacity: 0.10;
-  top: -20%;
-  right: -15%;
-  width: 60%;
-  height: 80%;
-  animation: aurora-drift-b 26s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
-}
-
-.aurora-layer-3 {
-  background: radial-gradient(closest-side, var(--step-1) 0%, transparent 70%);
-  opacity: 0.08;
-  top: 0%;
-  left: 30%;
-  width: 50%;
-  height: 70%;
-  animation: aurora-drift-c 30s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
-}
-
-.dark .aurora-layer-1 { opacity: 0.22; }
-.dark .aurora-layer-2 { opacity: 0.16; }
-.dark .aurora-layer-3 { opacity: 0.12; }
-
-@keyframes aurora-drift-a {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(8%, 6%, 0) scale(1.15); }
-}
-
-@keyframes aurora-drift-b {
-  0%   { transform: translate3d(0, 0, 0) scale(1.05); }
-  100% { transform: translate3d(-7%, 8%, 0) scale(1); }
-}
-
-@keyframes aurora-drift-c {
-  0%   { transform: translate3d(0, 0, 0) scale(0.95); }
-  100% { transform: translate3d(5%, -6%, 0) scale(1.1); }
-}
-
 /* ---- Shimmer text (ProductDemo model label reveal) ----
    Single-pass diagonal sweep that runs once when the element becomes visible.
    The text is filled by a gradient that is mostly the brand primary color,
@@ -185,12 +118,6 @@
     opacity: 1;
     transform: none;
     transition: none;
-  }
-
-  .aurora-layer-1,
-  .aurora-layer-2,
-  .aurora-layer-3 {
-    animation: none;
   }
 
   .shimmer-text {
