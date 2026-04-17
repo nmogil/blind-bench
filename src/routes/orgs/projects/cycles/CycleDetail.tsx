@@ -130,7 +130,7 @@ export function CycleDetail() {
     action: "new_version_manual" | "optimizer_requested" | "no_action",
   ) {
     try {
-      await setClosedAction({
+      const result = await setClosedAction({
         cycleId: cycleId as Id<"reviewCycles">,
         action,
       });
@@ -140,6 +140,11 @@ export function CycleDetail() {
         );
       } else if (action === "optimizer_requested") {
         toast.success("Optimizer triggered from cycle feedback");
+        if (result?.optimizationRequestId) {
+          navigate(
+            `/orgs/${orgSlug}/projects/${projectId}/optimizations/${result.optimizationRequestId}`,
+          );
+        }
       } else {
         toast.info("No action taken");
       }

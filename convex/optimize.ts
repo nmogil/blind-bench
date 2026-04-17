@@ -655,6 +655,60 @@ export const getOptimizationContext = internalQuery({
       }
     }
 
+    // When triggered from a closed cycle, the cycle holds its own snapshot of
+    // outputs, annotations, and ratings — load those into the same array so
+    // the optimizer sees the cycle's feedback under its blind labels.
+    if (request.sourceCycleId) {
+      const cycleOutputs = await ctx.db
+        .query("cycleOutputs")
+        .withIndex("by_cycle", (q) => q.eq("cycleId", request.sourceCycleId!))
+        .take(200);
+
+      for (const co of cycleOutputs) {
+        const sourceOutput = await ctx.db.get(co.sourceOutputId);
+
+        const fb = await ctx.db
+          .query("cycleFeedback")
+          .withIndex("by_cycle_output", (q) => q.eq("cycleOutputId", co._id))
+          .take(200);
+        for (const f of fb) {
+          outputFeedbackItems.push({
+            blindLabel: co.cycleBlindLabel,
+            highlightedText: f.annotationData.highlightedText,
+            comment: f.annotationData.comment,
+            model: sourceOutput?.model,
+            temperature: sourceOutput?.temperature,
+          });
+        }
+
+        const prefs = await ctx.db
+          .query("cyclePreferences")
+          .withIndex("by_cycle_output", (q) => q.eq("cycleOutputId", co._id))
+          .take(200);
+        if (prefs.length > 0) {
+          let best = 0;
+          let acceptable = 0;
+          let weak = 0;
+          for (const p of prefs) {
+            if (p.rating === "best") best++;
+            else if (p.rating === "acceptable") acceptable++;
+            else weak++;
+          }
+          const parts: string[] = [];
+          if (best > 0) parts.push(`${best} best`);
+          if (acceptable > 0) parts.push(`${acceptable} acceptable`);
+          if (weak > 0) parts.push(`${weak} weak`);
+          outputFeedbackItems.push({
+            blindLabel: co.cycleBlindLabel,
+            highlightedText: co.outputContentSnapshot.slice(0, 200),
+            comment: `Evaluator preference ratings — ${parts.join(", ")}.`,
+            model: sourceOutput?.model,
+            temperature: sourceOutput?.temperature,
+          });
+        }
+      }
+    }
+
     return {
       request,
       version,
