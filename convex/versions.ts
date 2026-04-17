@@ -61,11 +61,17 @@ export const getCurrent = query({
   },
 });
 
+const formatValidator = v.optional(
+  v.union(v.literal("plain"), v.literal("markdown")),
+);
+
 export const create = mutation({
   args: {
     projectId: v.id("projects"),
     systemMessage: v.optional(v.string()),
     userMessageTemplate: v.string(),
+    systemMessageFormat: formatValidator,
+    userMessageTemplateFormat: formatValidator,
     parentVersionId: v.optional(v.id("promptVersions")),
   },
   handler: async (ctx, args) => {
@@ -118,6 +124,8 @@ export const create = mutation({
       versionNumber: maxVersion + 1,
       systemMessage: args.systemMessage,
       userMessageTemplate: args.userMessageTemplate,
+      systemMessageFormat: args.systemMessageFormat,
+      userMessageTemplateFormat: args.userMessageTemplateFormat,
       parentVersionId: args.parentVersionId,
       status: "draft",
       createdById: userId,
@@ -130,6 +138,8 @@ export const update = mutation({
     versionId: v.id("promptVersions"),
     systemMessage: v.optional(v.string()),
     userMessageTemplate: v.optional(v.string()),
+    systemMessageFormat: formatValidator,
+    userMessageTemplateFormat: formatValidator,
   },
   handler: async (ctx, args) => {
     const version = await ctx.db.get(args.versionId);
@@ -172,6 +182,10 @@ export const update = mutation({
     if (args.systemMessage !== undefined) updates.systemMessage = args.systemMessage;
     if (args.userMessageTemplate !== undefined)
       updates.userMessageTemplate = args.userMessageTemplate;
+    if (args.systemMessageFormat !== undefined)
+      updates.systemMessageFormat = args.systemMessageFormat;
+    if (args.userMessageTemplateFormat !== undefined)
+      updates.userMessageTemplateFormat = args.userMessageTemplateFormat;
 
     await ctx.db.patch(args.versionId, updates);
 
@@ -249,6 +263,8 @@ export const fork = mutation({
       versionNumber: maxVersion + 1,
       systemMessage: source.systemMessage,
       userMessageTemplate: source.userMessageTemplate,
+      systemMessageFormat: source.systemMessageFormat,
+      userMessageTemplateFormat: source.userMessageTemplateFormat,
       sourceVersionId: args.sourceVersionId,
       status: "draft",
       createdById: userId,
@@ -307,6 +323,8 @@ export const rollback = mutation({
       versionNumber: head.versionNumber + 1,
       systemMessage: target.systemMessage,
       userMessageTemplate: target.userMessageTemplate,
+      systemMessageFormat: target.systemMessageFormat,
+      userMessageTemplateFormat: target.userMessageTemplateFormat,
       parentVersionId: head._id,
       sourceVersionId: target._id,
       status: "draft",

@@ -84,6 +84,13 @@ const schema = defineSchema({
     versionNumber: v.number(),
     systemMessage: v.optional(v.string()),
     userMessageTemplate: v.string(),
+    // Optional format hint for editor rendering. Absent = "plain".
+    systemMessageFormat: v.optional(
+      v.union(v.literal("plain"), v.literal("markdown")),
+    ),
+    userMessageTemplateFormat: v.optional(
+      v.union(v.literal("plain"), v.literal("markdown")),
+    ),
     parentVersionId: v.optional(v.id("promptVersions")),
     sourceVersionId: v.optional(v.id("promptVersions")),
     status: v.union(

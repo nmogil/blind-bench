@@ -185,6 +185,7 @@ export function RunView() {
                   canAnnotate={true}
                   resolvedModel={isMix ? (output.model ?? run.model) : undefined}
                   resolvedTemperature={isMix ? (output.temperature ?? run.temperature) : undefined}
+                  outputFormat="markdown"
                 />
                 {run.status === "completed" && (
                   <div className="flex items-center justify-between px-1">

@@ -196,6 +196,7 @@ export const get = query({
       ...run,
       outputs: outputs.sort((a, b) => a.blindLabel.localeCompare(b.blindLabel)),
       versionNumber: version?.versionNumber ?? null,
+      outputFormat: version?.userMessageTemplateFormat ?? null,
       testCaseName: testCase?.name ?? null,
       isQuickRun: !run.testCaseId,
       inlineVariables: run.inlineVariables ?? null,

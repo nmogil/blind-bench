@@ -4,6 +4,7 @@ import { Doc, Id } from "../../convex/_generated/dataModel";
 import { BlindLabelBadge } from "./BlindLabelBadge";
 import { RunStatusPill } from "./RunStatusPill";
 import { AnnotatedEditor } from "./tiptap/AnnotatedEditor";
+import type { EditorFormat } from "./tiptap/PromptEditor";
 import { cn } from "@/lib/utils";
 
 interface StreamingOutputPanelProps {
@@ -12,6 +13,8 @@ interface StreamingOutputPanelProps {
   canAnnotate?: boolean;
   resolvedModel?: string;
   resolvedTemperature?: number;
+  /** Rendering format for completed output text. Defaults to plain. */
+  outputFormat?: EditorFormat;
 }
 
 function formatTokens(n: number | undefined): string {
@@ -32,6 +35,7 @@ export function StreamingOutputPanel({
   canAnnotate = false,
   resolvedModel,
   resolvedTemperature,
+  outputFormat = "plain",
 }: StreamingOutputPanelProps) {
   const isStreaming = runStatus === "running";
   const isFailed = runStatus === "failed";
@@ -91,6 +95,7 @@ export function StreamingOutputPanel({
         <div className="flex-1 overflow-y-auto min-h-[200px]">
           <AnnotatedEditor
             content={output.outputContent}
+            format={outputFormat}
             annotations={annotations}
             canAnnotate={canAnnotate}
             onCreateAnnotation={(from, to, highlightedText, comment) => {

@@ -149,6 +149,7 @@ export function VersionEditor() {
     setSaving(true);
     setError("");
     setSuccess(false);
+
     try {
       await updateVersion({
         versionId: versionId as Id<"promptVersions">,
@@ -522,21 +523,23 @@ export function VersionEditor() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* System message (collapsible) */}
           <div>
-            <button
-              type="button"
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-              onClick={() => setSystemExpanded(!systemExpanded)}
-              aria-expanded={systemExpanded}
-              aria-controls="system-message-panel"
-            >
-              {systemExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-              System message
-              <span className="text-xs font-normal">(optional)</span>
-            </button>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setSystemExpanded(!systemExpanded)}
+                aria-expanded={systemExpanded}
+                aria-controls="system-message-panel"
+              >
+                {systemExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                System message
+                <span className="text-xs font-normal">(optional)</span>
+              </button>
+            </div>
             {systemExpanded && (
               <div
                 id="system-message-panel"
@@ -545,6 +548,7 @@ export function VersionEditor() {
                 {feedbackMode ? (
                   <AnnotatedEditor
                     content={systemMessage}
+                    format="markdown"
                     annotations={(promptFeedback ?? [])
                       .filter((fb) => fb.targetField === "system_message")
                       .map((fb) => ({
@@ -605,6 +609,7 @@ export function VersionEditor() {
               {feedbackMode ? (
                 <AnnotatedEditor
                   content={userTemplate}
+                  format="markdown"
                   annotations={(promptFeedback ?? [])
                     .filter((fb) => fb.targetField === "user_message_template")
                     .map((fb) => ({

@@ -1,12 +1,16 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { Markdown } from "tiptap-markdown";
 import {
   AnnotationHighlightExtension,
   annotationPluginKey,
   type AnnotationRange,
 } from "./AnnotationHighlightExtension";
+import { lowlight } from "./lowlight";
+import type { EditorFormat } from "./PromptEditor";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -25,6 +29,7 @@ export interface Annotation {
 interface AnnotatedEditorProps {
   content: string;
   annotations: Annotation[];
+  format?: EditorFormat;
   onCreateAnnotation?: (
     from: number,
     to: number,
@@ -49,6 +54,7 @@ interface PendingComment {
 export function AnnotatedEditor({
   content,
   annotations,
+  format = "plain",
   onCreateAnnotation,
   onUpdateAnnotation,
   onDeleteAnnotation,
@@ -73,8 +79,21 @@ export function AnnotatedEditor({
   const [isEditing, setIsEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const editor = useEditor({
-    extensions: [
+  const extensions = useMemo(() => {
+    if (format === "markdown") {
+      return [
+        StarterKit.configure({ codeBlock: false }),
+        CodeBlockLowlight.configure({ lowlight }),
+        Markdown.configure({
+          html: false,
+          tightLists: true,
+          linkify: true,
+          breaks: false,
+        }),
+        AnnotationHighlightExtension,
+      ];
+    }
+    return [
       StarterKit.configure({
         heading: false,
         bulletList: false,
@@ -88,24 +107,33 @@ export function AnnotatedEditor({
         code: false,
       }),
       AnnotationHighlightExtension,
-    ],
-    content: content || "",
-    editable: true, // Needed for selections + BubbleMenu
-    editorProps: {
-      attributes: {
-        class: cn(
-          "prose prose-sm max-w-none focus:outline-none min-h-[200px] px-3 py-2",
-          "whitespace-pre-wrap font-mono leading-relaxed text-sm",
-        ),
-        role: "textbox",
-        "aria-multiline": "true",
-        "aria-readonly": "true",
-        "aria-label": resolvedAriaLabel,
+    ];
+  }, [format]);
+
+  const editor = useEditor(
+    {
+      extensions,
+      content: content || "",
+      editable: true, // Needed for selections + BubbleMenu
+      editorProps: {
+        attributes: {
+          class: cn(
+            "prose prose-sm max-w-none focus:outline-none min-h-[200px] px-3 py-2",
+            format === "plain" &&
+              "whitespace-pre-wrap font-mono leading-relaxed text-sm",
+            format === "markdown" && "leading-relaxed text-sm",
+          ),
+          role: "textbox",
+          "aria-multiline": "true",
+          "aria-readonly": "true",
+          "aria-label": resolvedAriaLabel,
+        },
+        handlePaste: () => true,
+        handleDrop: () => true,
       },
-      handlePaste: () => true,
-      handleDrop: () => true,
     },
-  });
+    [format, extensions],
+  );
 
   // Sync external content changes
   useEffect(() => {
