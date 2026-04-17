@@ -566,6 +566,8 @@ const schema = defineSchema({
 
   // Ratings with source tracking — unified table for evaluator, anonymous,
   // solo, and author ratings. userId is null for anonymous entries.
+  // evaluatorType distinguishes human vs agent submissions; absent rows are
+  // human (backwards compatible).
   cyclePreferences: defineTable({
     cycleId: v.id("reviewCycles"),
     cycleOutputId: v.id("cycleOutputs"),
@@ -581,6 +583,10 @@ const schema = defineSchema({
       v.literal("solo"),
       v.literal("author"),
     ),
+    evaluatorType: v.optional(
+      v.union(v.literal("human"), v.literal("agent")),
+    ),
+    serviceTokenId: v.optional(v.id("serviceTokens")),
     sessionId: v.optional(v.string()),
   })
     .index("by_cycle", ["cycleId"])
@@ -619,6 +625,10 @@ const schema = defineSchema({
       v.literal("solo"),
       v.literal("author"),
     ),
+    evaluatorType: v.optional(
+      v.union(v.literal("human"), v.literal("agent")),
+    ),
+    serviceTokenId: v.optional(v.id("serviceTokens")),
     sessionId: v.optional(v.string()),
   })
     .index("by_cycle_output", ["cycleOutputId"])
@@ -639,6 +649,45 @@ const schema = defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_cycle", ["cycleId"]),
+
+  // =========================================================================
+  // Public API: Service Tokens (Phase 0)
+  // =========================================================================
+  //
+  // Service tokens authenticate machine clients (agents, CI, MCP server) for
+  // the /api/v1/* HTTP surface. Scoped to a single project. The plaintext
+  // token is shown only once at mint time — only the SHA-256 hash is stored.
+  //
+  // Token wire format: bbst_<env>_<24-byte-hex>  (env ∈ live | test, prefix is
+  // "bbst_<env>_" + first 8 chars of the random body for display/lookup).
+  serviceTokens: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(),
+    prefix: v.string(), // displayed in UI; safe to expose
+    tokenHash: v.string(), // SHA-256 hex of plaintext token
+    scopes: v.array(
+      v.union(
+        v.literal("runs:read"),
+        v.literal("runs:write"),
+        v.literal("cycles:read"),
+        v.literal("cycles:write"),
+        v.literal("evaluator:read"),
+        v.literal("evaluator:write"),
+      ),
+    ),
+    actorRole: v.union(
+      v.literal("editor"),    // can author + run
+      v.literal("evaluator"), // can submit feedback only
+    ),
+    createdById: v.id("users"),
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedById: v.optional(v.id("users")),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_hash", ["tokenHash"]),
 
   // Email invitations for anonymous evaluation via shareable links.
   evalInvitations: defineTable({

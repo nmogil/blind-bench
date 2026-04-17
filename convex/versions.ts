@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
 import { validateTemplate } from "./lib/templateValidation";
+import { createVersionCore } from "./lib/versionsCore";
 
 export const list = query({
   args: { projectId: v.id("projects") },
@@ -73,55 +74,7 @@ export const create = mutation({
       "owner",
       "editor",
     ]);
-
-    // Fetch variable names for template validation
-    const variables = await ctx.db
-      .query("projectVariables")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .take(200);
-    const variableNames = variables.map((v) => v.name);
-
-    // Validate templates and auto-create unknown variables
-    const unknownFromUser = validateTemplate(args.userMessageTemplate, variableNames);
-    const unknownFromSystem = args.systemMessage
-      ? validateTemplate(args.systemMessage, variableNames)
-      : [];
-    const allUnknown = [...new Set([...unknownFromUser, ...unknownFromSystem])];
-    const maxOrder = variables.reduce((max, v) => Math.max(max, v.order), -1);
-    for (let i = 0; i < allUnknown.length; i++) {
-      await ctx.db.insert("projectVariables", {
-        projectId: args.projectId,
-        name: allUnknown[i]!,
-        required: true,
-        order: maxOrder + 1 + i,
-      });
-    }
-
-    // Compute next version number and archive existing current version
-    const existing = await ctx.db
-      .query("promptVersions")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .take(200);
-    const maxVersion = existing.reduce(
-      (max, v) => Math.max(max, v.versionNumber),
-      0,
-    );
-
-    for (const v of existing) {
-      if (v.status === "current") {
-        await ctx.db.patch(v._id, { status: "archived" as const });
-      }
-    }
-
-    return await ctx.db.insert("promptVersions", {
-      projectId: args.projectId,
-      versionNumber: maxVersion + 1,
-      systemMessage: args.systemMessage,
-      userMessageTemplate: args.userMessageTemplate,
-      parentVersionId: args.parentVersionId,
-      status: "draft",
-      createdById: userId,
-    });
+    return await createVersionCore(ctx, { ...args, userId });
   },
 });
 

@@ -55,6 +55,31 @@ gh issue edit <N> --remove-label "in-progress"
 - Eval routes use opaque tokens, never real IDs
 - Test every change against the 13 rules in UX Spec Section 10
 
+## Public API (`/api/v1/*` + MCP)
+
+The HTTP API at `/api/v1/*` and the `mcp/` server are part of the product
+surface. Agents (Claude Code, custom backends, CI) integrate against them.
+Drift between the React frontend and these surfaces is a bug.
+
+**Source-of-truth files — touch carefully:**
+- `convex/lib/serviceAuth.ts` — token wire format, hashing, scope checks
+- `convex/lib/versionsCore.ts`, `convex/lib/runsCore.ts`, `convex/lib/reviewCyclesCore.ts` — shared business logic; user-facing mutations and HTTP routes both call these helpers
+- `convex/api.ts` — internal mutations/queries called by HTTP routes (one wrapper per endpoint)
+- `convex/http.ts` — `/api/v1/*` route handlers
+- `convex/serviceTokens.ts` — token CRUD + the validator HTTP routes call first
+- `convex/tests/api-contract.test.ts` — wire-shape snapshots; failing this test means the contract is changing
+- `mcp/` — TypeScript MCP server that wraps the HTTP API one-to-one
+
+**When you change a Convex mutation/query that the frontend uses:**
+1. Check whether the same logic should be available via API. If yes, update or add a `*Core` helper in `convex/lib/`, then add/update the wrapper in `convex/api.ts` and the route in `convex/http.ts` in the same PR.
+2. Update `convex/tests/api-contract.test.ts` to reflect the new shape.
+3. Update the matching MCP tool definition in `mcp/src/tools.ts`.
+4. Bump the API version note below if the change is breaking.
+
+**When you change anything in the source-of-truth files above, the contract test must be re-run and the MCP wrapper re-checked.**
+
+API version: v1 (unstable; breaking changes allowed pre-1.0 but must be called out in commit message).
+
 ## Do Not
 
 - Import Convex internal modules directly from frontend code
