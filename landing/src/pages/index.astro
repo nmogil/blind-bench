@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import Nav from '../components/Nav.astro';
+import PillNav from '../components/PillNav.astro';
 import Hero from '../components/Hero.astro';
 import Problem from '../components/Problem.astro';
 import Audience from '../components/Audience.astro';
@@ -10,10 +10,19 @@ import OptimizerDiff from '../components/OptimizerDiff.astro';
 import VsAlternatives from '../components/VsAlternatives.astro';
 import TrustStrip from '../components/TrustStrip.astro';
 import CtaFooter from '../components/CtaFooter.astro';
+
+const APP_URL = 'https://app.blindbench.dev';
 ---
 
 <Base>
-  <Nav />
+  <PillNav
+    items={[
+      { label: 'How it works', href: '#how-it-works' },
+      { label: 'Demo', href: '#demo-section' },
+    ]}
+    ctaHref={APP_URL}
+    ctaLabel="Start collecting feedback"
+  />
   <main id="main">
     <Hero />
     <Problem />

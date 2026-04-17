@@ -1,0 +1,584 @@
+---
+// Vanilla Astro port of the React Bits PillNav component.
+// Goals:
+//   - Match the visual language: pill bar, hover-circle sweep, label crossfade, sticky-floating capsule.
+//   - Zero JS framework runtime, zero GSAP. Animations are pure CSS transitions.
+//   - Honors prefers-reduced-motion and the landing site's < 100KB JS budget.
+//   - Mobile menu uses a tiny vanilla script (no module imports).
+
+interface NavItem {
+  label: string;
+  href: string;
+  ariaLabel?: string;
+}
+
+interface Props {
+  items: NavItem[];
+  activeHref?: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+  homeHref?: string;
+}
+
+const {
+  items,
+  activeHref,
+  ctaHref,
+  ctaLabel,
+  homeHref = '/',
+} = Astro.props;
+---
+
+<div class="pill-nav-wrap">
+  <nav class="pill-nav" aria-label="Primary">
+    <a class="pill-logo" href={homeHref} aria-label="Blind Bench home">
+      <svg class="pill-logo-mark" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+        <!-- A/B split mark, mirrors the previous Nav.astro -->
+        <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="M0.75 6A5.25 5.25 0 0 1 6 0.75h6v22.5H6A5.25 5.25 0 0 1 0.75 18Z" fill="currentColor" />
+        <line x1="12" y1="0.75" x2="12" y2="23.25" stroke="currentColor" stroke-width="1" opacity="0.9" />
+      </svg>
+      <span class="pill-logo-wordmark">Blind Bench</span>
+    </a>
+
+    <div class="pill-bar desktop-only">
+      <ul class="pill-list" role="menubar">
+        {items.map((item) => (
+          <li role="none">
+            <a
+              role="menuitem"
+              href={item.href}
+              class:list={['pill', { 'is-active': activeHref === item.href }]}
+              aria-label={item.ariaLabel ?? item.label}
+              aria-current={activeHref === item.href ? 'page' : undefined}
+            >
+              <span class="hover-circle" aria-hidden="true"></span>
+              <span class="label-stack">
+                <span class="pill-label">{item.label}</span>
+                <span class="pill-label-hover" aria-hidden="true">{item.label}</span>
+              </span>
+            </a>
+          </li>
+        ))}
+        {ctaHref && ctaLabel && (
+          <li role="none">
+            <a
+              role="menuitem"
+              href={ctaHref}
+              class="pill pill-cta"
+              aria-label={ctaLabel}
+            >
+              <span class="hover-circle" aria-hidden="true"></span>
+              <span class="label-stack">
+                <span class="pill-label">{ctaLabel}</span>
+                <span class="pill-label-hover" aria-hidden="true">{ctaLabel}</span>
+              </span>
+            </a>
+          </li>
+        )}
+      </ul>
+    </div>
+
+    <button
+      type="button"
+      class="mobile-menu-button mobile-only"
+      aria-label="Toggle menu"
+      aria-expanded="false"
+      aria-controls="pill-nav-mobile-menu"
+      data-pill-nav-toggle
+    >
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+  </nav>
+
+  <div
+    id="pill-nav-mobile-menu"
+    class="mobile-menu-popover mobile-only"
+    data-pill-nav-menu
+    hidden
+  >
+    <ul class="mobile-menu-list">
+      {items.map((item) => (
+        <li>
+          <a
+            href={item.href}
+            class:list={['mobile-menu-link', { 'is-active': activeHref === item.href }]}
+            aria-current={activeHref === item.href ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        </li>
+      ))}
+      {ctaHref && ctaLabel && (
+        <li>
+          <a href={ctaHref} class="mobile-menu-link mobile-menu-link-cta">
+            {ctaLabel}
+          </a>
+        </li>
+      )}
+    </ul>
+  </div>
+</div>
+
+<style>
+  /* ---- Color tokens for the pill nav ----
+     --bar-bg     : background of the pill bar + logo circle
+     --circle     : color the hover circle sweeps in (and the active dot)
+     --pill-text  : text color when at rest
+     --hover-text : text color when the circle has filled the pill
+     --cta-bg     : CTA pill resting background
+     --cta-text   : CTA pill resting text */
+  .pill-nav-wrap {
+    --bar-bg: var(--card);
+    --circle: var(--primary);
+    --pill-text: var(--muted-foreground);
+    --hover-text: var(--primary-foreground);
+    --cta-bg: var(--primary);
+    --cta-text: var(--primary-foreground);
+
+    position: sticky;
+    top: 1rem;
+    z-index: 50;
+    width: 100%;
+    pointer-events: none;
+  }
+
+  .pill-nav {
+    --nav-h: 44px;
+    --pill-pad-x: 18px;
+    --pill-gap: 4px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+    pointer-events: auto;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-sizing: border-box;
+  }
+
+  /* Logo + wordmark.
+     Rendered as a pill-shaped capsule matching the nav bar so the mark
+     and "Blind Bench" wordmark share a single affordance. */
+  .pill-logo {
+    height: var(--nav-h);
+    border-radius: 9999px;
+    background: var(--bar-bg);
+    color: var(--foreground);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px 0 12px;
+    text-decoration: none;
+    box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.25);
+  }
+
+  .pill-logo-mark {
+    flex: none;
+    transition: transform 0.6s var(--ease);
+    will-change: transform;
+  }
+
+  .pill-logo-wordmark {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .pill-logo:hover .pill-logo-mark,
+  .pill-logo:focus-visible .pill-logo-mark {
+    transform: rotate(360deg);
+  }
+
+  .pill-logo:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  /* Pill bar */
+  .pill-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: var(--nav-h);
+    background: var(--bar-bg);
+    border-radius: 9999px;
+    box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.25);
+  }
+
+  .pill-list {
+    list-style: none;
+    display: flex;
+    align-items: stretch;
+    gap: var(--pill-gap);
+    margin: 0;
+    padding: 4px;
+    height: 100%;
+  }
+
+  .pill-list > li {
+    display: flex;
+    height: 100%;
+  }
+
+  /* Each pill.
+     `line-height: 0` collapses the inline line box so the label-stack's
+     absolute-positioned hover twin sits flush with the resting label.
+     `isolation: isolate` keeps the hover fill's stacking context contained. */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 var(--pill-pad-x);
+    background: transparent;
+    color: var(--pill-text);
+    text-decoration: none;
+    border-radius: 9999px;
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 0;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    box-sizing: border-box;
+  }
+
+  .pill:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  /* CTA variant — primary-tinted at rest. On hover, the circle sweeps in
+     the bar background color, so the hover-label color is the foreground
+     (reads against the swept-in bar bg). Scope the override as CSS
+     variables so the base `.hover-circle` rule naturally picks up the
+     swapped color — no specificity battles. */
+  .pill.pill-cta {
+    background: var(--cta-bg);
+    color: var(--cta-text);
+    --circle: var(--bar-bg);
+    --hover-text: var(--foreground);
+  }
+
+  /* Hover fill.
+     Originally implemented as an oversized circle scaled up from below —
+     that approach bled past the pill's rounded clip in Chromium/WebKit
+     regardless of overflow/clip-path/contain. Using a pill-sized
+     pseudo-element that grows from the bottom is visually equivalent (the
+     rounded top edge reads as a sweep) and is impossible to bleed because
+     it's physically bound to the pill's own border-box. */
+  .pill .hover-circle {
+    position: absolute;
+    inset: 0;
+    background: var(--circle);
+    border-radius: inherit;
+    transform: translateY(100%);
+    transition: transform 0.45s var(--ease);
+    z-index: 1;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* On CTA hover, the swept-in bar-color circle replaces the blue pill.
+     Text tracks the hover-text color (set to --foreground on .pill-cta). */
+  .pill.pill-cta:hover,
+  .pill.pill-cta:focus-visible {
+    color: var(--hover-text);
+  }
+
+  .pill:hover .hover-circle,
+  .pill:focus-visible .hover-circle {
+    transform: translateY(0);
+  }
+
+  /* Label crossfade: the at-rest label slides up and out, a duplicate slides
+     up into its place from below. Translating by the full pill height
+     (`--nav-h`) — not a fraction of the label height — guarantees both
+     labels are outside the pill's clip region when not active, so nothing
+     ghost-renders above or below the pill during the transition. */
+  .pill .label-stack {
+    position: relative;
+    display: inline-block;
+    line-height: 1;
+    z-index: 2;
+  }
+
+  .pill .pill-label {
+    position: relative;
+    display: inline-block;
+    line-height: 1;
+    transform: translateY(0);
+    transition: transform 0.4s var(--ease);
+    will-change: transform;
+  }
+
+  .pill .pill-label-hover {
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--hover-text);
+    line-height: 1;
+    white-space: nowrap;
+    transform: translateY(var(--nav-h));
+    opacity: 0;
+    transition:
+      transform 0.4s var(--ease),
+      opacity 0.4s var(--ease);
+    will-change: transform, opacity;
+    z-index: 3;
+  }
+
+  .pill.pill-cta .pill-label-hover {
+    color: var(--hover-text);
+  }
+
+  .pill:hover .pill-label,
+  .pill:focus-visible .pill-label {
+    transform: translateY(calc(var(--nav-h) * -1));
+  }
+
+  .pill:hover .pill-label-hover,
+  .pill:focus-visible .pill-label-hover {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* Active state indicator */
+  .pill.is-active::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    background: var(--circle);
+    border-radius: 9999px;
+    z-index: 4;
+  }
+
+  /* Visibility helpers */
+  .desktop-only {
+    display: flex;
+  }
+  .mobile-only {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .desktop-only {
+      display: none;
+    }
+    .mobile-only {
+      display: flex;
+    }
+
+    .pill-nav {
+      width: 100%;
+      max-width: none;
+      justify-content: space-between;
+      padding: 0 1rem;
+    }
+  }
+
+  /* Mobile menu button (hamburger) */
+  .mobile-menu-button {
+    width: var(--nav-h);
+    height: var(--nav-h);
+    border-radius: 50%;
+    background: var(--bar-bg);
+    color: var(--foreground);
+    border: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 4px 16px -8px rgba(0, 0, 0, 0.25);
+  }
+
+  .mobile-menu-button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  .hamburger-line {
+    width: 16px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+    transition: transform 0.25s var(--ease);
+    transform-origin: center;
+  }
+
+  .mobile-menu-button[aria-expanded='true'] .hamburger-line:nth-child(1) {
+    transform: translateY(3px) rotate(45deg);
+  }
+  .mobile-menu-button[aria-expanded='true'] .hamburger-line:nth-child(2) {
+    transform: translateY(-3px) rotate(-45deg);
+  }
+
+  /* Mobile menu popover */
+  .mobile-menu-popover {
+    position: absolute;
+    top: calc(var(--nav-h, 44px) + 1.5rem);
+    left: 1rem;
+    right: 1rem;
+    background: var(--bar-bg);
+    border-radius: 18px;
+    box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.4);
+    pointer-events: auto;
+    transform-origin: top center;
+    transform: translateY(-6px);
+    opacity: 0;
+    transition:
+      opacity 0.2s var(--ease),
+      transform 0.2s var(--ease);
+  }
+
+  .mobile-menu-popover[hidden] {
+    display: none;
+  }
+
+  .mobile-menu-popover.is-open {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .mobile-menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mobile-menu-link {
+    display: block;
+    padding: 12px 16px;
+    color: var(--pill-text);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 9999px;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .mobile-menu-link:hover,
+  .mobile-menu-link:focus-visible {
+    background-color: var(--circle);
+    color: var(--hover-text);
+    outline: none;
+  }
+
+  .mobile-menu-link.mobile-menu-link-cta {
+    background-color: var(--cta-bg);
+    color: var(--cta-text);
+  }
+
+  .mobile-menu-link.mobile-menu-link-cta:hover,
+  .mobile-menu-link.mobile-menu-link-cta:focus-visible {
+    background-color: var(--bar-bg);
+    color: var(--pill-text);
+  }
+
+  /* Reduced motion: kill the showy stuff, keep functional state changes */
+  @media (prefers-reduced-motion: reduce) {
+    .pill-logo svg,
+    .pill .hover-circle,
+    .pill .pill-label,
+    .pill .pill-label-hover,
+    .hamburger-line,
+    .mobile-menu-popover {
+      transition: none;
+    }
+    .pill-logo:hover svg,
+    .pill-logo:focus-visible svg {
+      transform: none;
+    }
+    /* Replace the sweep with a flat color swap */
+    .pill:hover .pill-label,
+    .pill:focus-visible .pill-label {
+      transform: none;
+      opacity: 0;
+    }
+    .pill:hover .pill-label-hover,
+    .pill:focus-visible .pill-label-hover {
+      transform: none;
+      opacity: 1;
+    }
+    .pill:hover .hover-circle,
+    .pill:focus-visible .hover-circle {
+      transform: translateY(0);
+    }
+  }
+</style>
+
+<script>
+  // Tiny mobile menu controller. No imports, no framework runtime.
+  const toggle = document.querySelector<HTMLButtonElement>('[data-pill-nav-toggle]');
+  const menu = document.querySelector<HTMLDivElement>('[data-pill-nav-menu]');
+
+  if (toggle && menu) {
+    const close = () => {
+      toggle.setAttribute('aria-expanded', 'false');
+      menu.classList.remove('is-open');
+      // Re-hide after the closing transition finishes so it's removed from a11y tree
+      window.setTimeout(() => {
+        if (toggle.getAttribute('aria-expanded') === 'false') {
+          menu.setAttribute('hidden', '');
+        }
+      }, 220);
+    };
+
+    const open = () => {
+      menu.removeAttribute('hidden');
+      // Force a paint so the transition runs from opacity:0
+      requestAnimationFrame(() => {
+        toggle.setAttribute('aria-expanded', 'true');
+        menu.classList.add('is-open');
+      });
+    };
+
+    toggle.addEventListener('click', () => {
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      isOpen ? close() : open();
+    });
+
+    // Close on link click (navigation triggers within the page or to the app)
+    menu.querySelectorAll('a').forEach((a) => {
+      a.addEventListener('click', close);
+    });
+
+    // Close on Escape and when clicking outside
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+        close();
+        toggle.focus();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (toggle.getAttribute('aria-expanded') !== 'true') return;
+      const target = e.target as Node;
+      if (menu.contains(target) || toggle.contains(target)) return;
+      close();
+    });
+  }
+</script>
