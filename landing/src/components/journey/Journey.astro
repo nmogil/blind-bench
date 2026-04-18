@@ -152,17 +152,13 @@ const DEFAULT_INDEX = 0;
     }
   }
 
-  /* All panels share the same grid cell → cross-fade without layout shift */
+  /* Active panel flows normally (sets container height); inactive panels
+     are pulled out of flow so the container doesn't reserve their height. */
   .journey-panels {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
     position: relative;
   }
 
   .journey-panel {
-    grid-column: 1;
-    grid-row: 1;
     opacity: 0;
     pointer-events: none;
     transform: translateY(6px);
@@ -171,11 +167,18 @@ const DEFAULT_INDEX = 0;
       transform 280ms ease;
   }
 
+  .journey-panel:not([data-active='true']) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+
   .journey-panel[data-active='true'] {
+    position: relative;
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);
-    /* Raise the active panel so its interactive elements receive clicks */
     z-index: 1;
   }
 

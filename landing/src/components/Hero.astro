@@ -54,17 +54,22 @@ const APP_URL = 'https://app.blindbench.dev';
         class="mt-6 text-[2rem] font-semibold leading-[1.12] tracking-tight text-white sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem]"
       >
         Get feedback from{' '}
-        <span
-          class="hero-rotator"
-          data-hero-rotator
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <span class="hero-rotator-item is-active" data-index="0">PMs</span>
-          <span class="hero-rotator-item" data-index="1">legal</span>
-          <span class="hero-rotator-item" data-index="2">marketing</span>
-          <span class="hero-rotator-item" data-index="3">customers</span>
-          <span class="hero-rotator-item" data-index="4">experts</span>
+        <span class="hero-rotator" data-hero-rotator>
+          <!-- Invisible sizer locks the slot to the widest word so surrounding
+               text doesn't reflow as chars animate. -->
+          <span class="hero-rotator-sizer" aria-hidden="true">
+            <span>PMs</span>
+            <span>legal</span>
+            <span>marketing</span>
+            <span>customers</span>
+            <span>experts</span>
+          </span>
+          <span
+            class="hero-rotator-clip"
+            data-hero-rotator-active
+            aria-live="polite"
+            aria-atomic="true"
+          ></span>
         </span>{' '}
         to make your AI agent better.
       </h1>
@@ -129,50 +134,52 @@ const APP_URL = 'https://app.blindbench.dev';
     }
   }
 
-  /* Rotating persona in the H1. All items stack in one grid cell so the slot
-     sizes to the widest word — no layout jitter as words swap. */
+  /* Rotating persona in the H1. A hidden sizer stacks all words in one grid
+     cell so the slot is pre-sized to the widest — no layout jitter as words
+     swap. The visible clip overlays the same cell and animates per-character. */
   .hero-rotator {
     display: inline-grid;
     grid-template-columns: auto;
     grid-template-rows: 1fr;
     vertical-align: baseline;
-    color: #ddd6fe; /* violet-200: brighter/cleaner than 300, near-white with a hint */
-    font-weight: 700; /* bolder than the 600 h1 so the variable slot reads as emphasis */
-    letter-spacing: -0.01em; /* tighten slightly to match the display-weight feel */
-    /* Editorial underline — thin rule, generous offset, dimmed color. Signals
-       "variable slot" without reading as a hyperlink. */
+    color: #ddd6fe;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     text-decoration-line: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 0.16em;
     text-decoration-color: rgba(221, 214, 254, 0.55);
   }
 
-  .hero-rotator-item {
+  .hero-rotator-sizer {
     grid-column: 1;
     grid-row: 1;
-    opacity: 0;
-    filter: blur(8px);
-    transform: translateY(4px);
-    transition:
-      opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
-      filter 420ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    display: inline-grid;
+    grid-template-columns: auto;
+    grid-template-rows: 1fr;
+    visibility: hidden;
+  }
+
+  .hero-rotator-sizer > span {
+    grid-column: 1;
+    grid-row: 1;
     white-space: nowrap;
-    will-change: opacity, filter, transform;
   }
 
-  .hero-rotator-item.is-active {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
+  .hero-rotator-clip {
+    grid-column: 1;
+    grid-row: 1;
+    display: inline-flex;
+    overflow: hidden;
+    white-space: nowrap;
+    /* Extra vertical room so sliding chars + descenders don't clip at rest. */
+    padding: 0.08em 0 0.12em;
+    margin: -0.08em 0 -0.12em;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .hero-rotator-item {
-      transition: none;
-      filter: none;
-      transform: none;
-    }
+  .hero-rotator-char {
+    display: inline-block;
+    will-change: transform, opacity;
   }
 </style>
 
@@ -183,31 +190,101 @@ const APP_URL = 'https://app.blindbench.dev';
   const w = window as Window & { posthog?: PostHogGlobal };
 
   const rotator = document.querySelector<HTMLElement>('[data-hero-rotator]');
+  const rotatorActive = rotator?.querySelector<HTMLElement>(
+    '[data-hero-rotator-active]',
+  );
 
-  if (rotator) {
-    const items = Array.from(
-      rotator.querySelectorAll<HTMLElement>('.hero-rotator-item'),
-    );
+  if (rotator && rotatorActive) {
+    const ROLES = ['PMs', 'legal', 'marketing', 'customers', 'experts'];
+    const DWELL_MS = 2000;
+    const STAGGER_MS = 25; // matches React Bits staggerDuration 0.025
+    const ENTER_MS = 420;
+    const EXIT_MS = 320;
+    const ENTER_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const EXIT_EASING = 'cubic-bezier(0.7, 0, 0.84, 0)';
     const reducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)',
     ).matches;
-    const DWELL_MS = 1800;
-    let active = 0;
+
+    let index = 0;
     let paused = false;
-    rotator.dataset.current = items[0]?.textContent?.trim() ?? '';
+    let animating = false;
 
-    if (!reducedMotion && items.length > 1) {
-      const tick = () => {
+    // staggerFrom: 'last' — last char animates first, first char animates last.
+    function delayFor(i: number, total: number): number {
+      return (total - 1 - i) * STAGGER_MS;
+    }
+
+    function renderChars(text: string, animate: boolean): void {
+      rotatorActive!.innerHTML = '';
+      const chars = Array.from(text);
+      chars.forEach((ch, i) => {
+        const span = document.createElement('span');
+        span.className = 'hero-rotator-char';
+        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        rotatorActive!.appendChild(span);
+        if (animate) {
+          span.animate(
+            [
+              { transform: 'translateY(100%)', opacity: 0 },
+              { transform: 'translateY(0)', opacity: 1 },
+            ],
+            {
+              duration: ENTER_MS,
+              delay: delayFor(i, chars.length),
+              easing: ENTER_EASING,
+              fill: 'backwards',
+            },
+          );
+        }
+      });
+      rotator!.dataset.current = text;
+    }
+
+    async function exitCurrent(): Promise<void> {
+      const chars = Array.from(
+        rotatorActive!.querySelectorAll<HTMLElement>('.hero-rotator-char'),
+      );
+      if (!chars.length) return;
+      const total = chars.length;
+      await Promise.all(
+        chars.map((el, i) => {
+          const anim = el.animate(
+            [
+              { transform: 'translateY(0)', opacity: 1 },
+              { transform: 'translateY(-120%)', opacity: 0 },
+            ],
+            {
+              duration: EXIT_MS,
+              delay: delayFor(i, total),
+              easing: EXIT_EASING,
+              fill: 'forwards',
+            },
+          );
+          return anim.finished.catch(() => {});
+        }),
+      );
+    }
+
+    async function tick(): Promise<void> {
+      if (animating) return;
+      animating = true;
+      await exitCurrent();
+      index = (index + 1) % ROLES.length;
+      renderChars(ROLES[index], true);
+      animating = false;
+    }
+
+    // Initial paint — no entering animation on first load.
+    renderChars(ROLES[0], false);
+
+    if (!reducedMotion && ROLES.length > 1) {
+      setInterval(() => {
         if (paused) return;
-        items[active]?.classList.remove('is-active');
-        active = (active + 1) % items.length;
-        items[active]?.classList.add('is-active');
-        rotator.dataset.current = items[active]?.textContent?.trim() ?? '';
-      };
+        void tick();
+      }, DWELL_MS);
 
-      setInterval(tick, DWELL_MS);
-
-      // Let hover pause so readers can dwell on a word that caught their eye.
+      // Hover pauses rotation so readers can dwell on a word.
       rotator.addEventListener('mouseenter', () => {
         paused = true;
       });
