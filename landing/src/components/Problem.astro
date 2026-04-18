@@ -4,16 +4,16 @@
 
 const scenarios = [
   {
-    setup: 'You asked your team in Slack.',
-    punchline: 'The thread died on Tuesday.',
+    setup: 'You asked legal to review three responses.',
+    punchline: 'They said &ldquo;looks fine&rdquo; in Slack and moved on.',
   },
   {
-    setup: 'You tried a Google Doc.',
-    punchline: 'Feedback is scattered across 12 places.',
+    setup: 'You sent a Google Doc to marketing.',
+    punchline: 'Feedback scattered across 12 comment threads.',
   },
   {
-    setup: 'You shipped it anyway.',
-    punchline: 'And hoped the prompt held up in prod.',
+    setup: 'You launched anyway.',
+    punchline: 'And hoped the brand voice held up.',
   },
 ];
 ---
@@ -36,7 +36,10 @@ const scenarios = [
             </span>
             <p>
               <span class="text-foreground/85">{s.setup}</span>{' '}
-              <span class={`redacted redacted-delay-${i}`}>{s.punchline}</span>
+              <span
+                class={`redacted redacted-delay-${i}`}
+                set:html={s.punchline}
+              />
             </p>
           </li>
         ))

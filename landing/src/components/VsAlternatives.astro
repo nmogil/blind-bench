@@ -5,22 +5,22 @@
 
 const rows = [
   {
-    tried: 'Prompt management',
-    examples: 'PromptLayer, Langfuse',
-    gap: 'You get versions and logs, but reviewers are not part of the loop.',
-    bb: 'One shareable link, and reviewers never need an account.',
+    tried: 'Prompt management &amp; tracing',
+    examples: 'Langfuse, PromptLayer, PostHog, Braintrust',
+    gap: 'Built for developers. The reviewers whose judgment matters &mdash; PMs, legal, marketing &mdash; never open them, so feedback never reaches the prompt.',
+    bb: 'Pairs with them and closes the loop: reviewer comments become the next prompt version.',
   },
   {
     tried: 'Eval platforms',
-    examples: 'Promptfoo, LangSmith, Humanloop',
-    gap: 'Reviewers see which variant is yours, so bias leaks in and results end up stuck in a dashboard.',
-    bb: 'Blind by default, with annotations that route back as prompt edits.',
+    examples: 'Promptfoo, LangSmith',
+    gap: 'Reviewers see which variant is yours, and scores sit in a dashboard instead of driving the next edit.',
+    bb: 'Blind by default. Every annotation maps to a concrete prompt change, cited to the comment.',
   },
   {
     tried: 'Google Docs / Slack',
     examples: 'or email threads',
-    gap: 'No structure and no blinding, so feedback scatters and gets lost.',
-    bb: 'Structured, blind, and traceable into the next iteration.',
+    gap: 'No structure, no blinding, no path from a comment to a prompt change.',
+    bb: 'Structured, blind, and traceable &mdash; every comment lands in the next iteration.',
   },
 ];
 ---
@@ -32,9 +32,9 @@ const rows = [
         What Blind Bench does that others don&rsquo;t.
       </h2>
       <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-        Most tools either stop at version control or show reviewers which
-        variant is yours. Blind Bench keeps reviewers blind and turns
-        their feedback directly into edits.
+        Other tools log prompts or collect scores. None of them close the loop.
+        Blind Bench routes every reviewer comment back into the prompt &mdash;
+        the next version is built from the feedback that drove it.
       </p>
     </div>
 
@@ -67,15 +67,17 @@ const rows = [
               class={`grid grid-cols-[1.1fr_1.4fr_1fr] ${i < rows.length - 1 ? 'border-b border-border' : ''}`}
             >
               <div class="px-5 py-5">
-                <p class="text-sm font-semibold text-foreground">{r.tried}</p>
+                <p class="text-sm font-semibold text-foreground" set:html={r.tried} />
                 <p class="mt-1 text-xs text-muted-foreground">{r.examples}</p>
               </div>
-              <div class="px-5 py-5 text-sm leading-relaxed text-muted-foreground">
-                {r.gap}
-              </div>
-              <div class="border-l border-border bg-primary/5 px-5 py-5 text-sm leading-relaxed text-foreground">
-                {r.bb}
-              </div>
+              <div
+                class="px-5 py-5 text-sm leading-relaxed text-muted-foreground"
+                set:html={r.gap}
+              />
+              <div
+                class="border-l border-border bg-primary/5 px-5 py-5 text-sm leading-relaxed text-foreground"
+                set:html={r.bb}
+              />
             </div>
           ))
         }
@@ -87,7 +89,7 @@ const rows = [
           rows.map((r) => (
             <div class="overflow-hidden rounded-xl border border-border bg-card">
               <div class="border-b border-border bg-muted/40 px-4 py-3">
-                <p class="text-sm font-semibold text-foreground">{r.tried}</p>
+                <p class="text-sm font-semibold text-foreground" set:html={r.tried} />
                 <p class="mt-0.5 text-xs text-muted-foreground">{r.examples}</p>
               </div>
               <dl class="divide-y divide-border">
@@ -95,23 +97,40 @@ const rows = [
                   <dt class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                     What went wrong
                   </dt>
-                  <dd class="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {r.gap}
-                  </dd>
+                  <dd
+                    class="mt-1 text-sm leading-relaxed text-muted-foreground"
+                    set:html={r.gap}
+                  />
                 </div>
                 <div class="bg-primary/5 px-4 py-3">
                   <dt class="font-mono text-[10px] uppercase tracking-widest text-primary">
                     Blind Bench
                   </dt>
-                  <dd class="mt-1 text-sm leading-relaxed text-foreground">
-                    {r.bb}
-                  </dd>
+                  <dd
+                    class="mt-1 text-sm leading-relaxed text-foreground"
+                    set:html={r.bb}
+                  />
                 </div>
               </dl>
             </div>
           ))
         }
       </div>
+    </div>
+
+    <div
+      class="reveal mx-auto mt-10 flex max-w-3xl items-start gap-3 rounded-xl border border-border/60 bg-card/60 px-5 py-4 text-sm leading-relaxed text-muted-foreground sm:px-6"
+    >
+      <span
+        class="font-mono text-[10px] tracking-[0.18em] text-primary uppercase mt-0.5"
+      >
+        Soon
+      </span>
+      <p>
+        <span class="font-medium text-foreground">Integrations coming soon.</span>{' '}
+        Bring your traces from Langfuse, PostHog, or PromptLayer straight into a
+        review.
+      </p>
     </div>
   </div>
 </section>
