@@ -8,6 +8,7 @@ export const { auth, signIn, signOut, store } = convexAuth({
     Google,
     Email({
       id: "resend",
+      authorize: undefined,
       async sendVerificationRequest({ identifier, url, token }) {
         if (!process.env.RESEND_API_KEY) {
           // In dev without Resend, log the OTP code so you can still sign in
