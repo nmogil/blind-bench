@@ -47,20 +47,33 @@ const APP_URL = 'https://app.blindbench.dev';
       <p
         class="font-mono text-[11px] tracking-[0.18em] text-white/70 uppercase"
       >
-        Human evaluation for production LLM prompts
+        Google Docs for AI evaluation
       </p>
 
       <h1
         class="mt-6 text-[2rem] font-semibold leading-[1.12] tracking-tight text-white sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem]"
       >
-        Blind human review for every prompt, before it reaches production.
+        Get feedback from{' '}
+        <span
+          class="hero-rotator"
+          data-hero-rotator
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span class="hero-rotator-item is-active" data-index="0">PMs</span>
+          <span class="hero-rotator-item" data-index="1">legal</span>
+          <span class="hero-rotator-item" data-index="2">marketing</span>
+          <span class="hero-rotator-item" data-index="3">customers</span>
+          <span class="hero-rotator-item" data-index="4">experts</span>
+        </span>{' '}
+        to make your AI agent better.
       </h1>
 
       <p
         class="mt-6 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
       >
-        Share one link. Reviewers annotate outputs blind to variant, model, and
-        author. Feedback becomes cited prompt edits.
+        One shareable link. No account. Comments become prompt edits,
+        automatically.
       </p>
 
       <div
@@ -68,6 +81,7 @@ const APP_URL = 'https://app.blindbench.dev';
       >
         <a
           href={APP_URL}
+          data-hero-cta="get_started"
           class="inline-flex items-center justify-center rounded-md bg-white px-6 py-3 text-sm font-semibold text-neutral-950 transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           Get started
@@ -75,6 +89,7 @@ const APP_URL = 'https://app.blindbench.dev';
         </a>
         <a
           href="#how-it-works"
+          data-hero-cta="see_how"
           class="inline-flex items-center justify-center rounded-md border border-white/30 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           See how it works
@@ -113,4 +128,108 @@ const APP_URL = 'https://app.blindbench.dev';
       opacity: 1;
     }
   }
+
+  /* Rotating persona in the H1. All items stack in one grid cell so the slot
+     sizes to the widest word — no layout jitter as words swap. */
+  .hero-rotator {
+    display: inline-grid;
+    grid-template-columns: auto;
+    grid-template-rows: 1fr;
+    vertical-align: baseline;
+    color: #ddd6fe; /* violet-200: brighter/cleaner than 300, near-white with a hint */
+    font-weight: 700; /* bolder than the 600 h1 so the variable slot reads as emphasis */
+    letter-spacing: -0.01em; /* tighten slightly to match the display-weight feel */
+    /* Editorial underline — thin rule, generous offset, dimmed color. Signals
+       "variable slot" without reading as a hyperlink. */
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.16em;
+    text-decoration-color: rgba(221, 214, 254, 0.55);
+  }
+
+  .hero-rotator-item {
+    grid-column: 1;
+    grid-row: 1;
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(4px);
+    transition:
+      opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+      filter 420ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    white-space: nowrap;
+    will-change: opacity, filter, transform;
+  }
+
+  .hero-rotator-item.is-active {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-rotator-item {
+      transition: none;
+      filter: none;
+      transform: none;
+    }
+  }
 </style>
+
+<script>
+  type PostHogGlobal = {
+    capture: (event: string, props?: Record<string, unknown>) => void;
+  };
+  const w = window as Window & { posthog?: PostHogGlobal };
+
+  const rotator = document.querySelector<HTMLElement>('[data-hero-rotator]');
+
+  if (rotator) {
+    const items = Array.from(
+      rotator.querySelectorAll<HTMLElement>('.hero-rotator-item'),
+    );
+    const reducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+    const DWELL_MS = 1800;
+    let active = 0;
+    let paused = false;
+    rotator.dataset.current = items[0]?.textContent?.trim() ?? '';
+
+    if (!reducedMotion && items.length > 1) {
+      const tick = () => {
+        if (paused) return;
+        items[active]?.classList.remove('is-active');
+        active = (active + 1) % items.length;
+        items[active]?.classList.add('is-active');
+        rotator.dataset.current = items[active]?.textContent?.trim() ?? '';
+      };
+
+      setInterval(tick, DWELL_MS);
+
+      // Let hover pause so readers can dwell on a word that caught their eye.
+      rotator.addEventListener('mouseenter', () => {
+        paused = true;
+      });
+      rotator.addEventListener('mouseleave', () => {
+        paused = false;
+      });
+    }
+  }
+
+  // Instrument CTA clicks with the persona that was visible at click time.
+  // Passive learning — no A/B experiment setup needed — tells us which
+  // persona correlates with conversion.
+  document
+    .querySelectorAll<HTMLElement>('[data-hero-cta]')
+    .forEach((el) => {
+      el.addEventListener('click', () => {
+        const persona = rotator?.dataset.current ?? 'unknown';
+        const label = el.getAttribute('data-hero-cta') ?? 'unknown';
+        w.posthog?.capture('hero_cta_click', {
+          rotator_persona: persona,
+          cta_label: label,
+        });
+      });
+    });
+</script>
