@@ -8,6 +8,7 @@ import { OrgLayout } from "@/components/layouts/OrgLayout";
 import { ProjectLayout } from "@/components/layouts/ProjectLayout";
 import { EvalLayout } from "@/components/layouts/EvalLayout";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
+import { PostHogIdentityBridge } from "@/components/PostHogIdentityBridge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Route-level code splitting — each route loads its own chunk on demand
@@ -48,6 +49,7 @@ export function App() {
   return (
     <GlobalErrorBoundary>
     <TooltipProvider>
+      <PostHogIdentityBridge />
       <Suspense fallback={<LoadingScreen />}>
       <Routes>
         <Route path="/auth/sign-in" element={<AuthGatePublic />} />
