@@ -44,6 +44,8 @@ const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail
 const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/VersionDashboard").then(m => ({ default: m.VersionDashboard })));
 const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
 const HistoryPage = lazy(() => import("./routes/orgs/projects/HistoryPage").then(m => ({ default: m.HistoryPage })));
+const Terms = lazy(() => import("./routes/legal/Terms").then(m => ({ default: m.Terms })));
+const Privacy = lazy(() => import("./routes/legal/Privacy").then(m => ({ default: m.Privacy })));
 
 export function App() {
   return (
@@ -55,6 +57,8 @@ export function App() {
         <Route path="/auth/sign-in" element={<AuthGatePublic />} />
         <Route path="/compare" element={<QuickCompare />} />
         <Route path="/s/cycle/:token" element={<CycleShareableEvalView />} />
+        <Route path="/legal/terms" element={<Terms />} />
+        <Route path="/legal/privacy" element={<Privacy />} />
         <Route element={<AuthGateProtected />}>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/onboarding" element={<Onboarding />} />

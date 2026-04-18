@@ -286,13 +286,34 @@ export function CycleShareableEvalView() {
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <div className="border-b px-4 py-3">
         <span className="text-sm font-medium text-muted-foreground">
           Blind Bench — Anonymous Evaluation
         </span>
       </div>
-      <div className="max-w-4xl mx-auto p-6">{children}</div>
+      <div className="max-w-4xl mx-auto p-6 flex-1 w-full">{children}</div>
+      <footer className="border-t px-4 py-4 text-center text-[11px] text-muted-foreground">
+        By submitting ratings or comments, you agree to the Blind Bench{" "}
+        <a
+          href="/legal/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Terms
+        </a>{" "}
+        and{" "}
+        <a
+          href="/legal/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Privacy Policy
+        </a>
+        .
+      </footer>
     </div>
   );
 }

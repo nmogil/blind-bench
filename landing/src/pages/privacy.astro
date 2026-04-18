@@ -1,0 +1,14 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { marked } from 'marked';
+import privacy from '../../../project-docs/legal/privacy.md?raw';
+
+const html = marked.parse(privacy, { async: false }) as string;
+---
+
+<LegalLayout
+  title="Privacy Policy"
+  description="How Blind Bench collects, uses, and protects your information."
+>
+  <Fragment set:html={html} />
+</LegalLayout>

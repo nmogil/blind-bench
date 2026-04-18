@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.2.2",
     "@vercel/analytics": "^2.0.1",
     "astro": "^6.1.6",
+    "marked": "^18.0.1",
     "ogl": "^1.0.11",
     "posthog-js": "^1.369.3",
     "tailwindcss": "^4.2.2"

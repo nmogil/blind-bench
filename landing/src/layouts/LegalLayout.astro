@@ -1,0 +1,136 @@
+---
+import Base from './Base.astro';
+import ArrowRight from '../icons/ArrowRight.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const APP_URL = 'https://app.blindbench.dev';
+---
+
+<Base title={`${title} — Blind Bench`} description={description}>
+  <nav class="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur">
+    <div class="mx-auto flex h-14 max-w-3xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <a
+        href="/"
+        class="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        aria-label="Blind Bench home"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" class="text-primary">
+          <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+          <path d="M0.75 6A5.25 5.25 0 0 1 6 0.75h6v22.5H6A5.25 5.25 0 0 1 0.75 18Z" fill="currentColor" />
+          <line x1="12" y1="0.75" x2="12" y2="23.25" stroke="currentColor" stroke-width="1" opacity="0.9" />
+        </svg>
+        <span class="text-sm font-semibold text-foreground">Blind Bench</span>
+      </a>
+      <div class="flex items-center gap-5">
+        <a href="/terms" class="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline">Terms</a>
+        <a href="/privacy" class="hidden text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline">Privacy</a>
+        <a
+          href={APP_URL}
+          class="inline-flex items-center justify-center rounded-md bg-foreground px-3.5 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+        >
+          Sign in
+          <ArrowRight class="ml-1.5 h-3.5 w-3.5" />
+        </a>
+      </div>
+    </div>
+  </nav>
+  <main id="main" class="mx-auto max-w-3xl px-4 pb-24 pt-12 sm:px-6 sm:pt-16 lg:px-8">
+    <article class="legal-prose">
+      <slot />
+    </article>
+    <div class="mt-16 flex items-center justify-between border-t border-border/70 pt-8 text-xs text-muted-foreground">
+      <a href="/" class="hover:text-foreground transition-colors">← Back to home</a>
+      <span>&copy; {new Date().getFullYear()} Mogil Ventures, LLC.</span>
+    </div>
+  </main>
+</Base>
+
+<style is:global>
+  .legal-prose {
+    color: var(--foreground);
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+  .legal-prose h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.75rem;
+    color: var(--foreground);
+  }
+  .legal-prose h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--foreground);
+    letter-spacing: -0.01em;
+  }
+  .legal-prose h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--foreground);
+  }
+  .legal-prose p {
+    margin: 0 0 1rem;
+    color: var(--muted-foreground);
+  }
+  .legal-prose strong {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .legal-prose em {
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .legal-prose ul,
+  .legal-prose ol {
+    margin: 0 0 1rem 1.25rem;
+    color: var(--muted-foreground);
+  }
+  .legal-prose ul { list-style: disc; }
+  .legal-prose ol { list-style: decimal; }
+  .legal-prose li { margin: 0.25rem 0; }
+  .legal-prose li > p { margin: 0; }
+  .legal-prose a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .legal-prose a:hover {
+    opacity: 0.85;
+  }
+  .legal-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.875rem;
+  }
+  .legal-prose th,
+  .legal-prose td {
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .legal-prose th {
+    color: var(--foreground);
+    font-weight: 600;
+    border-bottom-width: 2px;
+  }
+  .legal-prose td {
+    color: var(--muted-foreground);
+  }
+  .legal-prose hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+</style>

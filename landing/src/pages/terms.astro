@@ -1,0 +1,14 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { marked } from 'marked';
+import terms from '../../../project-docs/legal/terms.md?raw';
+
+const html = marked.parse(terms, { async: false }) as string;
+---
+
+<LegalLayout
+  title="Terms of Service"
+  description="The terms that govern your use of Blind Bench."
+>
+  <Fragment set:html={html} />
+</LegalLayout>

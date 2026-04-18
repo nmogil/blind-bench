@@ -1,5 +1,6 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { EyeOff, Link2, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Grainient from "@/components/Grainient";
@@ -261,6 +262,23 @@ export function SignIn() {
           </div>
           <p className="text-center text-xs text-muted-foreground">
             Bring your own OpenRouter key. No per-seat billing. No credit card.
+          </p>
+          <p className="text-center text-[11px] text-muted-foreground">
+            By continuing, you agree to our{" "}
+            <Link
+              to="/legal/terms"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link
+              to="/legal/privacy"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Privacy Policy
+            </Link>
+            .
           </p>
         </motion.div>
       </div>

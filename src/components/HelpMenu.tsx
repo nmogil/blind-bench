@@ -25,6 +25,8 @@ import {
   MessageCircle,
   ExternalLink,
   Info,
+  FileText,
+  Shield,
 } from "lucide-react";
 
 export function HelpMenu() {
@@ -75,6 +77,15 @@ export function HelpMenu() {
           >
             <ExternalLink className="mr-2 h-4 w-4" />
             Documentation
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate("/legal/terms")}>
+            <FileText className="mr-2 h-4 w-4" />
+            Terms of Service
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate("/legal/privacy")}>
+            <Shield className="mr-2 h-4 w-4" />
+            Privacy Policy
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setAboutOpen(true)}>
