@@ -2,9 +2,9 @@
 import Play from '../../icons/Play.astro';
 
 const models = [
-  { name: 'GPT-4o', vendor: 'OpenAI', temp: '0.7' },
-  { name: 'Claude 3.5 Haiku', vendor: 'Anthropic', temp: '0.7' },
-  { name: 'Gemini 1.5 Pro', vendor: 'Google', temp: '1.0' },
+  { label: 'A', name: 'GPT-4o', vendor: 'OpenAI', temp: '0.7' },
+  { label: 'B', name: 'Claude Haiku 4', vendor: 'Anthropic', temp: '0.7' },
+  { label: 'C', name: 'Gemini 2.5 Pro', vendor: 'Google', temp: '1.0' },
 ];
 ---
 
@@ -65,16 +65,16 @@ const models = [
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Model slots
           </span>
-          <span class="text-[11px] text-muted-foreground">3 of 6</span>
+          <span class="text-[11px] text-muted-foreground">3 of 5</span>
         </div>
         <div class="space-y-2">
           {
-            models.map((m, i) => (
+            models.map((m) => (
               <div class="rounded-lg border border-border bg-card p-3">
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary">
-                      {i + 1}
+                      {m.label}
                     </span>
                     <span class="truncate text-xs font-medium text-foreground">{m.name}</span>
                   </div>
