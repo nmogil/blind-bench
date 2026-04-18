@@ -29,7 +29,7 @@ export function ProjectLayout() {
   }
 
   if (result === null) {
-    return <Navigate to="/denied" replace />;
+    return <Navigate to={`/orgs/${orgSlug}`} replace />;
   }
 
   const { project, role } = result;

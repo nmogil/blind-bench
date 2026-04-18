@@ -23,6 +23,8 @@ export function ProjectSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     setName(project.name);
@@ -55,12 +57,16 @@ export function ProjectSettings() {
 
   async function handleDelete() {
     if (!confirm("Delete this prompt? This action cannot be undone.")) return;
-    navigate(`/orgs/${orgSlug}`);
+    setDeleting(true);
+    setDeleteError("");
     try {
       await deleteProject({ projectId });
+      navigate(`/orgs/${orgSlug}`);
     } catch (err) {
-      navigate(`/orgs/${orgSlug}/projects/${projectId}/settings`);
-      setError(friendlyError(err, "Failed to delete prompt. Please try again."));
+      setDeleting(false);
+      setDeleteError(
+        friendlyError(err, "Failed to delete prompt. Please try again."),
+      );
     }
   }
 
@@ -105,9 +111,16 @@ export function ProjectSettings() {
           <CardTitle className="text-destructive">Danger zone</CardTitle>
         </CardHeader>
         <CardContent>
-          <Button variant="destructive" onClick={handleDelete}>
-            Delete prompt
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? "Deleting..." : "Delete prompt"}
           </Button>
+          {deleteError && (
+            <p className="mt-2 text-sm text-destructive">{deleteError}</p>
+          )}
           <p className="mt-2 text-xs text-muted-foreground">
             This will permanently delete the prompt and all its data.
           </p>

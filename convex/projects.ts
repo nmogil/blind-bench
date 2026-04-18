@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireOrgRole, requireProjectRole } from "./lib/auth";
+import { requireAuth, requireOrgRole, requireProjectRole } from "./lib/auth";
 
 // ===== Meta Context (owner only) =====
 
@@ -240,13 +240,16 @@ export const list = query({
 export const get = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const { collaborator } = await requireProjectRole(ctx, args.projectId, [
-      "owner",
-      "editor",
-      "evaluator",
-    ]);
+    const userId = await requireAuth(ctx);
     const project = await ctx.db.get(args.projectId);
     if (!project) return null;
+    const collaborator = await ctx.db
+      .query("projectCollaborators")
+      .withIndex("by_project_and_user", (q) =>
+        q.eq("projectId", args.projectId).eq("userId", userId),
+      )
+      .unique();
+    if (!collaborator) throw new Error("Permission denied");
     return { project, role: collaborator.role };
   },
 });

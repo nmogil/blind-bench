@@ -5,6 +5,8 @@ import { requireProjectRole } from "./lib/auth";
 export const list = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return [];
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
 
     const testCases = await ctx.db
