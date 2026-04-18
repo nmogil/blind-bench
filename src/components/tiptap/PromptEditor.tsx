@@ -141,7 +141,7 @@ export function PromptEditor({
   );
 
   return (
-    <div className={cn("space-y-1", className)}>
+    <div className={cn("space-y-1", className)} data-ph-mask>
       <div
         className={cn(
           "rounded-md border bg-transparent text-sm transition-colors overflow-hidden",

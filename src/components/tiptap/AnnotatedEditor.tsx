@@ -237,7 +237,7 @@ export function AnnotatedEditor({
   }, [pendingComment]);
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative", className)} data-ph-mask>
       <div
         className={cn(
           "rounded-md border bg-transparent text-sm transition-colors",

@@ -124,6 +124,7 @@ export function StreamingOutputPanel({
             !output.outputContent && "text-muted-foreground italic",
           )}
           aria-live="polite"
+          data-ph-mask
         >
           {output.outputContent ||
             (isStreaming

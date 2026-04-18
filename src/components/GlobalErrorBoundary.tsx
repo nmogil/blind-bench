@@ -1,4 +1,5 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import { posthog } from "@/lib/posthog";
 
 interface Props {
   children: ReactNode;
@@ -16,6 +17,13 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(): State {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    posthog.captureException(error, {
+      react_component_stack: info.componentStack,
+      source: "react_error_boundary",
+    });
   }
 
   render() {
