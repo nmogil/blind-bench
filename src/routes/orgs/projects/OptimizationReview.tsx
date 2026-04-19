@@ -361,8 +361,6 @@ function ReviewView({
     }
   };
 
-  const oldSystem = sourceVersion?.systemMessage ?? "";
-  const oldTemplate = sourceVersion?.userMessageTemplate ?? "";
   const newSystem = optimization.generatedSystemMessage ?? "";
   const newTemplate = optimization.generatedUserTemplate ?? "";
 
