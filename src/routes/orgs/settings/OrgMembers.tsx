@@ -5,7 +5,6 @@ import { api } from "../../../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -22,7 +21,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trash2, UserPlus } from "lucide-react";
+import { Trash2, UserPlus, MailX } from "lucide-react";
+import { toast } from "sonner";
+import { InviteDialog } from "@/components/InviteDialog";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { friendlyError } from "@/lib/errors";
 
@@ -30,6 +31,7 @@ type OrgRole = "owner" | "admin" | "member";
 
 export function OrgMembers() {
   const { orgId, role } = useOrg();
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   if (role !== "owner") {
     return <Navigate to="/denied" replace />;
@@ -37,95 +39,92 @@ export function OrgMembers() {
 
   return (
     <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold">Members</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Manage who has access to this organization.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Members</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage who has access to this organization.
+          </p>
+        </div>
+        <Button onClick={() => setInviteOpen(true)}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Invite member
+        </Button>
+      </div>
 
-      <InviteRow orgId={orgId} />
+      <PendingInvitesTable orgId={orgId} />
       <MemberTable orgId={orgId} />
+
+      <InviteDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        scope="org"
+        scopeId={orgId as string}
+        defaultRole="org_member"
+      />
     </div>
   );
 }
 
-function InviteRow({ orgId }: { orgId: Id<"organizations"> }) {
-  const inviteMember = useMutation(api.organizations.inviteMember);
-  const [email, setEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<OrgRole>("member");
-  const [inviting, setInviting] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+function PendingInvitesTable({ orgId }: { orgId: Id<"organizations"> }) {
+  const invites = useQuery(api.invitations.list, {
+    scope: "org",
+    scopeId: orgId as string,
+  });
+  const revoke = useMutation(api.invitations.revoke);
 
-  const userLookup = useQuery(
-    api.users.findByEmail,
-    email.includes("@") ? { email: email.trim() } : "skip",
-  );
+  if (invites === undefined) return null;
+  const pending = invites.filter((i) => i.status === "pending");
+  if (pending.length === 0) return null;
 
-  async function handleInvite(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-
-    setInviting(true);
-    setError("");
-    setSuccess("");
-
-    if (!userLookup) {
-      setError("No user found with that email. They need to sign up first.");
-      setInviting(false);
-      return;
-    }
-
+  async function handleRevoke(id: Id<"invitations">, email: string) {
+    if (!confirm(`Revoke invitation for ${email || "link"}?`)) return;
     try {
-      await inviteMember({
-        orgId,
-        userId: userLookup._id,
-        role: inviteRole,
-      });
-      setSuccess(`Invited ${email}`);
-      setEmail("");
-      setTimeout(() => setSuccess(""), 3000);
+      await revoke({ invitationId: id });
+      toast.success("Invitation revoked.");
     } catch (err) {
-      setError(friendlyError(err, "Failed to send invite. Please try again."));
-    } finally {
-      setInviting(false);
+      toast.error(friendlyError(err, "Failed to revoke invitation."));
     }
   }
 
   return (
-    <div className="mt-4">
-      <form onSubmit={handleInvite} className="flex items-end gap-2">
-        <div className="flex-1">
-          <Input
-            placeholder="Email address"
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError("");
-              setSuccess("");
-            }}
-          />
-        </div>
-        <Select
-          value={inviteRole}
-          onValueChange={(v) => setInviteRole(v as OrgRole)}
-        >
-          <SelectTrigger className="w-28">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="owner">Owner</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="member">Member</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button type="submit" disabled={inviting || !email.trim()}>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Invite
-        </Button>
-      </form>
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-      {success && <p className="mt-2 text-sm text-sky-700 dark:text-sky-300">{success}</p>}
+    <div className="mt-6 space-y-2">
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        Pending invites
+      </h2>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Email</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Sent</TableHead>
+            <TableHead className="w-16"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pending.map((inv) => (
+            <TableRow key={inv._id}>
+              <TableCell className="text-sm">{inv.email || "—"}</TableCell>
+              <TableCell className="text-xs text-muted-foreground capitalize">
+                {inv.role.replace(/^org_/, "")}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {formatDate(inv.invitedAt)}
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void handleRevoke(inv._id, inv.email)}
+                  aria-label="Revoke invitation"
+                >
+                  <MailX className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -147,6 +146,9 @@ function MemberTable({ orgId }: { orgId: Id<"organizations"> }) {
 
   return (
     <div className="mt-6">
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+        Members
+      </h2>
       <Table>
         <TableHeader>
           <TableRow>
@@ -218,4 +220,16 @@ function MemberTable({ orgId }: { orgId: Id<"organizations"> }) {
       </Table>
     </div>
   );
+}
+
+function formatDate(ts: number): string {
+  const now = Date.now();
+  const diffDays = Math.floor((now - ts) / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }

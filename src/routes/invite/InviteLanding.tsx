@@ -180,37 +180,33 @@ function AuthenticatedAccept({
 
 function UnauthenticatedPath({
   token,
-  meta,
 }: {
   token: string;
   meta: InviteMeta;
 }) {
   const navigate = useNavigate();
 
-  const allowGuest = meta.scope === "cycle" && meta.role === "cycle_reviewer";
-
-  if (!allowGuest) {
-    return (
-      <div className="mt-6 space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Sign in to accept this invitation. If you don't have an account,
-          you'll be prompted to create one.
-        </p>
-        <Button
-          className="w-full"
-          onClick={() =>
-            navigate(
-              `/auth/sign-in?next=${encodeURIComponent(`/invite/${token}`)}`,
-            )
-          }
-        >
-          Sign in to continue
-        </Button>
-      </div>
-    );
-  }
-
-  return <GuestAcceptFlow token={token} meta={meta} />;
+  // Guest acceptance is intentionally gated behind sign-in until the
+  // reviewSessions pipeline supports guestIdentityId end-to-end. The schema
+  // + invitations.acceptAsGuest path are in place; the review deck isn't.
+  return (
+    <div className="mt-6 space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Sign in to accept this invitation. If you don't have an account,
+        you'll be prompted to create one.
+      </p>
+      <Button
+        className="w-full"
+        onClick={() =>
+          navigate(
+            `/auth/sign-in?next=${encodeURIComponent(`/invite/${token}`)}`,
+          )
+        }
+      >
+        Sign in to continue
+      </Button>
+    </div>
+  );
 }
 
 function GuestAcceptFlow({

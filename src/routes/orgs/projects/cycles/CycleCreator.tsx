@@ -70,11 +70,10 @@ export function CycleCreator() {
   const createCycle = useMutation(api.reviewCycles.create);
   const addOutputs = useMutation(api.reviewCycles.addOutputs);
   const autoPoolOutputs = useMutation(api.reviewCycles.autoPoolOutputs);
-  const assignEvaluators = useMutation(api.reviewCycles.assignEvaluators);
   const startCycle = useMutation(api.reviewCycles.start);
   const updateName = useMutation(api.reviewCycles.updateName);
   const toggleSoloEval = useMutation(api.reviewCycles.toggleSoloEval);
-  const sendInvitations = useMutation(api.evalInvitations.sendInvitations);
+  const createInvitations = useMutation(api.invitations.create);
 
   // State
   const [step, setStep] = useState<Step>("versions");
@@ -207,25 +206,29 @@ export function CycleCreator() {
         }
       }
 
-      // Step 4: Assign evaluators
-      const evalIds = [...selectedEvaluatorIds].map(
-        (id) => id as Id<"users">,
-      );
-      if (evalIds.length > 0) {
-        await assignEvaluators({ cycleId, evaluatorIds: evalIds });
-      }
-
-      // Step 5: Start the cycle
+      // Step 4: Start the cycle
       await startCycle({ cycleId });
 
-      // Step 6: Toggle solo eval if requested
+      // Step 5: Toggle solo eval if requested
       if (includeSoloEval) {
         await toggleSoloEval({ cycleId, includeSoloEval: true });
       }
 
-      // Step 7: Send email invitations if any
-      if (inviteeEmails.length > 0) {
-        await sendInvitations({ emails: inviteeEmails, cycleId });
+      // Step 6: Send invitations — merge selected collaborators' emails with
+      // any typed-in emails. All go through the unified invitation flow.
+      const collaboratorEmails = [...selectedEvaluatorIds]
+        .map((id) => evaluators.find((e) => e.userId === id)?.email)
+        .filter((e): e is string => !!e);
+      const allEmails = Array.from(
+        new Set([...collaboratorEmails, ...inviteeEmails]),
+      );
+      if (allEmails.length > 0) {
+        await createInvitations({
+          scope: "cycle",
+          scopeId: cycleId as string,
+          role: "cycle_reviewer",
+          emails: allEmails,
+        });
       }
 
       // Navigate to cycle detail

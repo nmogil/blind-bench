@@ -35,8 +35,6 @@ const ReviewDemo = lazy(() => import("./routes/review/DemoDeck").then(m => ({ de
 const SessionDeck = lazy(() => import("./routes/review/SessionDeck").then(m => ({ default: m.SessionDeck })));
 const ReviewRunStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewRunStarter })));
 const ReviewCycleStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewCycleStarter })));
-const TokenReviewCycleStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.TokenReviewCycleStarter })));
-const CycleShareableEvalView = lazy(() => import("./routes/share/CycleShareableEvalView").then(m => ({ default: m.CycleShareableEvalView })));
 const InviteLanding = lazy(() => import("./routes/invite/InviteLanding").then(m => ({ default: m.InviteLanding })));
 const InvitesInbox = lazy(() => import("./routes/invite/InvitesInbox").then(m => ({ default: m.InvitesInbox })));
 const RunConfigurator = lazy(() => import("./routes/orgs/projects/RunConfigurator").then(m => ({ default: m.RunConfigurator })));
@@ -59,7 +57,6 @@ export function App() {
         <Route path="/auth/sign-in" element={<AuthGatePublic />} />
         <Route path="/compare" element={<QuickCompare />} />
         <Route path="/review/demo" element={<ReviewDemo />} />
-        <Route path="/s/cycle/:token" element={<CycleShareableEvalView />} />
         <Route path="/invite/:token" element={<InviteLanding />} />
         <Route path="/legal/terms" element={<Terms />} />
         <Route path="/legal/privacy" element={<Privacy />} />
@@ -115,10 +112,6 @@ export function App() {
           </Route>
           <Route path="/eval" element={<EvalLayout />}>
             <Route index element={<InvitesInbox />} />
-            <Route
-              path="cycle/:cycleEvalToken"
-              element={<TokenReviewCycleStarter />}
-            />
           </Route>
           <Route path="/denied" element={<Denied />} />
           <Route path="*" element={<NotFound />} />

@@ -654,16 +654,6 @@ const schema = defineSchema({
     .index("by_cycle_and_user", ["cycleId", "userId"])
     .index("by_cycle_and_status", ["cycleId", "status"]),
 
-  // Opaque tokens for cycle-based evaluation (24hr TTL).
-  cycleEvalTokens: defineTable({
-    token: v.string(),
-    cycleId: v.id("reviewCycles"),
-    projectId: v.id("projects"),
-    expiresAt: v.number(),
-  })
-    .index("by_token", ["token"])
-    .index("by_cycle", ["cycleId"]),
-
   // Ratings with source tracking — unified table for evaluator, anonymous,
   // solo, and author ratings. userId is null for anonymous entries.
   cyclePreferences: defineTable({
@@ -698,7 +688,6 @@ const schema = defineSchema({
     cycleId: v.id("reviewCycles"),
     cycleOutputId: v.id("cycleOutputs"),
     userId: v.optional(v.id("users")),
-    invitationId: v.optional(v.id("evalInvitations")),
     annotationData: v.object({
       from: v.number(),
       to: v.number(),
@@ -740,23 +729,7 @@ const schema = defineSchema({
     .index("by_cycle_output", ["cycleOutputId"])
     .index("by_cycle", ["cycleId"])
     .index("by_user", ["userId"])
-    .index("by_invitation", ["invitationId"])
     .index("by_review_session", ["reviewSessionId"]),
-
-  // Shareable links scoped to cycles for anonymous evaluation (48hr TTL).
-  cycleShareableLinks: defineTable({
-    token: v.string(),
-    cycleId: v.id("reviewCycles"),
-    projectId: v.id("projects"),
-    createdById: v.id("users"),
-    expiresAt: v.number(),
-    maxResponses: v.optional(v.number()),
-    responseCount: v.number(),
-    active: v.boolean(),
-    purpose: v.optional(v.literal("invitation")),
-  })
-    .index("by_token", ["token"])
-    .index("by_cycle", ["cycleId"]),
 
   // =========================================================================
   // M19: Unified Review Sessions (Flash deck + Battle arena)
@@ -854,27 +827,6 @@ const schema = defineSchema({
   })
     .index("by_session", ["sessionId"])
     .index("by_session_round", ["sessionId", "round"]),
-
-  // Email invitations for anonymous evaluation via shareable links.
-  evalInvitations: defineTable({
-    email: v.string(),
-    projectId: v.id("projects"),
-    cycleId: v.optional(v.id("reviewCycles")),
-    runId: v.optional(v.id("promptRuns")),
-    shareableLinkId: v.string(),
-    linkType: v.union(v.literal("cycle"), v.literal("run")),
-    invitedById: v.id("users"),
-    invitedAt: v.number(),
-    status: v.union(v.literal("pending"), v.literal("responded")),
-    respondedAt: v.optional(v.number()),
-    lastReminderSentAt: v.optional(v.number()),
-    reminderCount: v.number(),
-  })
-    .index("by_cycle", ["cycleId"])
-    .index("by_run", ["runId"])
-    .index("by_email_and_cycle", ["email", "cycleId"])
-    .index("by_email_and_run", ["email", "runId"])
-    .index("by_shareable_link", ["shareableLinkId"]),
 
   // =========================================================================
   // M25: Unified Invites & Guest Identities

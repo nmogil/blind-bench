@@ -1,18 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireProjectRole, requireAuth } from "./lib/auth";
+import { requireProjectRole } from "./lib/auth";
 import { fisherYatesShuffle } from "./lib/shuffle";
 import { getCycleBlindLabels } from "./lib/slotConfig";
-import { generateToken } from "./lib/crypto";
-import { resolveCycleEvalToken } from "./lib/cycleEvalTokens";
 import { Id } from "./_generated/dataModel";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const CYCLE_EVAL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ---------------------------------------------------------------------------
 // #57: Cycle CRUD mutations
@@ -332,83 +324,6 @@ export const autoPoolOutputs = mutation({
   },
 });
 
-export const assignEvaluators = mutation({
-  args: {
-    cycleId: v.id("reviewCycles"),
-    evaluatorIds: v.array(v.id("users")),
-  },
-  handler: async (ctx, args) => {
-    const cycle = await ctx.db.get(args.cycleId);
-    if (!cycle) throw new Error("Cycle not found");
-    if (cycle.status !== "draft") {
-      throw new Error("Can only assign evaluators to a draft cycle");
-    }
-
-    await requireProjectRole(ctx, cycle.projectId, ["owner", "editor"]);
-
-    // Verify each user is an evaluator on the project
-    for (const evalId of args.evaluatorIds) {
-      const collaborator = await ctx.db
-        .query("projectCollaborators")
-        .withIndex("by_project_and_user", (q) =>
-          q.eq("projectId", cycle.projectId).eq("userId", evalId),
-        )
-        .unique();
-
-      if (!collaborator || collaborator.role !== "evaluator") {
-        throw new Error(
-          `User is not an evaluator on this project`,
-        );
-      }
-
-      // Check if already assigned
-      const existing = await ctx.db
-        .query("cycleEvaluators")
-        .withIndex("by_cycle_and_user", (q) =>
-          q.eq("cycleId", args.cycleId).eq("userId", evalId),
-        )
-        .unique();
-
-      if (existing) continue; // Skip duplicates
-
-      await ctx.db.insert("cycleEvaluators", {
-        cycleId: args.cycleId,
-        userId: evalId,
-        status: "pending",
-        assignedAt: Date.now(),
-        reminderCount: 0,
-      });
-    }
-  },
-});
-
-export const removeEvaluator = mutation({
-  args: {
-    cycleId: v.id("reviewCycles"),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const cycle = await ctx.db.get(args.cycleId);
-    if (!cycle) throw new Error("Cycle not found");
-    if (cycle.status !== "draft") {
-      throw new Error("Can only remove evaluators from a draft cycle");
-    }
-
-    await requireProjectRole(ctx, cycle.projectId, ["owner", "editor"]);
-
-    const evaluator = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_cycle_and_user", (q) =>
-        q.eq("cycleId", args.cycleId).eq("userId", args.userId),
-      )
-      .unique();
-
-    if (!evaluator) throw new Error("Evaluator not assigned to this cycle");
-
-    await ctx.db.delete(evaluator._id);
-  },
-});
-
 export const start = mutation({
   args: {
     cycleId: v.id("reviewCycles"),
@@ -447,15 +362,6 @@ export const start = mutation({
       );
     }
 
-    // Mint cycle eval token (24hr TTL)
-    const token = generateToken();
-    await ctx.db.insert("cycleEvalTokens", {
-      token,
-      cycleId: args.cycleId,
-      projectId: cycle.projectId,
-      expiresAt: Date.now() + CYCLE_EVAL_TOKEN_TTL_MS,
-    });
-
     // Open the cycle
     await ctx.db.patch(args.cycleId, {
       status: "open",
@@ -474,7 +380,7 @@ export const start = mutation({
       },
     );
 
-    return { token };
+    return { cycleId: args.cycleId };
   },
 });
 
@@ -582,236 +488,6 @@ export const updateName = mutation({
 // #58: Cycle evaluation — evaluator-facing mutations (SECURITY BOUNDARY)
 // ===========================================================================
 
-/**
- * SECURITY BOUNDARY — Returns ONLY blind labels and content snapshots.
- * No sourceOutputId, sourceRunId, sourceVersionId, model, temperature, latency.
- */
-export const getOutputsForEvaluator = query({
-  args: { cycleEvalToken: v.string() },
-  handler: async (ctx, args) => {
-    const resolved = await resolveCycleEvalToken(ctx, args.cycleEvalToken);
-    if (!resolved) throw new Error("Invalid or expired cycle eval token");
-
-    const cycle = await ctx.db.get(resolved.cycleId);
-    if (!cycle) throw new Error("Cycle not found");
-
-    // Verify caller is assigned as an evaluator for this cycle
-    const userId = await requireAuth(ctx);
-    const evaluator = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_cycle_and_user", (q) =>
-        q.eq("cycleId", resolved.cycleId).eq("userId", userId),
-      )
-      .unique();
-    if (!evaluator) throw new Error("Not assigned to this cycle");
-
-    const project = await ctx.db.get(resolved.projectId);
-
-    const outputs = await ctx.db
-      .query("cycleOutputs")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", resolved.cycleId))
-      .take(26);
-
-    // Load existing feedback annotations for display
-    const result = [];
-    for (const output of outputs) {
-      const feedback = await ctx.db
-        .query("cycleFeedback")
-        .withIndex("by_cycle_output", (q) =>
-          q.eq("cycleOutputId", output._id),
-        )
-        .take(200);
-
-      result.push({
-        cycleBlindLabel: output.cycleBlindLabel,
-        outputContentSnapshot: output.outputContentSnapshot,
-        annotations: feedback.map((fb) => ({
-          from: fb.annotationData.from,
-          to: fb.annotationData.to,
-          highlightedText: fb.annotationData.highlightedText,
-          comment: fb.annotationData.comment,
-          createdAt: fb._creationTime,
-        })),
-      });
-    }
-
-    // SECURITY: Return ONLY blindLabel, content snapshot, annotations + names
-    return {
-      projectName: project?.name ?? "Unknown",
-      cycleName: cycle.name,
-      cycleStatus: cycle.status,
-      outputs: result.sort((a, b) =>
-        a.cycleBlindLabel.localeCompare(b.cycleBlindLabel),
-      ),
-    };
-  },
-});
-
-/** Token-based rating for evaluators. Upserts cyclePreferences. */
-export const rateCycleOutput = mutation({
-  args: {
-    cycleEvalToken: v.string(),
-    cycleBlindLabel: v.string(),
-    rating: v.union(
-      v.literal("best"),
-      v.literal("acceptable"),
-      v.literal("weak"),
-    ),
-  },
-  handler: async (ctx, args) => {
-    const resolved = await resolveCycleEvalToken(ctx, args.cycleEvalToken);
-    if (!resolved) throw new Error("Invalid or expired cycle eval token");
-
-    const cycle = await ctx.db.get(resolved.cycleId);
-    if (!cycle || cycle.status !== "open") {
-      throw new Error("Cycle is not open for evaluation");
-    }
-
-    const userId = await requireAuth(ctx);
-
-    // Verify evaluator is assigned
-    const evaluator = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_cycle_and_user", (q) =>
-        q.eq("cycleId", resolved.cycleId).eq("userId", userId),
-      )
-      .unique();
-    if (!evaluator) throw new Error("Not assigned to this cycle");
-
-    // Find output by blind label (never by outputId)
-    const cycleOutput = await ctx.db
-      .query("cycleOutputs")
-      .withIndex("by_cycle_and_label", (q) =>
-        q
-          .eq("cycleId", resolved.cycleId)
-          .eq("cycleBlindLabel", args.cycleBlindLabel),
-      )
-      .unique();
-    if (!cycleOutput) throw new Error("Output not found");
-
-    // Upsert: check for existing rating by this user on this output
-    const existing = await ctx.db
-      .query("cyclePreferences")
-      .withIndex("by_cycle_output", (q) =>
-        q.eq("cycleOutputId", cycleOutput._id),
-      )
-      .take(100);
-    const myExisting = existing.find(
-      (p) => p.userId === userId && p.source === "evaluator",
-    );
-
-    if (myExisting) {
-      await ctx.db.patch(myExisting._id, { rating: args.rating });
-    } else {
-      await ctx.db.insert("cyclePreferences", {
-        cycleId: resolved.cycleId,
-        cycleOutputId: cycleOutput._id,
-        userId,
-        rating: args.rating,
-        source: "evaluator",
-      });
-    }
-
-    // Auto-update evaluator status
-    const totalOutputs = await ctx.db
-      .query("cycleOutputs")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", resolved.cycleId))
-      .take(26);
-
-    const myRatings = await ctx.db
-      .query("cyclePreferences")
-      .withIndex("by_cycle_user", (q) =>
-        q.eq("cycleId", resolved.cycleId).eq("userId", userId),
-      )
-      .take(26);
-    const evaluatorRatings = myRatings.filter(
-      (r) => r.source === "evaluator",
-    );
-
-    if (evaluator.status === "pending") {
-      await ctx.db.patch(evaluator._id, {
-        status: "in_progress",
-        startedAt: Date.now(),
-      });
-    }
-
-    if (evaluatorRatings.length >= totalOutputs.length) {
-      await ctx.db.patch(evaluator._id, {
-        status: "completed",
-        completedAt: Date.now(),
-      });
-    }
-  },
-});
-
-/** Token-based annotation feedback for evaluators. */
-export const addCycleFeedback = mutation({
-  args: {
-    cycleEvalToken: v.string(),
-    cycleBlindLabel: v.string(),
-    annotationData: v.object({
-      from: v.number(),
-      to: v.number(),
-      highlightedText: v.string(),
-      comment: v.string(),
-    }),
-    tags: v.optional(
-      v.array(
-        v.union(
-          v.literal("accuracy"),
-          v.literal("tone"),
-          v.literal("length"),
-          v.literal("relevance"),
-          v.literal("safety"),
-          v.literal("format"),
-          v.literal("clarity"),
-          v.literal("other"),
-        ),
-      ),
-    ),
-  },
-  handler: async (ctx, args) => {
-    const resolved = await resolveCycleEvalToken(ctx, args.cycleEvalToken);
-    if (!resolved) throw new Error("Invalid or expired cycle eval token");
-
-    const cycle = await ctx.db.get(resolved.cycleId);
-    if (!cycle || cycle.status !== "open") {
-      throw new Error("Cycle is not open for evaluation");
-    }
-
-    const userId = await requireAuth(ctx);
-
-    // Verify evaluator is assigned
-    const evaluator = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_cycle_and_user", (q) =>
-        q.eq("cycleId", resolved.cycleId).eq("userId", userId),
-      )
-      .unique();
-    if (!evaluator) throw new Error("Not assigned to this cycle");
-
-    // Find output by blind label
-    const cycleOutput = await ctx.db
-      .query("cycleOutputs")
-      .withIndex("by_cycle_and_label", (q) =>
-        q
-          .eq("cycleId", resolved.cycleId)
-          .eq("cycleBlindLabel", args.cycleBlindLabel),
-      )
-      .unique();
-    if (!cycleOutput) throw new Error("Output not found");
-
-    await ctx.db.insert("cycleFeedback", {
-      cycleId: resolved.cycleId,
-      cycleOutputId: cycleOutput._id,
-      userId,
-      annotationData: args.annotationData,
-      tags: args.tags,
-      source: "evaluator",
-    });
-  },
-});
-
 /** Author rates outputs directly (not token-based). */
 export const rateAsAuthor = mutation({
   args: {
@@ -865,42 +541,6 @@ export const rateAsAuthor = mutation({
         source: "author",
       });
     }
-  },
-});
-
-/** Token-based query: returns existing ratings for the current user. */
-export const getMyRatingsForCycle = query({
-  args: { cycleEvalToken: v.string() },
-  handler: async (ctx, args) => {
-    const resolved = await resolveCycleEvalToken(ctx, args.cycleEvalToken);
-    if (!resolved) throw new Error("Invalid or expired cycle eval token");
-
-    const userId = await requireAuth(ctx);
-
-    const ratings = await ctx.db
-      .query("cyclePreferences")
-      .withIndex("by_cycle_user", (q) =>
-        q.eq("cycleId", resolved.cycleId).eq("userId", userId),
-      )
-      .take(26);
-
-    const evaluatorRatings = ratings.filter(
-      (r) => r.source === "evaluator",
-    );
-
-    // Map to blind labels — never expose output IDs to evaluators
-    const result = [];
-    for (const rating of evaluatorRatings) {
-      const output = await ctx.db.get(rating.cycleOutputId);
-      if (output) {
-        result.push({
-          cycleBlindLabel: output.cycleBlindLabel,
-          rating: rating.rating,
-        });
-      }
-    }
-
-    return result;
   },
 });
 
@@ -1093,21 +733,6 @@ export const get = query({
       });
     }
 
-    // Get eval token for sharing
-    const evalToken = await ctx.db
-      .query("cycleEvalTokens")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-      .take(1);
-
-    // Get shareable link if exists (exclude per-email invitation links)
-    const shareableLink = await ctx.db
-      .query("cycleShareableLinks")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-      .take(100);
-    const activeLink = shareableLink.find(
-      (l) => l.active && l.purpose !== "invitation",
-    );
-
     return {
       _id: cycle._id,
       projectId: cycle.projectId,
@@ -1131,14 +756,6 @@ export const get = query({
         a.cycleBlindLabel.localeCompare(b.cycleBlindLabel),
       ),
       evaluators,
-      evalToken: evalToken[0]?.token ?? null,
-      shareableLink: activeLink
-        ? {
-            token: activeLink.token,
-            responseCount: activeLink.responseCount,
-            expiresAt: activeLink.expiresAt,
-          }
-        : null,
     };
   },
 });
@@ -1399,47 +1016,6 @@ export const sendReminder = mutation({
         message: `Reminder: "${cycle.name}" is waiting for your review`,
       },
     );
-
-    // Email reminder
-    const user = await ctx.db.get(args.evaluatorId);
-    const project = await ctx.db.get(cycle.projectId);
-    const evalToken = await ctx.db
-      .query("cycleEvalTokens")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-      .take(1);
-
-    if (user?.email && evalToken[0]) {
-      // Count rated outputs
-      const ratings = await ctx.db
-        .query("cyclePreferences")
-        .withIndex("by_cycle_user", (q) =>
-          q.eq("cycleId", args.cycleId).eq("userId", args.evaluatorId),
-        )
-        .take(26);
-      const ratedCount = ratings.filter(
-        (r) => r.source === "evaluator",
-      ).length;
-      const totalCount = (
-        await ctx.db
-          .query("cycleOutputs")
-          .withIndex("by_cycle", (q) => q.eq("cycleId", args.cycleId))
-          .take(26)
-      ).length;
-
-      await ctx.scheduler.runAfter(
-        0,
-        internal.reviewCycleActions.sendCycleReminderEmail,
-        {
-          evaluatorEmail: user.email,
-          evaluatorName: user.name ?? undefined,
-          cycleName: cycle.name,
-          projectName: project?.name ?? "Unknown",
-          cycleEvalToken: evalToken[0].token,
-          ratedCount,
-          totalCount,
-        },
-      );
-    }
   },
 });
 
@@ -2102,73 +1678,6 @@ export const getAvailableRunsForPooling = query({
 });
 
 // ===========================================================================
-// Evaluator inbox: list pending/in-progress cycles for the current user
-// ===========================================================================
-
-export const listMyCyclesToEvaluate = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await requireAuth(ctx);
-
-    const assignments = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(100);
-
-    const pendingOrInProgress = assignments.filter(
-      (a) => a.status === "pending" || a.status === "in_progress",
-    );
-
-    const result = [];
-    for (const assignment of pendingOrInProgress) {
-      const cycle = await ctx.db.get(assignment.cycleId);
-      if (!cycle || cycle.status !== "open") continue;
-
-      const project = await ctx.db.get(cycle.projectId);
-
-      // Get the eval token
-      const tokenDoc = await ctx.db
-        .query("cycleEvalTokens")
-        .withIndex("by_cycle", (q) => q.eq("cycleId", cycle._id))
-        .take(1);
-
-      if (!tokenDoc[0]) continue;
-
-      const outputCount = (
-        await ctx.db
-          .query("cycleOutputs")
-          .withIndex("by_cycle", (q) => q.eq("cycleId", cycle._id))
-          .take(26)
-      ).length;
-
-      // Count rated outputs
-      const ratings = await ctx.db
-        .query("cyclePreferences")
-        .withIndex("by_cycle_user", (q) =>
-          q.eq("cycleId", cycle._id).eq("userId", userId),
-        )
-        .take(26);
-      const ratedCount = ratings.filter(
-        (r) => r.source === "evaluator",
-      ).length;
-
-      result.push({
-        cycleId: cycle._id,
-        cycleName: cycle.name,
-        projectName: project?.name ?? "Unknown",
-        cycleEvalToken: tokenDoc[0].token,
-        outputCount,
-        ratedCount,
-        assignedAt: assignment.assignedAt,
-        status: assignment.status,
-      });
-    }
-
-    return result.sort((a, b) => b.assignedAt - a.assignedAt);
-  },
-});
-
-// ===========================================================================
 // #63: Count open cycles for a project (used for ProjectTabs badge)
 // ===========================================================================
 
@@ -2509,9 +2018,6 @@ export const listCycleFeedback = query({
           const user = await ctx.db.get(fb.userId);
           if (user?.name) authorLabel = user.name;
           else if (user?.email) authorLabel = user.email;
-        } else if (fb.invitationId) {
-          const inv = await ctx.db.get(fb.invitationId);
-          if (inv?.email) authorLabel = inv.email;
         }
 
         // Match this commenter's rating on the same output.
@@ -2626,9 +2132,6 @@ export const listCycleFeedbackForVersion = query({
             const user = await ctx.db.get(fb.userId);
             if (user?.name) authorLabel = user.name;
             else if (user?.email) authorLabel = user.email;
-          } else if (fb.invitationId) {
-            const inv = await ctx.db.get(fb.invitationId);
-            if (inv?.email) authorLabel = inv.email;
           }
 
           let rating: Rating | null = null;

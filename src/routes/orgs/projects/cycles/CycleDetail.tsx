@@ -12,23 +12,19 @@ import { BlindLabelBadge } from "@/components/BlindLabelBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft,
-  Copy,
-  Check,
   StopCircle,
   Play,
   Wand2,
   Plus,
   X,
   Bell,
-  Link2,
-  Trash2,
   Mail,
   ChevronDown,
   ChevronRight,
   MessageSquare,
   Sparkles,
 } from "lucide-react";
-import { SendEvaluationDialog } from "@/components/SendEvaluationDialog";
+import { InviteDialog } from "@/components/InviteDialog";
 import { FeedbackItem } from "@/components/FeedbackItem";
 import { cn } from "@/lib/utils";
 import { friendlyError } from "@/lib/errors";
@@ -64,26 +60,10 @@ export function CycleDetail() {
   const startCycle = useMutation(api.reviewCycles.start);
   const sendReminder = useMutation(api.reviewCycles.sendReminder);
   const sendReminderAll = useMutation(api.reviewCycles.sendReminderAll);
-  const createShareableLink = useMutation(
-    api.cycleShareableLinks.createCycleShareableLink,
-  );
-  const deactivateShareableLink = useMutation(
-    api.cycleShareableLinks.deactivateCycleShareableLink,
-  );
   const toggleSoloEval = useMutation(api.reviewCycles.toggleSoloEval);
-  const sendInvitationReminder = useMutation(
-    api.evalInvitations.sendInvitationReminder,
-  );
-
-  const invitations = useQuery(
-    api.evalInvitations.getInvitations,
-    cycleId ? { cycleId: cycleId as Id<"reviewCycles"> } : "skip",
-  );
 
   const [closing, setClosing] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
-  const [copiedToken, setCopiedToken] = useState(false);
-  const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(
     null,
   );
@@ -166,15 +146,6 @@ export function CycleDetail() {
     }
   }
 
-  function copyEvalLink() {
-    if (!cycle?.evalToken) return;
-    const url = `${window.location.origin}/eval/cycle/${cycle.evalToken}`;
-    navigator.clipboard.writeText(url);
-    setCopiedToken(true);
-    toast.success("Evaluation link copied");
-    setTimeout(() => setCopiedToken(false), 2000);
-  }
-
   const REMINDER_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
   const MAX_REMINDERS = 3;
 
@@ -243,38 +214,6 @@ export function CycleDetail() {
     }
   }
 
-  async function handleCreateShareableLink() {
-    try {
-      await createShareableLink({
-        cycleId: cycleId as Id<"reviewCycles">,
-      });
-      toast.success("Shareable link created");
-    } catch (e) {
-      toast.error(friendlyError(e, "Failed to create link."));
-    }
-  }
-
-  function copyShareableLink() {
-    if (!cycle?.shareableLink) return;
-    const url = `${window.location.origin}/s/cycle/${cycle.shareableLink.token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedShareLink(true);
-    toast.success("Shareable link copied");
-    setTimeout(() => setCopiedShareLink(false), 2000);
-  }
-
-  async function handleDeactivateShareableLink() {
-    if (!cycle?.shareableLink) return;
-    try {
-      await deactivateShareableLink({
-        cycleId: cycleId as Id<"reviewCycles">,
-      });
-      toast.success("Shareable link deactivated");
-    } catch (e) {
-      toast.error(friendlyError(e, "Failed to deactivate link."));
-    }
-  }
-
   async function handleToggleSoloEval() {
     if (!cycle) return;
     setTogglingSolo(true);
@@ -337,19 +276,7 @@ export function CycleDetail() {
                 onClick={() => setSendDialogOpen(true)}
               >
                 <Mail className="h-3.5 w-3.5 mr-1.5" />
-                Send Evaluation
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={copyEvalLink}
-              >
-                {copiedToken ? (
-                  <Check className="h-3.5 w-3.5 mr-1.5" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                )}
-                Copy eval link
+                Invite reviewers
               </Button>
               <Button
                 size="sm"
@@ -516,137 +443,6 @@ export function CycleDetail() {
           </div>
         )}
 
-      {/* Email Invitees Section */}
-      {(cycle.status === "open" || cycle.status === "closed") &&
-        invitations &&
-        invitations.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">
-                Email Invitees{" "}
-                <span className="font-normal text-muted-foreground">
-                  — {invitations.filter((i) => i.status === "responded").length}{" "}
-                  of {invitations.length} responded
-                </span>
-              </h3>
-            </div>
-            <div className="rounded-lg border divide-y">
-              {invitations.map((inv) => (
-                <div
-                  key={inv._id}
-                  className="flex items-center justify-between px-4 py-3"
-                >
-                  <span className="text-sm truncate">{inv.email}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "text-[10px]",
-                        inv.status === "responded" &&
-                          "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
-                      )}
-                    >
-                      {inv.status}
-                    </Badge>
-                    {cycle.status === "open" && inv.status === "pending" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2 text-xs"
-                        disabled={inv.reminderCount >= MAX_REMINDERS}
-                        title={
-                          inv.reminderCount >= MAX_REMINDERS
-                            ? "Maximum reminders sent"
-                            : "Send reminder email"
-                        }
-                        onClick={async () => {
-                          try {
-                            await sendInvitationReminder({
-                              invitationId: inv._id,
-                            });
-                            toast.success(`Reminder sent to ${inv.email}`);
-                          } catch (e) {
-                            toast.error(
-                              friendlyError(e, "Failed to send reminder."),
-                            );
-                          }
-                        }}
-                      >
-                        <Bell className="h-3 w-3 mr-1" />
-                        ({inv.reminderCount}/{MAX_REMINDERS})
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-      {/* Shareable Link Section */}
-      {cycle.status === "open" && (
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold mb-3">Shareable Link</h3>
-          <div className="rounded-lg border p-4">
-            {cycle.shareableLink ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <code className="text-xs bg-muted px-2 py-1 rounded flex-1 truncate">
-                    {window.location.origin}/s/cycle/
-                    {cycle.shareableLink.token}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={copyShareableLink}
-                  >
-                    {copiedShareLink ? (
-                      <Check className="h-3.5 w-3.5" />
-                    ) : (
-                      <Copy className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleDeactivateShareableLink}
-                    title="Deactivate link"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>
-                    {cycle.shareableLink.responseCount} response
-                    {cycle.shareableLink.responseCount !== 1 ? "s" : ""}
-                  </span>
-                  <span>
-                    Expires{" "}
-                    {new Date(
-                      cycle.shareableLink.expiresAt,
-                    ).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Generate a link for anonymous evaluators to rate outputs.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCreateShareableLink}
-                >
-                  <Link2 className="h-3.5 w-3.5 mr-1.5" />
-                  Generate Link
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Solo Eval Toggle */}
       {(cycle.status === "draft" || cycle.status === "open") && (
         <div className="mt-6">
@@ -800,11 +596,12 @@ export function CycleDetail() {
         </div>
       )}
 
-      <SendEvaluationDialog
+      <InviteDialog
         open={sendDialogOpen}
         onOpenChange={setSendDialogOpen}
-        projectId={projectId}
-        preselectedCycleId={cycleId as Id<"reviewCycles">}
+        scope="cycle"
+        scopeId={cycleId as string}
+        allowShareable
       />
     </div>
   );

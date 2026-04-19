@@ -579,6 +579,46 @@ async function materializeMembership(
   }
   // cycle
   const cycleId = invite.scopeId as Id<"reviewCycles">;
+  const cycle = await ctx.db.get(cycleId);
+  if (!cycle) throw new Error("Cycle not found");
+  const project = await ctx.db.get(cycle.projectId);
+  if (!project) throw new Error("Project not found");
+
+  // Ensure org membership so reviewSessions.start's requireProjectRole gate
+  // can see the caller.
+  const orgMembership = await ctx.db
+    .query("organizationMembers")
+    .withIndex("by_org_and_user", (q) =>
+      q.eq("organizationId", project.organizationId).eq("userId", userId),
+    )
+    .unique();
+  if (!orgMembership) {
+    await ctx.db.insert("organizationMembers", {
+      organizationId: project.organizationId,
+      userId,
+      role: "member",
+    });
+  }
+
+  // Ensure the user shows up as a project evaluator (required by
+  // resolveScopeOrThrow → requireProjectRole).
+  const existingCollab = await ctx.db
+    .query("projectCollaborators")
+    .withIndex("by_project_and_user", (q) =>
+      q.eq("projectId", cycle.projectId).eq("userId", userId),
+    )
+    .unique();
+  if (!existingCollab) {
+    await ctx.db.insert("projectCollaborators", {
+      projectId: cycle.projectId,
+      userId,
+      role: "evaluator",
+      invitedById: invite.invitedById,
+      invitedAt: invite.invitedAt,
+      acceptedAt: now,
+    });
+  }
+
   const existing = await ctx.db
     .query("cycleEvaluators")
     .withIndex("by_cycle_and_user", (q) =>

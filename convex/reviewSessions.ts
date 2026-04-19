@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireAuth, requireProjectRole } from "./lib/auth";
-import { resolveCycleEvalToken } from "./lib/cycleEvalTokens";
 import { fisherYatesShuffle } from "./lib/shuffle";
 import {
   generateFirstRound,
@@ -16,10 +15,6 @@ import {
   type BTMatchup,
 } from "./lib/bradleyTerry";
 import type { Doc, Id } from "./_generated/dataModel";
-
-/** Error code thrown when a user with a higher-than-evaluator project role
- *  hits the token-based eval route. Surfaced to the client per Rule 7. */
-export const EVAL_ROLE_ABOVE_EVALUATOR = "EVAL_ROLE_ABOVE_EVALUATOR";
 
 // ---------------------------------------------------------------------------
 // Validators shared across mutations
@@ -321,107 +316,6 @@ export const start = mutation({
       phase: "phase1",
       requirePhase1: args.requirePhase1 ?? true,
       requirePhase2: args.requirePhase2 ?? true,
-      currentIndex: 0,
-      outputOrder,
-      startedAt: Date.now(),
-    });
-  },
-});
-
-/**
- * Token-based session entry for cycle evaluators.
- *
- * Security contract:
- *   - Caller must be authenticated.
- *   - Caller must be assigned on `cycleEvaluators` for this cycle.
- *   - If caller has any project role above "evaluator" (owner, editor) we
- *     throw EVAL_ROLE_ABOVE_EVALUATOR so the client can render the Rule 7
- *     "you're an editor on this project" notice instead of blinding them.
- *
- * Returns a sessionId scoped to this user — the opaque token never flows
- * into SessionDeck.
- */
-export const startFromCycleToken = mutation({
-  args: { cycleEvalToken: v.string() },
-  handler: async (ctx, args) => {
-    const resolved = await resolveCycleEvalToken(ctx, args.cycleEvalToken);
-    if (!resolved) {
-      throw new Error("Invalid or expired cycle eval token");
-    }
-
-    const userId = await requireAuth(ctx);
-
-    const collaborator = await ctx.db
-      .query("projectCollaborators")
-      .withIndex("by_project_and_user", (q) =>
-        q.eq("projectId", resolved.projectId).eq("userId", userId),
-      )
-      .unique();
-    if (collaborator && collaborator.role !== "evaluator") {
-      throw new Error(EVAL_ROLE_ABOVE_EVALUATOR);
-    }
-
-    const assignment = await ctx.db
-      .query("cycleEvaluators")
-      .withIndex("by_cycle_and_user", (q) =>
-        q.eq("cycleId", resolved.cycleId).eq("userId", userId),
-      )
-      .unique();
-    if (!assignment) {
-      throw new Error("Not assigned to this cycle");
-    }
-
-    // Assigned evaluators get one pass per assignment: reuse any prior
-    // session (including completed) so revisiting the token lands on the
-    // completion view instead of re-shuffling a new blind order.
-    const existing = await findExistingSession(
-      ctx,
-      userId,
-      { cycleId: resolved.cycleId },
-      ["phase1", "phase2", "complete"],
-    );
-    if (existing) return existing._id;
-
-    const cycle = await ctx.db.get(resolved.cycleId);
-    if (!cycle) throw new Error("Cycle not found");
-
-    const cycleOutputs = await ctx.db
-      .query("cycleOutputs")
-      .withIndex("by_cycle", (q) => q.eq("cycleId", resolved.cycleId))
-      .collect();
-
-    const testCaseByRun = new Map<
-      Id<"promptRuns">,
-      Id<"testCases"> | undefined
-    >();
-    const entries: ResolvedEntry[] = [];
-    for (const co of cycleOutputs) {
-      let tc = testCaseByRun.get(co.sourceRunId);
-      if (tc === undefined) {
-        const run = await ctx.db.get(co.sourceRunId);
-        tc = run?.testCaseId ?? undefined;
-        testCaseByRun.set(co.sourceRunId, tc);
-      }
-      entries.push({ cycleOutputId: co._id, testCaseId: tc });
-    }
-
-    const shuffled = fisherYatesShuffle(entries);
-    const labels = sessionBlindLabels(shuffled.length);
-    const outputOrder = shuffled.map((e, i) => ({
-      runOutputId: e.runOutputId,
-      cycleOutputId: e.cycleOutputId,
-      testCaseId: e.testCaseId,
-      sessionBlindLabel: labels[i]!,
-    }));
-
-    return await ctx.db.insert("reviewSessions", {
-      projectId: resolved.projectId,
-      cycleId: resolved.cycleId,
-      userId,
-      role: "evaluator",
-      phase: "phase1",
-      requirePhase1: true,
-      requirePhase2: true,
       currentIndex: 0,
       outputOrder,
       startedAt: Date.now(),

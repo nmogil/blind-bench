@@ -1,6 +1,6 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { EyeOff, Link2, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Grainient from "@/components/Grainient";
@@ -26,8 +26,18 @@ const features = [
   },
 ];
 
+function isSafeNextPath(next: string | null): next is string {
+  if (!next) return false;
+  if (!next.startsWith("/")) return false;
+  if (next.startsWith("//")) return false;
+  return true;
+}
+
 export function SignIn() {
   const { signIn } = useAuthActions();
+  const [searchParams] = useSearchParams();
+  const rawNext = searchParams.get("next");
+  const redirectTo = isSafeNextPath(rawNext) ? rawNext : "/";
   const [email, setEmail] = useState("");
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +48,7 @@ export function SignIn() {
     setError(null);
     setLoading(true);
     try {
-      await signIn("google", { redirectTo: "/" });
+      await signIn("google", { redirectTo });
     } catch {
       setError("Google sign-in failed. Please try again.");
       setLoading(false);
@@ -52,7 +62,7 @@ export function SignIn() {
     setError(null);
     setLoading(true);
     try {
-      await signIn("resend", { email: email.trim() });
+      await signIn("resend", { email: email.trim(), redirectTo });
       setMagicLinkSent(true);
     } catch {
       setError("Failed to send magic link. Please try again.");
