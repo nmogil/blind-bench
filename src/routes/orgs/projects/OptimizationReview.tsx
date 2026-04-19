@@ -6,6 +6,11 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
 import { PromptDiff } from "@/components/PromptDiff";
 import { ChangesPanel } from "@/components/ChangesPanel";
+import {
+  genMessageId,
+  readVersionMessages,
+  type PromptMessage,
+} from "@/lib/promptMessages";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -361,6 +366,16 @@ function ReviewView({
   const newSystem = optimization.generatedSystemMessage ?? "";
   const newTemplate = optimization.generatedUserTemplate ?? "";
 
+  // Prefer the source version's authored messages[] when available; else fall
+  // back to synthesizing from legacy fields so pre-M18 versions still render.
+  const oldMessages: PromptMessage[] = sourceVersion
+    ? readVersionMessages(sourceVersion)
+    : [];
+  const newMessages: PromptMessage[] =
+    optimization.generatedMessages && optimization.generatedMessages.length > 0
+      ? optimization.generatedMessages
+      : synthesizeGeneratedMessages(newSystem, newTemplate);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -391,20 +406,10 @@ function ReviewView({
                 onTemplateChange={setEditedTemplate}
               />
             ) : (
-              <>
-                {(oldSystem || newSystem) && (
-                  <PromptDiff
-                    oldText={oldSystem}
-                    newText={newSystem}
-                    label="System message"
-                  />
-                )}
-                <PromptDiff
-                  oldText={oldTemplate}
-                  newText={newTemplate}
-                  label="User template"
-                />
-              </>
+              <PromptDiff
+                oldMessages={oldMessages}
+                newMessages={newMessages}
+              />
             )}
           </div>
 
@@ -629,4 +634,29 @@ function CycleOriginBadge({
       </Badge>
     </Link>
   );
+}
+
+// Synthesize a messages[] from the legacy optimizer output so the per-message
+// diff has something to align against for pre-M18 optimizations that never
+// emitted generatedMessages.
+function synthesizeGeneratedMessages(
+  systemMessage: string,
+  userTemplate: string,
+): PromptMessage[] {
+  const out: PromptMessage[] = [];
+  if (systemMessage) {
+    out.push({
+      id: genMessageId(),
+      role: "system",
+      content: systemMessage,
+      format: "plain",
+    });
+  }
+  out.push({
+    id: genMessageId(),
+    role: "user",
+    content: userTemplate,
+    format: "plain",
+  });
+  return out;
 }

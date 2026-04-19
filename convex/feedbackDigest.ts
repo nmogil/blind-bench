@@ -273,7 +273,7 @@ export const getDigestContext = internalQuery({
 
     for (const fb of promptFb) {
       promptFeedbackItems.push({
-        targetField: fb.targetField,
+        targetField: fb.targetField ?? "message",
         highlightedText: fb.annotationData.highlightedText,
         comment: fb.annotationData.comment,
         tags: fb.tags ?? undefined,

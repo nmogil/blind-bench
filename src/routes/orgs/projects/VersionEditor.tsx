@@ -9,9 +9,15 @@ import {
 import { api } from "../../../../convex/_generated/api";
 import { Id, Doc } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
-import { PromptEditor } from "@/components/tiptap/PromptEditor";
-import { AnnotatedEditor } from "@/components/tiptap/AnnotatedEditor";
+import { MessageComposer } from "@/components/prompt/MessageComposer";
+import { type Annotation } from "@/components/tiptap/AnnotatedEditor";
 import { detectVariables } from "@/lib/detectVariables";
+import {
+  readVersionMessages,
+  getMessageText,
+  type PromptMessage,
+  type PromptMessageRole,
+} from "@/lib/promptMessages";
 import { AddVariableDialog } from "@/components/AddVariableDialog";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
 import { RunStatusPill } from "@/components/RunStatusPill";
@@ -77,9 +83,7 @@ export function VersionEditor() {
   const registerUploaded = useMutation(api.attachments.registerUploaded);
   const deleteAttachment = useMutation(api.attachments.deleteAttachment);
 
-  const [systemMessage, setSystemMessage] = useState("");
-  const [userTemplate, setUserTemplate] = useState("");
-  const [systemExpanded, setSystemExpanded] = useState(false);
+  const [messages, setMessages] = useState<PromptMessage[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -152,25 +156,26 @@ export function VersionEditor() {
   const isDraft = version?.status === "draft";
   const isReadOnly = !isDraft;
 
-  // Detect new variables in the editor content
+  // Detect new variables across every authored message
   const existingVarNames = useMemo(
     () => new Set(variables?.map((v) => v.name) ?? []),
     [variables],
   );
   const newVarNames = useMemo(() => {
-    const fromUser = detectVariables(userTemplate);
-    const fromSystem = detectVariables(systemMessage);
-    return [...new Set([...fromUser, ...fromSystem])].filter(
-      (name) => !existingVarNames.has(name),
-    );
-  }, [userTemplate, systemMessage, existingVarNames]);
+    const names = new Set<string>();
+    for (const m of messages) {
+      for (const name of detectVariables(getMessageText(m))) {
+        names.add(name);
+      }
+    }
+    return [...names].filter((name) => !existingVarNames.has(name));
+  }, [messages, existingVarNames]);
 
-  // Initialize form state when version loads
+  // Initialize form state when version loads — prefer authored messages[], fall
+  // back to synthesizing from legacy fields for pre-M18 versions.
   useEffect(() => {
     if (!version) return;
-    setSystemMessage(version.systemMessage ?? "");
-    setUserTemplate(version.userMessageTemplate ?? "");
-    setSystemExpanded(!!version.systemMessage);
+    setMessages(readVersionMessages(version));
   }, [version?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = useCallback(async () => {
@@ -182,8 +187,7 @@ export function VersionEditor() {
     try {
       await updateVersion({
         versionId: versionId as Id<"promptVersions">,
-        systemMessage: systemMessage || undefined,
-        userMessageTemplate: userTemplate,
+        messages,
       });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
@@ -192,7 +196,7 @@ export function VersionEditor() {
     } finally {
       setSaving(false);
     }
-  }, [versionId, isReadOnly, systemMessage, userTemplate, updateVersion]);
+  }, [versionId, isReadOnly, messages, updateVersion]);
 
   // Cmd+S / Cmd+Enter to save, Cmd+R to optimize
   useEffect(() => {
@@ -588,137 +592,48 @@ export function VersionEditor() {
           />
         </div>
 
-        {/* Center — Prompt editors + attachments */}
+        {/* Center — Message composer + attachments */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* System message (collapsible) */}
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={() => setSystemExpanded(!systemExpanded)}
-                aria-expanded={systemExpanded}
-                aria-controls="system-message-panel"
-              >
-                {systemExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                System message
-                <span className="text-xs font-normal">(optional)</span>
-              </button>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-sm font-medium">Messages</Label>
             </div>
-            {systemExpanded && (
-              <div
-                id="system-message-panel"
-                className="mt-2 max-h-[400px] overflow-y-auto"
-              >
-                {feedbackMode ? (
-                  <AnnotatedEditor
-                    content={systemMessage}
-                    format="markdown"
-                    annotations={(promptFeedback ?? [])
-                      .filter((fb) => fb.targetField === "system_message")
-                      .map((fb) => ({
-                        _id: fb._id as string,
-                        from: fb.annotationData.from,
-                        to: fb.annotationData.to,
-                        highlightedText: fb.annotationData.highlightedText,
-                        comment: fb.annotationData.comment,
-                        authorName: fb.authorName ?? undefined,
-                        isOwn: fb.isOwn,
-                      }))}
-                    canAnnotate={true}
-                    onCreateAnnotation={(from, to, highlightedText, comment) => {
-                      addPromptFeedback({
-                        promptVersionId: versionId as Id<"promptVersions">,
-                        targetField: "system_message",
-                        annotationData: { from, to, highlightedText, comment },
-                      });
-                    }}
-                    onUpdateAnnotation={(id, comment) => {
-                      updatePromptFeedback({
-                        feedbackId: id as Id<"promptFeedback">,
-                        comment,
-                      });
-                    }}
-                    onDeleteAnnotation={(id) => {
-                      deletePromptFeedback({
-                        feedbackId: id as Id<"promptFeedback">,
-                      });
-                    }}
-                  />
-                ) : (
-                  <PromptEditor
-                    content={systemMessage}
-                    onChange={setSystemMessage}
-                    readOnly={isReadOnly}
-                    placeholder="You are a helpful assistant..."
-                  />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* User message template */}
-          <div>
-            <Label className="text-sm font-medium">
-              User message template
-            </Label>
             <OnboardingCallout
               calloutKey="onboarding_write_template"
               prerequisiteDismissed="onboarding_add_variable"
-              className="mt-2"
+              className="mb-2"
             >
-              Write your prompt here. Use {"{{variableName}}"} to insert
-              variables. This is the message sent to the LLM.
+              Author the turns you want sent to the LLM. Use {"{{variableName}}"}{" "}
+              anywhere — Blind Bench substitutes values per test case.
             </OnboardingCallout>
-            <div className="mt-2">
-              {feedbackMode ? (
-                <AnnotatedEditor
-                  content={userTemplate}
-                  format="markdown"
-                  annotations={(promptFeedback ?? [])
-                    .filter((fb) => fb.targetField === "user_message_template")
-                    .map((fb) => ({
-                      _id: fb._id as string,
-                      from: fb.annotationData.from,
-                      to: fb.annotationData.to,
-                      highlightedText: fb.annotationData.highlightedText,
-                      comment: fb.annotationData.comment,
-                      authorName: fb.authorName ?? undefined,
-                      isOwn: fb.isOwn,
-                    }))}
-                  canAnnotate={true}
-                  onCreateAnnotation={(from, to, highlightedText, comment) => {
-                    addPromptFeedback({
-                      promptVersionId: versionId as Id<"promptVersions">,
-                      targetField: "user_message_template",
-                      annotationData: { from, to, highlightedText, comment },
-                    });
-                  }}
-                  onUpdateAnnotation={(id, comment) => {
-                    updatePromptFeedback({
-                      feedbackId: id as Id<"promptFeedback">,
-                      comment,
-                    });
-                  }}
-                  onDeleteAnnotation={(id) => {
-                    deletePromptFeedback({
-                      feedbackId: id as Id<"promptFeedback">,
-                    });
-                  }}
-                />
-              ) : (
-                <PromptEditor
-                  content={userTemplate}
-                  onChange={setUserTemplate}
-                  readOnly={isReadOnly}
-                  placeholder="Hello {{customer_name}}, ..."
-                />
+            <MessageComposer
+              messages={messages}
+              onChange={setMessages}
+              readOnly={isReadOnly}
+              feedbackMode={feedbackMode}
+              annotationsByMessageId={groupAnnotationsByMessage(
+                promptFeedback,
+                messages,
               )}
-            </div>
+              onCreateAnnotation={(messageId, from, to, highlightedText, comment) => {
+                addPromptFeedback({
+                  promptVersionId: versionId as Id<"promptVersions">,
+                  messageId,
+                  annotationData: { from, to, highlightedText, comment },
+                });
+              }}
+              onUpdateAnnotation={(id, comment) => {
+                updatePromptFeedback({
+                  feedbackId: id as Id<"promptFeedback">,
+                  comment,
+                });
+              }}
+              onDeleteAnnotation={(id) => {
+                deletePromptFeedback({
+                  feedbackId: id as Id<"promptFeedback">,
+                });
+              }}
+            />
           </div>
 
           {/* New variable detection bar */}
@@ -813,6 +728,58 @@ export function VersionEditor() {
       )}
     </div>
   );
+}
+
+type PromptFeedbackRow = {
+  _id: string;
+  target?: { kind: "message"; messageId: string };
+  targetField?: "system_message" | "user_message_template";
+  annotationData: {
+    from: number;
+    to: number;
+    highlightedText: string;
+    comment: string;
+  };
+  authorName?: string | null;
+  isOwn?: boolean;
+};
+
+// Partition prompt feedback rows across the current message list by their
+// messageId anchor, falling back to the legacy targetField slot so pre-M18
+// feedback still lights up even before the backfill runs.
+function groupAnnotationsByMessage(
+  feedback: PromptFeedbackRow[] | undefined,
+  messages: PromptMessage[],
+): Record<string, Annotation[]> {
+  const out: Record<string, Annotation[]> = {};
+  if (!feedback) return out;
+
+  const firstByRole = (roles: PromptMessageRole[]): string | undefined =>
+    messages.find((m) => roles.includes(m.role))?.id;
+
+  for (const fb of feedback) {
+    let messageId = fb.target?.messageId;
+    if (!messageId) {
+      if (fb.targetField === "system_message") {
+        messageId = firstByRole(["system", "developer"]);
+      } else if (fb.targetField === "user_message_template") {
+        messageId = firstByRole(["user"]);
+      }
+    }
+    if (!messageId) continue;
+    if (!messages.some((m) => m.id === messageId)) continue;
+    const list = out[messageId] ?? (out[messageId] = []);
+    list.push({
+      _id: fb._id,
+      from: fb.annotationData.from,
+      to: fb.annotationData.to,
+      highlightedText: fb.annotationData.highlightedText,
+      comment: fb.annotationData.comment,
+      authorName: fb.authorName ?? undefined,
+      isOwn: fb.isOwn,
+    });
+  }
+  return out;
 }
 
 function ProvenanceBadge({

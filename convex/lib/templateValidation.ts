@@ -29,3 +29,24 @@ export function validateTemplate(
 
   return unknownVars;
 }
+
+/**
+ * Return the set of {{variable}} names referenced anywhere across the given
+ * template strings. Unsupported block syntax still throws via validateTemplate
+ * semantics — use this after a successful template save, not before.
+ */
+export function collectReferencedVariables(templates: string[]): Set<string> {
+  const pattern = /(?<!\\)\{\{([^}]+)\}\}/g;
+  const out = new Set<string>();
+  for (const template of templates) {
+    if (!template) continue;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(template)) !== null) {
+      const inner = match[1]!.trim();
+      if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(inner)) {
+        out.add(inner);
+      }
+    }
+  }
+  return out;
+}

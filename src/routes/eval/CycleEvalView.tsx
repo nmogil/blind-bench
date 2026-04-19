@@ -42,6 +42,9 @@ export function CycleEvalView() {
   const rateMutation = useMutation(api.reviewCycles.rateCycleOutput);
   const addFeedbackMutation = useMutation(api.reviewCycles.addCycleFeedback);
 
+  const isMobile = useIsMobile();
+  const [mobileIndex, setMobileIndex] = useState(0);
+
   // Track local rating state for immediate UI feedback
   const [localRatings, setLocalRatings] = useState<
     Record<string, "best" | "acceptable" | "weak">
@@ -147,8 +150,6 @@ export function CycleEvalView() {
 
   const outputCount = data.outputs.length;
   const ratedCount = Object.keys(localRatings).length;
-  const isMobile = useIsMobile();
-  const [mobileIndex, setMobileIndex] = useState(0);
   const usePagination = isMobile && outputCount >= 7;
 
   // Adaptive column count based on output count

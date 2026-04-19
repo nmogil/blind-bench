@@ -9,8 +9,50 @@ import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
 import { validateTemplate } from "./lib/templateValidation";
 import { getOptimizerPromptVersion } from "./lib/optimizerPrompt";
+import {
+  genMessageId,
+  readMessages,
+  type PromptMessage,
+} from "./lib/messages";
 
 const OPTIMIZER_MODEL = "anthropic/claude-sonnet-4";
+
+// M18: The v1 optimizer meta-prompt is single-turn — it only reasons about a
+// system message and one user template. Until we teach it to rewrite arbitrary
+// message arrays, multi-turn sources are refused up front with a clear error.
+function isSingleTurnSource(messages: PromptMessage[]): boolean {
+  const userCount = messages.filter((m) => m.role === "user").length;
+  const assistantCount = messages.filter((m) => m.role === "assistant").length;
+  const systemCount = messages.filter(
+    (m) => m.role === "system" || m.role === "developer",
+  ).length;
+  return userCount === 1 && assistantCount === 0 && systemCount <= 1;
+}
+
+// Build a canonical messages[] for the accepted/edited version from legacy
+// single-field output. Keeps one source of truth (messages[]) on the new
+// version so downstream readers don't have to re-synthesize.
+function messagesFromLegacyFields(args: {
+  systemMessage: string | undefined;
+  userMessageTemplate: string;
+}): PromptMessage[] {
+  const out: PromptMessage[] = [];
+  if (args.systemMessage) {
+    out.push({
+      id: genMessageId(),
+      role: "system",
+      content: args.systemMessage,
+      format: "plain",
+    });
+  }
+  out.push({
+    id: genMessageId(),
+    role: "user",
+    content: args.userMessageTemplate,
+    format: "plain",
+  });
+  return out;
+}
 
 // --- Public mutations ---
 
@@ -24,6 +66,16 @@ export const requestOptimization = mutation({
       "owner",
       "editor",
     ]);
+
+    // M18: refuse multi-turn sources while the optimizer is still single-turn.
+    // Surfaced here rather than inside the action so the user sees the error
+    // before a pending row is created.
+    if (!isSingleTurnSource(readMessages(version))) {
+      throw new Error(
+        "This version has multi-turn structure. The optimizer doesn't yet " +
+          "support multi-turn prompts — edit it by hand for now.",
+      );
+    }
 
     // 1-in-flight-per-project cap
     const pendingOpts = await ctx.db
@@ -224,11 +276,20 @@ export const acceptOptimization = mutation({
       0,
     );
 
+    const acceptedMessages =
+      request.generatedMessages && request.generatedMessages.length > 0
+        ? request.generatedMessages
+        : messagesFromLegacyFields({
+            systemMessage: request.generatedSystemMessage,
+            userMessageTemplate: request.generatedUserTemplate,
+          });
+
     const newVersionId = await ctx.db.insert("promptVersions", {
       projectId: request.projectId,
       versionNumber: maxVersion + 1,
       systemMessage: request.generatedSystemMessage,
       userMessageTemplate: request.generatedUserTemplate,
+      messages: acceptedMessages,
       parentVersionId: request.promptVersionId,
       status: "draft",
       createdById: userId,
@@ -354,11 +415,17 @@ export const editAndAcceptOptimization = mutation({
       0,
     );
 
+    const editedMessages = messagesFromLegacyFields({
+      systemMessage: args.systemMessage,
+      userMessageTemplate: args.userTemplate,
+    });
+
     const newVersionId = await ctx.db.insert("promptVersions", {
       projectId: request.projectId,
       versionNumber: maxVersion + 1,
       systemMessage: args.systemMessage,
       userMessageTemplate: args.userTemplate,
+      messages: editedMessages,
       parentVersionId: request.promptVersionId,
       status: "draft",
       createdById: userId,
@@ -719,13 +786,19 @@ export const getOptimizationContext = internalQuery({
         required: v.required,
       })),
       outputFeedback: outputFeedbackItems,
-      promptFeedback: promptFeedback.map((pf) => ({
-        targetField: pf.targetField as
-          | "system_message"
-          | "user_message_template",
-        highlightedText: pf.annotationData.highlightedText,
-        comment: pf.annotationData.comment,
-      })),
+      promptFeedback: promptFeedback
+        .filter(
+          (pf): pf is typeof pf & {
+            targetField: "system_message" | "user_message_template";
+          } =>
+            pf.targetField === "system_message" ||
+            pf.targetField === "user_message_template",
+        )
+        .map((pf) => ({
+          targetField: pf.targetField,
+          highlightedText: pf.annotationData.highlightedText,
+          comment: pf.annotationData.comment,
+        })),
       metaContext: project.metaContext ?? [],
       organizationId: project.organizationId,
     };

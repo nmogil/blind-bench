@@ -8,6 +8,8 @@ import {
 import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
 import { getBlindLabels, validateSlotConfigs } from "./lib/slotConfig";
+import { collectReferencedVariables } from "./lib/templateValidation";
+import { readMessages } from "./lib/messages";
 
 const CONCURRENT_CAP = 10;
 
@@ -47,11 +49,44 @@ export const execute = mutation({
     }
 
     // Verify test case belongs to same project (when using test case)
+    let testCaseVarValues: Record<string, string> | undefined;
     if (args.testCaseId) {
       const testCase = await ctx.db.get(args.testCaseId);
       if (!testCase || testCase.projectId !== version.projectId) {
         throw new Error("Test case not found");
       }
+      testCaseVarValues = testCase.variableValues;
+    }
+
+    // Required-variable check — applies across every message in messages[] so
+    // a {{var}} appearing only in an assistant turn still counts.
+    const effectiveValues =
+      args.inlineVariables ?? testCaseVarValues ?? {};
+    const messages = readMessages(version);
+    const referenced = collectReferencedVariables(
+      messages.map((m) =>
+        m.role === "assistant" ? (m.content ?? "") : m.content,
+      ),
+    );
+    const projectVars = await ctx.db
+      .query("projectVariables")
+      .withIndex("by_project", (q) => q.eq("projectId", version.projectId))
+      .take(200);
+    const missing: string[] = [];
+    for (const pv of projectVars) {
+      if (!pv.required) continue;
+      if (!referenced.has(pv.name)) continue;
+      const value = effectiveValues[pv.name];
+      if (value === undefined || value === "") {
+        missing.push(pv.name);
+      }
+    }
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required variable${missing.length === 1 ? "" : "s"}: ${missing
+          .map((n) => `{{${n}}}`)
+          .join(", ")}`,
+      );
     }
 
     // Enforce concurrent run cap

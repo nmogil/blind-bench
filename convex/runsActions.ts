@@ -9,6 +9,7 @@ import {
   type StreamUsage,
 } from "./lib/openrouter";
 import { captureEvent, captureException } from "./lib/posthog";
+import { readMessages, type PromptMessage } from "./lib/messages";
 
 /**
  * Replace {{varName}} placeholders with values from the test case.
@@ -68,30 +69,21 @@ export const executeRunAction = internalAction({
       startedAt: startTime,
     });
 
-    // 4. Variable substitution
-    const substitutedUser = substituteVariables(
-      version.userMessageTemplate,
-      testCase.variableValues,
-    );
-    const substitutedSystem = version.systemMessage
-      ? substituteVariables(version.systemMessage, testCase.variableValues)
-      : undefined;
+    // 4. Build the canonical messages[] — prefer the version's authored
+    //    messages[]; synthesize from legacy fields for pre-M18 versions that
+    //    haven't been backfilled yet.
+    const authoredMessages: PromptMessage[] = readMessages(version);
 
-    // 5. Build messages array
-    const messages: OpenRouterMessage[] = [];
-
-    if (substitutedSystem) {
-      messages.push({ role: "system", content: substitutedSystem });
-    }
-
-    // Build user content — may include vision attachments
-    const userContent: MessageContent = await buildUserContent(
+    // 5. Variable-substitute every message and attach vision content to the
+    //    last user message (preserves prior behaviour where attachments rode
+    //    on the single user turn).
+    const messages: OpenRouterMessage[] = await buildDispatchMessages(
       ctx,
-      substitutedUser,
+      authoredMessages,
+      testCase.variableValues,
       testCase.attachmentIds,
       promptAttachments.map((a) => a.storageId),
     );
-    messages.push({ role: "user", content: userContent });
 
     // 6. Fire 3 parallel streaming calls
     const appendChunk = (outputId: Id<"runOutputs">, chunk: string) =>
@@ -172,32 +164,51 @@ export const executeRunAction = internalAction({
   },
 });
 
-async function buildUserContent(
+async function buildDispatchMessages(
   ctx: { storage: { getUrl: (id: Id<"_storage">) => Promise<string | null> } },
-  text: string,
+  authored: PromptMessage[],
+  variableValues: Record<string, string>,
   testCaseAttachmentIds: Id<"_storage">[],
   promptAttachmentIds: Id<"_storage">[],
-): Promise<MessageContent> {
+): Promise<OpenRouterMessage[]> {
   const allAttachmentIds = [...promptAttachmentIds, ...testCaseAttachmentIds];
+  const lastUserIndex = findLastIndex(authored, (m) => m.role === "user");
 
-  if (allAttachmentIds.length === 0) {
-    return text;
-  }
+  const out: OpenRouterMessage[] = [];
+  for (let i = 0; i < authored.length; i++) {
+    const m = authored[i]!;
+    const rawText =
+      m.role === "assistant" ? (m.content ?? "") : m.content;
+    const text = substituteVariables(rawText, variableValues);
 
-  // Build multi-content array for vision
-  const content: Array<
-    | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string } }
-  > = [{ type: "text", text }];
-
-  for (const storageId of allAttachmentIds) {
-    const url = await ctx.storage.getUrl(storageId);
-    if (url) {
-      content.push({ type: "image_url", image_url: { url } });
+    // Attach vision parts to the last user message so existing vision runs
+    // keep working. Non-user messages always pass text-only content.
+    if (
+      m.role === "user" &&
+      i === lastUserIndex &&
+      allAttachmentIds.length > 0
+    ) {
+      const content: MessageContent = [{ type: "text", text }];
+      for (const storageId of allAttachmentIds) {
+        const url = await ctx.storage.getUrl(storageId);
+        if (url) {
+          content.push({ type: "image_url", image_url: { url } });
+        }
+      }
+      out.push({ role: "user", content });
+      continue;
     }
-  }
 
-  return content;
+    out.push({ role: m.role, content: text });
+  }
+  return out;
+}
+
+function findLastIndex<T>(arr: T[], predicate: (v: T) => boolean): number {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i]!)) return i;
+  }
+  return -1;
 }
 
 async function runSingleOutput(params: {

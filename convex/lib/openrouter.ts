@@ -11,7 +11,7 @@ export type MessageContent =
     >;
 
 export interface OpenRouterMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "developer" | "user" | "assistant";
   content: MessageContent;
 }
 

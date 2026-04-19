@@ -79,6 +79,9 @@ const schema = defineSchema({
   }).index("by_project", ["projectId"]),
 
   // M2: Prompt Versions & Attachments
+  // M18: `messages` is the canonical representation. Legacy single-string
+  // fields are still written in M18-M22 for backward compatibility and dropped
+  // in M23.
   promptVersions: defineTable({
     projectId: v.id("projects"),
     versionNumber: v.number(),
@@ -90,6 +93,35 @@ const schema = defineSchema({
     ),
     userMessageTemplateFormat: v.optional(
       v.union(v.literal("plain"), v.literal("markdown")),
+    ),
+    // M18: Multi-turn messages. Absent on pre-M18 versions until the backfill
+    // migration runs. Ids are immutable once set — feedback anchors on them.
+    messages: v.optional(
+      v.array(
+        v.union(
+          v.object({
+            id: v.string(),
+            role: v.union(v.literal("system"), v.literal("developer")),
+            content: v.string(),
+            format: v.optional(
+              v.union(v.literal("plain"), v.literal("markdown")),
+            ),
+          }),
+          v.object({
+            id: v.string(),
+            role: v.literal("user"),
+            content: v.string(),
+            format: v.optional(
+              v.union(v.literal("plain"), v.literal("markdown")),
+            ),
+          }),
+          v.object({
+            id: v.string(),
+            role: v.literal("assistant"),
+            content: v.optional(v.string()),
+          }),
+        ),
+      ),
     ),
     parentVersionId: v.optional(v.id("promptVersions")),
     sourceVersionId: v.optional(v.id("promptVersions")),
@@ -199,9 +231,21 @@ const schema = defineSchema({
   promptFeedback: defineTable({
     promptVersionId: v.id("promptVersions"),
     userId: v.id("users"),
-    targetField: v.union(
-      v.literal("system_message"),
-      v.literal("user_message_template"),
+    // M18: optional during M18-M22 for backward compatibility. New feedback
+    // always sets it; backfill populates it for legacy rows.
+    targetField: v.optional(
+      v.union(
+        v.literal("system_message"),
+        v.literal("user_message_template"),
+      ),
+    ),
+    // M18: canonical anchor — points at a stable message id on the version's
+    // messages[] array. Absent only on legacy rows not yet backfilled.
+    target: v.optional(
+      v.object({
+        kind: v.literal("message"),
+        messageId: v.string(),
+      }),
     ),
     annotationData: v.object({
       from: v.number(),
@@ -360,6 +404,36 @@ const schema = defineSchema({
     ),
     generatedSystemMessage: v.optional(v.string()),
     generatedUserTemplate: v.optional(v.string()),
+    // M18: messages[] version of the optimizer output. v1 only populates this
+    // for single-turn source prompts; multi-turn optimization is a future
+    // milestone. Coexists with the legacy string fields during M18-M22.
+    generatedMessages: v.optional(
+      v.array(
+        v.union(
+          v.object({
+            id: v.string(),
+            role: v.union(v.literal("system"), v.literal("developer")),
+            content: v.string(),
+            format: v.optional(
+              v.union(v.literal("plain"), v.literal("markdown")),
+            ),
+          }),
+          v.object({
+            id: v.string(),
+            role: v.literal("user"),
+            content: v.string(),
+            format: v.optional(
+              v.union(v.literal("plain"), v.literal("markdown")),
+            ),
+          }),
+          v.object({
+            id: v.string(),
+            role: v.literal("assistant"),
+            content: v.optional(v.string()),
+          }),
+        ),
+      ),
+    ),
     changesSummary: v.optional(v.string()),
     changesReasoning: v.optional(v.string()),
     optimizerModel: v.string(),

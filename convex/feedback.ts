@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth, requireProjectRole } from "./lib/auth";
+import { legacyTargetFieldForMessage, readMessages } from "./lib/messages";
 
 const tagsValidator = v.optional(
   v.array(
@@ -127,9 +128,14 @@ export const deleteOutputFeedback = mutation({
 export const addPromptFeedback = mutation({
   args: {
     promptVersionId: v.id("promptVersions"),
-    targetField: v.union(
-      v.literal("system_message"),
-      v.literal("user_message_template"),
+    // M18: messageId is the canonical anchor. targetField is accepted for
+    // legacy callers during M18-M22; one of the two must be provided.
+    messageId: v.optional(v.string()),
+    targetField: v.optional(
+      v.union(
+        v.literal("system_message"),
+        v.literal("user_message_template"),
+      ),
     ),
     annotationData: v.object({
       from: v.number(),
@@ -148,10 +154,44 @@ export const addPromptFeedback = mutation({
       "editor",
     ]);
 
+    const messages = readMessages(version);
+
+    let messageId = args.messageId;
+    let legacyTargetField = args.targetField;
+
+    if (messageId) {
+      // Validate the message id exists on this version.
+      if (!messages.some((m) => m.id === messageId)) {
+        throw new Error("Feedback target message not found on this version.");
+      }
+      // Derive legacy targetField from the message's position so readers that
+      // still key off system_message / user_message_template keep working.
+      legacyTargetField =
+        legacyTargetFieldForMessage(messages, messageId) ??
+        args.targetField;
+    } else if (args.targetField) {
+      // Legacy caller — resolve to the corresponding message id.
+      const target =
+        args.targetField === "system_message"
+          ? messages.find(
+              (m) => m.role === "system" || m.role === "developer",
+            )
+          : messages.find((m) => m.role === "user");
+      if (!target) {
+        throw new Error(
+          "Version has no matching message for the requested targetField.",
+        );
+      }
+      messageId = target.id;
+    } else {
+      throw new Error("Provide either messageId or targetField.");
+    }
+
     return await ctx.db.insert("promptFeedback", {
       promptVersionId: args.promptVersionId,
       userId,
-      targetField: args.targetField,
+      targetField: legacyTargetField,
+      target: { kind: "message" as const, messageId },
       annotationData: args.annotationData,
       tags: args.tags,
     });
