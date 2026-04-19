@@ -94,5 +94,26 @@ const posthogHost = import.meta.env.PUBLIC_POSTHOG_HOST;
         });
       }
     </script>
+
+    <!-- Cal.com embed: lazy-init on first intent to keep initial bundle small -->
+    <script is:inline>
+      (function () {
+        var loaded = false;
+        function loadCal() {
+          if (loaded) return;
+          loaded = true;
+          (function (C, A, L) { let p = function (a, ar) { a.q.push(ar); }; let d = C.document; C.Cal = C.Cal || function () { let cal = C.Cal; let ar = arguments; if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement("script")).src = A; cal.loaded = true; } if (ar[0] === L) { const api = function () { p(api, arguments); }; const namespace = ar[1]; api.q = api.q || []; if(typeof namespace === "string"){cal.ns[namespace] = cal.ns[namespace] || api;p(cal.ns[namespace], ar);p(cal, ["initNamespace", namespace]);} else p(cal, ar); return;} p(cal, ar); }; })(window, "https://app.cal.com/embed/embed.js", "init");
+          Cal("init", "blind-bench-intro", { origin: "https://app.cal.com" });
+          Cal.ns["blind-bench-intro"]("ui", { hideEventTypeDetails: false, layout: "month_view" });
+        }
+        function onIntent(e) {
+          var t = e.target;
+          if (t && t.closest && t.closest('[data-cal-link]')) loadCal();
+        }
+        document.addEventListener('pointerover', onIntent, { passive: true, capture: true });
+        document.addEventListener('focusin', onIntent, { passive: true, capture: true });
+        document.addEventListener('touchstart', onIntent, { passive: true, capture: true });
+      })();
+    </script>
   </body>
 </html>

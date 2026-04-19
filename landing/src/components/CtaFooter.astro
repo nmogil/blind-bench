@@ -27,12 +27,15 @@ const year = new Date().getFullYear();
           Get started
           <ArrowRight class="ml-2 h-4 w-4" />
         </a>
-        <a
-          href={`mailto:${CONTACT_EMAIL}`}
+        <button
+          type="button"
+          data-cal-link="mogil-ventures/blind-bench-intro"
+          data-cal-namespace="blind-bench-intro"
+          data-cal-config='{"layout":"month_view","useSlotsViewOnSmallScreen":"true"}'
           class="inline-flex items-center justify-center rounded-md border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
-          Talk to the team
-        </a>
+          Talk to the founder
+        </button>
       </div>
     </div>
   </div>
