@@ -28,16 +28,17 @@ const VersionEditor = lazy(() => import("./routes/orgs/projects/VersionEditor").
 const RunView = lazy(() => import("./routes/orgs/projects/RunView").then(m => ({ default: m.RunView })));
 const RunsList = lazy(() => import("./routes/orgs/projects/RunsList").then(m => ({ default: m.RunsList })));
 const OptimizationReview = lazy(() => import("./routes/orgs/projects/OptimizationReview").then(m => ({ default: m.OptimizationReview })));
-const SoloEvalSetup = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalSetup").then(m => ({ default: m.SoloEvalSetup })));
-const SoloEvalActive = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalActive").then(m => ({ default: m.SoloEvalActive })));
-const SoloEvalResults = lazy(() => import("./routes/orgs/projects/solo-eval/SoloEvalResults").then(m => ({ default: m.SoloEvalResults })));
-const EvalInbox = lazy(() => import("./routes/eval/EvalInbox").then(m => ({ default: m.EvalInbox })));
-const CycleEvalView = lazy(() => import("./routes/eval/CycleEvalView").then(m => ({ default: m.CycleEvalView })));
 const NotFound = lazy(() => import("./routes/errors/NotFound").then(m => ({ default: m.NotFound })));
 const Denied = lazy(() => import("./routes/errors/Denied").then(m => ({ default: m.Denied })));
 const QuickCompare = lazy(() => import("./routes/compare/QuickCompare").then(m => ({ default: m.QuickCompare })));
 const ReviewDemo = lazy(() => import("./routes/review/DemoDeck").then(m => ({ default: m.DemoDeck })));
+const SessionDeck = lazy(() => import("./routes/review/SessionDeck").then(m => ({ default: m.SessionDeck })));
+const ReviewRunStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewRunStarter })));
+const ReviewCycleStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewCycleStarter })));
+const TokenReviewCycleStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.TokenReviewCycleStarter })));
 const CycleShareableEvalView = lazy(() => import("./routes/share/CycleShareableEvalView").then(m => ({ default: m.CycleShareableEvalView })));
+const InviteLanding = lazy(() => import("./routes/invite/InviteLanding").then(m => ({ default: m.InviteLanding })));
+const InvitesInbox = lazy(() => import("./routes/invite/InvitesInbox").then(m => ({ default: m.InvitesInbox })));
 const RunConfigurator = lazy(() => import("./routes/orgs/projects/RunConfigurator").then(m => ({ default: m.RunConfigurator })));
 const CyclesList = lazy(() => import("./routes/orgs/projects/cycles/CyclesList").then(m => ({ default: m.CyclesList })));
 const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreator").then(m => ({ default: m.CycleCreator })));
@@ -59,11 +60,15 @@ export function App() {
         <Route path="/compare" element={<QuickCompare />} />
         <Route path="/review/demo" element={<ReviewDemo />} />
         <Route path="/s/cycle/:token" element={<CycleShareableEvalView />} />
+        <Route path="/invite/:token" element={<InviteLanding />} />
         <Route path="/legal/terms" element={<Terms />} />
         <Route path="/legal/privacy" element={<Privacy />} />
         <Route element={<AuthGateProtected />}>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/review/session/:sessionId" element={<SessionDeck />} />
+          <Route path="/review/start/run/:runId" element={<ReviewRunStarter />} />
+          <Route path="/review/start/cycle/:cycleId" element={<ReviewCycleStarter />} />
           <Route path="/orgs/:orgSlug" element={<OrgLayout />}>
             <Route index element={<OrgHome />} />
             <Route path="settings" element={<OrgSettings />} />
@@ -99,15 +104,6 @@ export function App() {
                 path="cycles/:cycleId"
                 element={<CycleDetail />}
               />
-              <Route path="solo-eval" element={<SoloEvalSetup />} />
-              <Route
-                path="solo-eval/:sessionId"
-                element={<SoloEvalActive />}
-              />
-              <Route
-                path="solo-eval/:sessionId/results"
-                element={<SoloEvalResults />}
-              />
               <Route path="evaluate" element={<EvaluatePage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="settings" element={<ProjectSettings />} />
@@ -118,10 +114,10 @@ export function App() {
             </Route>
           </Route>
           <Route path="/eval" element={<EvalLayout />}>
-            <Route index element={<EvalInbox />} />
+            <Route index element={<InvitesInbox />} />
             <Route
               path="cycle/:cycleEvalToken"
-              element={<CycleEvalView />}
+              element={<TokenReviewCycleStarter />}
             />
           </Route>
           <Route path="/denied" element={<Denied />} />

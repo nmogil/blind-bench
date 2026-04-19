@@ -232,6 +232,9 @@ const schema = defineSchema({
     targetKind: v.optional(
       v.union(v.literal("inline"), v.literal("overall")),
     ),
+    // M25: when set, the author is a verified guest (no user account).
+    // Mutually exclusive with userId in practice; enforced in code.
+    guestIdentityId: v.optional(v.id("guestIdentities")),
   })
     .index("by_output", ["outputId"])
     .index("by_user", ["userId"])
@@ -313,6 +316,8 @@ const schema = defineSchema({
     // so session resume can find prior ratings by this user. Absent on legacy
     // rows from before M19.
     reviewSessionId: v.optional(v.id("reviewSessions")),
+    // M25: guest principal attribution (see outputFeedback.guestIdentityId).
+    guestIdentityId: v.optional(v.id("guestIdentities")),
   })
     .index("by_run_user", ["runId", "userId"])
     .index("by_output", ["outputId"])
@@ -679,6 +684,8 @@ const schema = defineSchema({
     sessionId: v.optional(v.string()),
     // M19: links back to the review session that produced this rating.
     reviewSessionId: v.optional(v.id("reviewSessions")),
+    // M25: guest principal attribution (see outputFeedback.guestIdentityId).
+    guestIdentityId: v.optional(v.id("guestIdentities")),
   })
     .index("by_cycle", ["cycleId"])
     .index("by_cycle_user", ["cycleId", "userId"])
@@ -727,6 +734,8 @@ const schema = defineSchema({
     targetKind: v.optional(
       v.union(v.literal("inline"), v.literal("overall")),
     ),
+    // M25: guest principal attribution (see outputFeedback.guestIdentityId).
+    guestIdentityId: v.optional(v.id("guestIdentities")),
   })
     .index("by_cycle_output", ["cycleOutputId"])
     .index("by_cycle", ["cycleId"])
@@ -761,7 +770,11 @@ const schema = defineSchema({
     // Exactly one of runId / cycleId is set (enforced in code).
     runId: v.optional(v.id("promptRuns")),
     cycleId: v.optional(v.id("reviewCycles")),
-    userId: v.id("users"),
+    // M25: exactly one of {userId, guestIdentityId} is set. userId was
+    // required pre-M25 and remains the common case; guestIdentityId is set
+    // only when an unauthenticated guest accepts a cycle invite.
+    userId: v.optional(v.id("users")),
+    guestIdentityId: v.optional(v.id("guestIdentities")),
     // Reviewer's capacity for this session. "author" is the run/cycle creator;
     // "collaborator" is another project member; "evaluator" is an invited
     // blind reviewer routed via cycleEvaluators.
@@ -797,6 +810,7 @@ const schema = defineSchema({
   })
     .index("by_project_user", ["projectId", "userId"])
     .index("by_user_status", ["userId", "phase"])
+    .index("by_guest_status", ["guestIdentityId", "phase"])
     .index("by_run", ["runId"])
     .index("by_cycle", ["cycleId"]),
 
@@ -861,6 +875,94 @@ const schema = defineSchema({
     .index("by_email_and_cycle", ["email", "cycleId"])
     .index("by_email_and_run", ["email", "runId"])
     .index("by_shareable_link", ["shareableLinkId"]),
+
+  // =========================================================================
+  // M25: Unified Invites & Guest Identities
+  // =========================================================================
+
+  // A verified email identity for users who haven't created an account yet.
+  // Created lazily on first click of an invite link. If the guest later signs
+  // up with the same email, `promotedToUserId` is set and queries that fan
+  // out across both principals can follow the pointer.
+  //
+  // Attribution guarantees: every cyclePreferences / cycleFeedback /
+  // outputPreferences / outputFeedback row authored by a guest carries
+  // guestIdentityId, so cycle owners can see "3 reviewers (2 users + 1 guest:
+  // jane@example.com)" without exposing version identity.
+  guestIdentities: defineTable({
+    email: v.string(),
+    verifiedAt: v.number(),
+    displayName: v.optional(v.string()),
+    promotedToUserId: v.optional(v.id("users")),
+    promotedAt: v.optional(v.number()),
+  })
+    .index("by_email", ["email"])
+    .index("by_promoted_user", ["promotedToUserId"]),
+
+  // Unified invitation table. Replaces the Phase 5 migration source tables:
+  //   organizationMembers (pending invites only), projectCollaborators,
+  //   cycleEvaluators, evalInvitations, cycleShareableLinks.
+  //
+  // `shareable: true` means a single token many guests can redeem (replaces
+  // public cycleShareableLinks). Targeted email invites have shareable=false
+  // and a single recipient email.
+  invitations: defineTable({
+    scope: v.union(
+      v.literal("org"),
+      v.literal("project"),
+      v.literal("cycle"),
+    ),
+    // String form of the scope entity id — Convex can't parametrize v.id(...)
+    // on a sibling field. Code resolves scopeId back to the proper table id
+    // based on `scope`.
+    scopeId: v.string(),
+    // Denormalized for fast org-wide admin queries. Always the containing
+    // organization, even for project/cycle scopes.
+    orgId: v.id("organizations"),
+
+    role: v.union(
+      // org roles
+      v.literal("org_owner"),
+      v.literal("org_admin"),
+      v.literal("org_member"),
+      // project roles
+      v.literal("project_owner"),
+      v.literal("project_editor"),
+      v.literal("project_evaluator"),
+      // cycle roles (guests can only accept this)
+      v.literal("cycle_reviewer"),
+    ),
+
+    email: v.string(),
+    token: v.string(),
+    shareable: v.boolean(),
+
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("revoked"),
+      v.literal("expired"),
+    ),
+
+    invitedById: v.id("users"),
+    invitedAt: v.number(),
+    expiresAt: v.number(),
+
+    // Set when accepted. Exactly one of acceptedByUserId / acceptedByGuestId
+    // for shareable=false. For shareable=true, these are left empty on the
+    // root invite and acceptance is tracked via acceptCount + child
+    // guestIdentities / user membership rows.
+    acceptedByUserId: v.optional(v.id("users")),
+    acceptedByGuestId: v.optional(v.id("guestIdentities")),
+    acceptedAt: v.optional(v.number()),
+
+    acceptCount: v.number(),
+    maxAccepts: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_scope", ["scope", "scopeId"])
+    .index("by_email_scope", ["email", "scope", "scopeId"])
+    .index("by_org_status", ["orgId", "status"]),
 });
 
 export default schema;

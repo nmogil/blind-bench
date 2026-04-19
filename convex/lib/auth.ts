@@ -16,6 +16,41 @@ export async function requireAuth(
   return userId;
 }
 
+/**
+ * M25: Unified principal type. A principal is either a signed-in user or a
+ * verified guest (email-only identity) that accepted a cycle invite. Review
+ * session endpoints that can serve guests use `resolvePrincipal` — everything
+ * else stays on `requireAuth`.
+ */
+export type Principal =
+  | { kind: "user"; userId: Id<"users">; email: string | null }
+  | { kind: "guest"; guestId: Id<"guestIdentities">; email: string };
+
+/**
+ * Resolve the current caller to a Principal. Passing a `guestToken` falls
+ * back to guest resolution when there is no signed-in user — guest tokens
+ * are minted at guest-invite acceptance time and stored client-side.
+ *
+ * Throws if neither auth nor a valid guest token is present.
+ */
+export async function resolvePrincipal(
+  ctx: QueryCtx,
+  guestIdentityId?: Id<"guestIdentities">,
+): Promise<Principal> {
+  const userId = await getAuthUserId(ctx);
+  if (userId !== null) {
+    const user = await ctx.db.get(userId);
+    return { kind: "user", userId, email: user?.email ?? null };
+  }
+  if (guestIdentityId) {
+    const guest = await ctx.db.get(guestIdentityId);
+    if (guest) {
+      return { kind: "guest", guestId: guestIdentityId, email: guest.email };
+    }
+  }
+  throw new Error("Not authenticated");
+}
+
 type OrgRole = Doc<"organizationMembers">["role"];
 
 /**

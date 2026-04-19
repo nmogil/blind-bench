@@ -88,6 +88,36 @@ const friendlyMessages: Record<string, string> = {
     "Suggestion request not found.",
   "Provide a test case or inline variable values":
     "Provide a test case or inline variable values.",
+  "Not assigned to this cycle":
+    "You're not on the evaluator list for this review. Ask the project owner to invite you.",
+  "Invalid or expired cycle eval token":
+    "This review link has expired or was revoked. Ask for a new link.",
+  "Cycle not found":
+    "This review cycle no longer exists.",
+  "Review session not found":
+    "Review session not found. It may have been cleared.",
+  "Session is not in phase1":
+    "This review isn't in the rating phase anymore.",
+  "Session is not in phase2":
+    "This review isn't in the battle phase anymore.",
+  "Invitation not found":
+    "This invitation link is invalid or no longer exists.",
+  "Invitation was revoked":
+    "This invitation was revoked. Ask for a new one.",
+  "This invitation has expired":
+    "This invitation has expired. Ask for a new one.",
+  "Invitation was already accepted":
+    "This invitation was already accepted.",
+  "This invitation was sent to a different email":
+    "This invitation was sent to a different email. Sign in with that email to accept.",
+  "Guest acceptance is only allowed for cycle reviewers":
+    "This invitation requires signing in — guest access isn't allowed here.",
+  "This invitation has reached its response limit":
+    "This invitation has reached its response limit.",
+  "Role does not match scope":
+    "That role can't be used with this invitation scope.",
+  "Email is required":
+    "Enter your email to continue as a guest.",
 };
 
 /**
