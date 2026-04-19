@@ -55,22 +55,14 @@ const APP_URL = 'https://app.blindbench.dev';
       >
         Get feedback from{' '}
         <span class="hero-rotator" data-hero-rotator>
-          <!-- Invisible sizer locks the slot to the widest word so surrounding
-               text doesn't reflow as chars animate. -->
-          <span class="hero-rotator-sizer" aria-hidden="true">
-            <span>PMs</span>
-            <span>legal</span>
-            <span>marketing</span>
-            <span>customers</span>
-            <span>experts</span>
-          </span>
           <span
             class="hero-rotator-clip"
             data-hero-rotator-active
             aria-live="polite"
             aria-atomic="true"
           ></span>
-        </span>{' '}
+        </span>
+        <br />
         to make your AI agent better.
       </h1>
 
@@ -134,13 +126,11 @@ const APP_URL = 'https://app.blindbench.dev';
     }
   }
 
-  /* Rotating persona in the H1. A hidden sizer stacks all words in one grid
-     cell so the slot is pre-sized to the widest — no layout jitter as words
-     swap. The visible clip overlays the same cell and animates per-character. */
+  /* Rotating persona in the H1. A <br> in the markup parks this slot at the
+     end of line 1, so the rotator's width changes don't push any sibling
+     text around. */
   .hero-rotator {
-    display: inline-grid;
-    grid-template-columns: auto;
-    grid-template-rows: 1fr;
+    display: inline-block;
     vertical-align: baseline;
     color: #ddd6fe;
     font-weight: 700;
@@ -151,24 +141,7 @@ const APP_URL = 'https://app.blindbench.dev';
     text-decoration-color: rgba(221, 214, 254, 0.55);
   }
 
-  .hero-rotator-sizer {
-    grid-column: 1;
-    grid-row: 1;
-    display: inline-grid;
-    grid-template-columns: auto;
-    grid-template-rows: 1fr;
-    visibility: hidden;
-  }
-
-  .hero-rotator-sizer > span {
-    grid-column: 1;
-    grid-row: 1;
-    white-space: nowrap;
-  }
-
   .hero-rotator-clip {
-    grid-column: 1;
-    grid-row: 1;
     display: inline-flex;
     overflow: hidden;
     white-space: nowrap;
