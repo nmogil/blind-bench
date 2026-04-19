@@ -1,0 +1,196 @@
+---
+import Pencil from '../../icons/Pencil.astro';
+import Share from '../../icons/Share.astro';
+import Sparkles from '../../icons/Sparkles.astro';
+
+interface Props {
+  default?: number;
+}
+const { default: defaultIndex = 0 } = Astro.props;
+
+// All three nodes sit on a single circle (radius 180, center 250,250 in
+// a 500×500 viewBox). Arcs are trimmed at each node's circumference
+// using an angular offset of asin(r/R) ≈ 12.84° so the dashed/solid
+// strokes never overlap the node circles.
+const nodes = [
+  { x: 50, y: 14, label: '01', title: 'Set up', Icon: Pencil },
+  { x: 81.18, y: 68, label: '02', title: 'Share', Icon: Share },
+  { x: 18.82, y: 68, label: '03', title: 'Apply', Icon: Sparkles },
+];
+
+const arcs = [
+  // 0: Set up → Share  (CW segment of the big circle)
+  'M 290 74.5 A 180 180 0 0 1 421.9 303.14',
+  // 1: Share → Apply
+  'M 382 372.4 A 180 180 0 0 1 118 372.4',
+  // 2: Apply → Set up
+  'M 78.1 303.14 A 180 180 0 0 1 210 74.5',
+];
+---
+
+<div
+  class="journey-diagram relative mx-auto aspect-square w-full max-w-[480px]"
+  data-journey-diagram
+  data-active-step={defaultIndex}
+>
+  <!-- Connecting arcs (drawn behind nodes) -->
+  <svg
+    class="absolute inset-0 h-full w-full"
+    viewBox="0 0 500 500"
+    fill="none"
+    aria-hidden="true"
+  >
+    <defs>
+      <marker
+        id="journey-arrow"
+        viewBox="0 0 10 10"
+        refX="6"
+        refY="5"
+        markerWidth="5"
+        markerHeight="5"
+        orient="auto-start-reverse"
+      >
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--primary)" />
+      </marker>
+    </defs>
+
+    <!-- Dashed background ring (always visible) -->
+    {
+      arcs.map((d) => (
+        <path
+          d={d}
+          stroke="color-mix(in oklch, var(--muted-foreground) 35%, transparent)"
+          stroke-width="1.5"
+          stroke-dasharray="6 8"
+          stroke-linecap="round"
+        />
+      ))
+    }
+
+    <!-- Active arc overlays (one shown at a time) -->
+    {
+      arcs.map((d, i) => (
+        <path
+          class="journey-arc"
+          data-arc={i}
+          d={d}
+          stroke="var(--primary)"
+          stroke-width="2"
+          stroke-linecap="round"
+          marker-end="url(#journey-arrow)"
+        />
+      ))
+    }
+  </svg>
+
+  <!-- Center: Blind Bench mark -->
+  <div
+    class="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2.5"
+    aria-hidden="true"
+  >
+    <svg
+      width="36"
+      height="36"
+      viewBox="0 0 24 24"
+      class="text-foreground/85"
+    >
+      <rect
+        x="0.75"
+        y="0.75"
+        width="22.5"
+        height="22.5"
+        rx="5.25"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+      />
+      <path
+        d="M0.75 6A5.25 5.25 0 0 1 6 0.75h6v22.5H6A5.25 5.25 0 0 1 0.75 18Z"
+        fill="currentColor"
+      />
+      <line
+        x1="12"
+        y1="0.75"
+        x2="12"
+        y2="23.25"
+        stroke="currentColor"
+        stroke-width="1"
+        opacity="0.9"
+      />
+    </svg>
+    <span class="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground/80">
+      Blind&nbsp;Bench
+    </span>
+  </div>
+
+  <!-- Nodes -->
+  {
+    nodes.map((n, i) => (
+      <div
+        class="journey-node absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3"
+        style={`left: ${n.x}%; top: ${n.y}%;`}
+        data-node={i}
+      >
+        <div class="journey-node-circle flex h-20 w-20 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground transition-[color,border-color,box-shadow] duration-300">
+          <n.Icon class="h-7 w-7" />
+        </div>
+        <div class="flex flex-col items-center gap-0.5 text-center">
+          <span class="journey-node-label font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground/70 transition-colors duration-300">
+            {n.label}
+          </span>
+          <span class="journey-node-title text-sm font-semibold text-muted-foreground/80 transition-colors duration-300">
+            {n.title}
+          </span>
+        </div>
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  /* Active arc: only the one matching the current step is visible. */
+  .journey-arc {
+    opacity: 0;
+    transition: opacity 400ms ease;
+  }
+
+  .journey-diagram[data-active-step='0'] .journey-arc[data-arc='0'],
+  .journey-diagram[data-active-step='1'] .journey-arc[data-arc='1'],
+  .journey-diagram[data-active-step='2'] .journey-arc[data-arc='2'] {
+    opacity: 1;
+  }
+
+  /* Active node: layered halo + colored icon. */
+  .journey-diagram[data-active-step='0'] .journey-node[data-node='0'] .journey-node-circle,
+  .journey-diagram[data-active-step='1'] .journey-node[data-node='1'] .journey-node-circle,
+  .journey-diagram[data-active-step='2'] .journey-node[data-node='2'] .journey-node-circle {
+    color: var(--primary);
+    border-color: color-mix(in oklch, var(--primary) 70%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--primary) 35%, transparent),
+      0 0 0 6px color-mix(in oklch, var(--primary) 12%, transparent),
+      0 0 28px 4px color-mix(in oklch, var(--primary) 30%, transparent),
+      0 0 64px 12px color-mix(in oklch, var(--primary) 18%, transparent);
+  }
+
+  .journey-diagram[data-active-step='0'] .journey-node[data-node='0'] .journey-node-title,
+  .journey-diagram[data-active-step='1'] .journey-node[data-node='1'] .journey-node-title,
+  .journey-diagram[data-active-step='2'] .journey-node[data-node='2'] .journey-node-title {
+    color: var(--foreground);
+  }
+
+  .journey-diagram[data-active-step='0'] .journey-node[data-node='0'] .journey-node-label,
+  .journey-diagram[data-active-step='1'] .journey-node[data-node='1'] .journey-node-label,
+  .journey-diagram[data-active-step='2'] .journey-node[data-node='2'] .journey-node-label {
+    color: var(--primary);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .journey-arc,
+    .journey-node-circle,
+    .journey-node-title,
+    .journey-node-label {
+      transition: none;
+    }
+  }
+</style>

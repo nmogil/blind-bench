@@ -1,42 +1,38 @@
 ---
-import StepTab from './StepTab.astro';
+import JourneyDiagram from './JourneyDiagram.astro';
 import SetupPanel from './SetupPanel.astro';
 import SharePanel from './SharePanel.astro';
 import ApplyPanel from './ApplyPanel.astro';
 
 const steps = [
   {
-    number: 1,
-    title: 'Set up',
+    number: '01',
+    eyebrow: 'Set up',
+    title: 'Draft a prompt, pick the models.',
     description:
-      'Draft your prompt and pick the models you want to compare.',
+      'Write your system message, mark the variables, and choose a few models or temperatures to compare side-by-side.',
   },
   {
-    number: 2,
-    title: 'Share one link',
+    number: '02',
+    eyebrow: 'Share',
+    title: 'Send one link. No login.',
     description:
-      'Reviewers annotate outputs in the browser. No login.',
+      'Reviewers see outputs blind — no model names, no version numbers — and highlight the lines they like or hate right in the browser.',
   },
   {
-    number: 3,
-    title: 'Apply the feedback',
+    number: '03',
+    eyebrow: 'Apply',
+    title: 'Turn feedback into prompt edits.',
     description:
-      'The optimizer turns annotations into prompt edits, each cited to the comment.',
+      'The optimizer reads every annotation and proposes a new version, with each change cited to the comment that motivated it.',
   },
 ];
-
-// Step 1 is default: linear reading order. Hash #demo-section (used by
-// Nav + CtaFooter) still auto-activates Step 2 via the controller.
-const DEFAULT_INDEX = 0;
 ---
 
-<section
-  id="how-it-works"
-  class="scroll-mt-16 py-20 lg:py-32"
-  data-journey-default={DEFAULT_INDEX}
->
-  <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-    <div class="reveal mx-auto max-w-3xl text-center">
+<section id="how-it-works" class="scroll-mt-16 py-20 lg:py-28">
+  <!-- Section header (narrower for readability) -->
+  <div class="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+    <div class="reveal">
       <h2
         class="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl"
       >
@@ -50,235 +46,135 @@ const DEFAULT_INDEX = 0;
         without leaving a tab open for your reviewers.
       </p>
     </div>
+  </div>
 
-    <!-- Tablist rail + indicator -->
-    <div class="reveal mt-14 lg:mt-20">
-      <div
-        class="journey-rail relative border-t border-border"
-        aria-hidden="true"
-      >
-        <div class="journey-indicator" data-journey-indicator></div>
-      </div>
+  <!-- Sticky split: diagram (left) + step blocks (right) — wider container -->
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="journey-scroller mt-14 lg:mt-20">
+      <div class="grid grid-cols-1 gap-12 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-10 xl:gap-16">
+        <!-- Left: sticky diagram (desktop) / inline (mobile) -->
+        <div class="journey-sticky-col">
+          <div class="journey-sticky-inner lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-7rem)] lg:items-center">
+            <JourneyDiagram default={0} />
+          </div>
+        </div>
 
-      <div
-        class="journey-tablist grid grid-cols-1 gap-2 lg:grid-cols-3 lg:gap-8"
-        role="tablist"
-        aria-label="How Blind Bench works"
-      >
-        {
-          steps.map((s, i) => (
-            <StepTab
-              index={i}
-              number={s.number}
-              title={s.title}
-              description={s.description}
-              active={i === DEFAULT_INDEX}
-              panelId={`journey-panel-${i}`}
-              tabId={`journey-tab-${i}`}
-            />
-          ))
-        }
-      </div>
-    </div>
+        <!-- Right: stacked step blocks -->
+        <div class="space-y-24 lg:space-y-32">
+          {
+            steps.map((s, i) => (
+              <article
+                class="journey-step"
+                data-journey-step={i}
+                aria-label={`Step ${s.number}: ${s.eyebrow}`}
+              >
+                <div class="mb-6 flex items-center gap-3">
+                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/40 bg-primary/10 font-mono text-[11px] font-semibold text-primary">
+                    {i + 1}
+                  </span>
+                  <span class="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-primary">
+                    {s.eyebrow}
+                  </span>
+                </div>
+                <h3 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                  {s.title}
+                </h3>
+                <p class="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">
+                  {s.description}
+                </p>
 
-    <!-- Panels (stacked with CSS grid so all stay in DOM; cross-fade on tab change) -->
-    <div class="reveal-scale journey-panels mt-10 lg:mt-14">
-      <div
-        class="journey-panel"
-        role="tabpanel"
-        id="journey-panel-0"
-        aria-labelledby="journey-tab-0"
-        data-journey-panel
-        data-index="0"
-        data-active={DEFAULT_INDEX === 0 ? 'true' : 'false'}
-        {...(DEFAULT_INDEX !== 0 ? { hidden: true } : {})}
-      >
-        <SetupPanel />
-      </div>
-      <div
-        class="journey-panel"
-        role="tabpanel"
-        id="journey-panel-1"
-        aria-labelledby="journey-tab-1"
-        data-journey-panel
-        data-index="1"
-        data-active={DEFAULT_INDEX === 1 ? 'true' : 'false'}
-        {...(DEFAULT_INDEX !== 1 ? { hidden: true } : {})}
-      >
-        <SharePanel />
-      </div>
-      <div
-        class="journey-panel"
-        role="tabpanel"
-        id="journey-panel-2"
-        aria-labelledby="journey-tab-2"
-        data-journey-panel
-        data-index="2"
-        data-active={DEFAULT_INDEX === 2 ? 'true' : 'false'}
-        {...(DEFAULT_INDEX !== 2 ? { hidden: true } : {})}
-      >
-        <ApplyPanel />
+                <div class="mt-8">
+                  {i === 0 && <SetupPanel />}
+                  {i === 1 && <SharePanel />}
+                  {i === 2 && <ApplyPanel />}
+                </div>
+              </article>
+            ))
+          }
+        </div>
       </div>
     </div>
   </div>
 </section>
 
 <style>
-  .journey-rail {
-    height: 1px;
-  }
-
-  .journey-indicator {
-    position: absolute;
-    top: -1px;
-    left: 0;
-    height: 2px;
-    width: calc(100% / 3);
-    background: linear-gradient(
-      90deg,
-      color-mix(in oklch, var(--primary) 30%, transparent),
-      var(--primary) 50%,
-      color-mix(in oklch, var(--primary) 30%, transparent)
-    );
-    transform: translateX(calc(var(--journey-active, 0) * 100%));
-    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
-  }
-
-  /* Mobile: rail becomes a vertical accent on the left of the stacked tablist */
+  /* Mobile (no sticky): center the diagram naturally above the first step. */
   @media (max-width: 1023.98px) {
-    .journey-rail {
-      display: none;
+    .journey-sticky-inner {
+      padding-bottom: 1.5rem;
     }
   }
 
-  /* Active panel flows normally (sets container height); inactive panels
-     are pulled out of flow so the container doesn't reserve their height. */
-  .journey-panels {
-    position: relative;
-  }
-
-  .journey-panel {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(6px);
-    transition:
-      opacity 280ms ease,
-      transform 280ms ease;
-  }
-
-  .journey-panel:not([data-active='true']) {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-  }
-
-  .journey-panel[data-active='true'] {
-    position: relative;
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-    z-index: 1;
-  }
-
-  /* hidden attribute is a fallback for no-JS — the default-active panel omits it */
-  .journey-panel[hidden] {
-    display: none;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .journey-indicator,
-    .journey-panel {
-      transition: none;
+  /* On desktop, give each step block enough vertical room so the sticky
+     diagram has scroll distance to dwell on each. The min-height of the
+     last block is reduced so the section ends near the bottom of its panel
+     rather than leaving empty space below the final step. */
+  @media (min-width: 1024px) {
+    .journey-step {
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
-    .journey-panel {
-      transform: none;
+    .journey-step:last-child {
+      min-height: 0;
     }
   }
 </style>
 
 <script>
-  type PanelEl = HTMLElement & { dataset: DOMStringMap };
+  type DiagramEl = HTMLElement & { dataset: { activeStep?: string } };
 
   const section = document.getElementById('how-it-works');
   if (section) {
-    const defaultIndex = Number(section.dataset.journeyDefault || '0');
-    const tabs = Array.from(
-      section.querySelectorAll<HTMLButtonElement>('[data-journey-tab]'),
-    );
-    const panels = Array.from(
-      section.querySelectorAll<PanelEl>('[data-journey-panel]'),
-    );
-    const indicator = section.querySelector<HTMLElement>(
-      '[data-journey-indicator]',
+    const diagram = section.querySelector<DiagramEl>('[data-journey-diagram]');
+    const stepEls = Array.from(
+      section.querySelectorAll<HTMLElement>('[data-journey-step]'),
     );
 
-    // Reveal all panels in DOM (the hidden attribute was a no-JS fallback).
-    panels.forEach((p) => p.removeAttribute('hidden'));
+    if (diagram && stepEls.length) {
+      let active = Number(diagram.dataset.activeStep || '0');
 
-    let active = defaultIndex;
+      const setActive = (i: number) => {
+        if (i === active) return;
+        active = i;
+        diagram.dataset.activeStep = String(i);
+      };
 
-    function activate(index: number, options: { focus?: boolean } = {}) {
-      if (index < 0 || index >= tabs.length) return;
-      active = index;
-
-      tabs.forEach((t, i) => {
-        const isActive = i === index;
-        t.setAttribute('aria-selected', String(isActive));
-        t.tabIndex = isActive ? 0 : -1;
-        if (isActive && options.focus) t.focus();
-      });
-
-      panels.forEach((p, i) => {
-        p.dataset.active = i === index ? 'true' : 'false';
-      });
-
-      if (indicator) {
-        indicator.style.setProperty('--journey-active', String(index));
-      }
-    }
-
-    tabs.forEach((t) => {
-      t.addEventListener('click', () => {
-        const idx = Number(t.dataset.index);
-        activate(idx);
-      });
-    });
-
-    // Keyboard: Left/Right/Home/End on the tablist
-    tabs.forEach((t) => {
-      t.addEventListener('keydown', (ev) => {
-        let next = active;
-        switch (ev.key) {
-          case 'ArrowRight':
-          case 'ArrowDown':
-            next = (active + 1) % tabs.length;
-            break;
-          case 'ArrowLeft':
-          case 'ArrowUp':
-            next = (active - 1 + tabs.length) % tabs.length;
-            break;
-          case 'Home':
-            next = 0;
-            break;
-          case 'End':
-            next = tabs.length - 1;
-            break;
-          default:
-            return;
+      // Pick the step whose center is closest to the viewport's vertical center.
+      // Runs on scroll/resize; rAF-throttled to keep it cheap.
+      let ticking = false;
+      const update = () => {
+        ticking = false;
+        const viewportCenter = window.innerHeight / 2;
+        let best = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < stepEls.length; i++) {
+          const r = stepEls[i].getBoundingClientRect();
+          const center = r.top + r.height / 2;
+          const dist = Math.abs(center - viewportCenter);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+          }
         }
-        ev.preventDefault();
-        activate(next, { focus: true });
-      });
-    });
+        setActive(best);
+      };
 
-    // Hash support: #demo-section (used by Nav + CtaFooter) opens Step 2.
-    // Anchor scroll still works because the <SharePanel> root keeps id="demo-section".
-    function syncFromHash() {
-      if (location.hash === '#demo-section') activate(1);
+      const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(update);
+      };
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      update();
+
+      // Hash support: #demo-section (used by Nav + CtaFooter) — anchor
+      // scroll still works because <SharePanel> keeps id="demo-section".
+      // The scroll listener will pick up the resulting position and set
+      // the diagram to step 2 automatically.
     }
-    syncFromHash();
-    window.addEventListener('hashchange', syncFromHash);
   }
 </script>
