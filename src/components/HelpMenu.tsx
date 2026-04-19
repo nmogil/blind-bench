@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
-import { useOrg } from "@/contexts/OrgContext";
 import { toggleCheatSheet } from "@/lib/shortcutCheatSheetState";
+import { useOnboardingChecklist } from "@/components/OnboardingChecklistSheet";
+import { ONBOARDING_CHECKLIST_KEY } from "@/components/OnboardingChecklist";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +34,7 @@ export function HelpMenu() {
   const resetCallouts = useMutation(api.userPreferences.resetCallouts);
   const undismissCallout = useMutation(api.userPreferences.undismissCallout);
   const navigate = useNavigate();
-  const { org } = useOrg();
+  const { openChecklist } = useOnboardingChecklist();
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
@@ -46,12 +47,12 @@ export function HelpMenu() {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem
             onClick={async () => {
-              await undismissCallout({ calloutKey: "onboarding_welcome" });
-              navigate(`/orgs/${org.slug}`);
+              await undismissCallout({ calloutKey: ONBOARDING_CHECKLIST_KEY });
+              openChecklist();
             }}
           >
             <BookOpen className="mr-2 h-4 w-4" />
-            How it works
+            Restart setup guide
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => toggleCheatSheet()}>
             <Keyboard className="mr-2 h-4 w-4" />

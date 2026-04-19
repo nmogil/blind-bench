@@ -4,7 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { useOrgLayout } from "@/components/layouts/OrgLayout";
 import { EmptyState } from "@/components/EmptyState";
-import { WelcomeCard } from "@/components/WelcomeCard";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FolderOpen, ChevronRight } from "lucide-react";
 
@@ -20,7 +20,7 @@ export function OrgHome() {
       <p className="mt-1 text-sm text-muted-foreground">Your prompts</p>
 
       <div className="mt-4">
-        <WelcomeCard onCreateProject={openNewProjectDialog} />
+        <OnboardingChecklist variant="inline" />
       </div>
 
       <div className="mt-6">
