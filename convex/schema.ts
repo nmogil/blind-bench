@@ -224,9 +224,18 @@ const schema = defineSchema({
         ),
       ),
     ),
+    // M19: links feedback back to the review session that produced it.
+    // Absent on legacy rows from before M19.
+    reviewSessionId: v.optional(v.id("reviewSessions")),
+    // M19: "inline" (existing) anchors to a text range; "overall" is a
+    // per-output note with empty annotationData. Absent = "inline".
+    targetKind: v.optional(
+      v.union(v.literal("inline"), v.literal("overall")),
+    ),
   })
     .index("by_output", ["outputId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_review_session", ["reviewSessionId"]),
 
   promptFeedback: defineTable({
     promptVersionId: v.id("promptVersions"),
@@ -300,10 +309,15 @@ const schema = defineSchema({
       v.literal("acceptable"),
       v.literal("weak"),
     ),
+    // M19: links a preference back to the review session that produced it,
+    // so session resume can find prior ratings by this user. Absent on legacy
+    // rows from before M19.
+    reviewSessionId: v.optional(v.id("reviewSessions")),
   })
     .index("by_run_user", ["runId", "userId"])
     .index("by_output", ["outputId"])
-    .index("by_run", ["runId"]),
+    .index("by_run", ["runId"])
+    .index("by_review_session", ["reviewSessionId"]),
 
   // Solo Blind Self-Evaluation (Issue #54)
   soloEvalSessions: defineTable({
@@ -663,11 +677,14 @@ const schema = defineSchema({
       v.literal("author"),
     ),
     sessionId: v.optional(v.string()),
+    // M19: links back to the review session that produced this rating.
+    reviewSessionId: v.optional(v.id("reviewSessions")),
   })
     .index("by_cycle", ["cycleId"])
     .index("by_cycle_user", ["cycleId", "userId"])
     .index("by_cycle_output", ["cycleOutputId"])
-    .index("by_cycle_and_source", ["cycleId", "source"]),
+    .index("by_cycle_and_source", ["cycleId", "source"])
+    .index("by_review_session", ["reviewSessionId"]),
 
   // Text annotations with source tracking for cycle outputs.
   cycleFeedback: defineTable({
@@ -703,11 +720,19 @@ const schema = defineSchema({
       v.literal("author"),
     ),
     sessionId: v.optional(v.string()),
+    // M19: links back to the review session that produced this annotation.
+    reviewSessionId: v.optional(v.id("reviewSessions")),
+    // M19: "inline" (existing) anchors to a text range; "overall" is a
+    // per-output note with empty annotationData. Absent = "inline".
+    targetKind: v.optional(
+      v.union(v.literal("inline"), v.literal("overall")),
+    ),
   })
     .index("by_cycle_output", ["cycleOutputId"])
     .index("by_cycle", ["cycleId"])
     .index("by_user", ["userId"])
-    .index("by_invitation", ["invitationId"]),
+    .index("by_invitation", ["invitationId"])
+    .index("by_review_session", ["reviewSessionId"]),
 
   // Shareable links scoped to cycles for anonymous evaluation (48hr TTL).
   cycleShareableLinks: defineTable({
@@ -723,6 +748,98 @@ const schema = defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_cycle", ["cycleId"]),
+
+  // =========================================================================
+  // M19: Unified Review Sessions (Flash deck + Battle arena)
+  // =========================================================================
+  // A reviewSession is a single pass by one reviewer over a pool of outputs
+  // (from one run OR one cycle). It tracks phase state, cursor, and is the
+  // coordinating key for Phase 1 ratings/annotations (written to the existing
+  // preference + feedback tables via reviewSessionId) and Phase 2 matchups.
+  reviewSessions: defineTable({
+    projectId: v.id("projects"),
+    // Exactly one of runId / cycleId is set (enforced in code).
+    runId: v.optional(v.id("promptRuns")),
+    cycleId: v.optional(v.id("reviewCycles")),
+    userId: v.id("users"),
+    // Reviewer's capacity for this session. "author" is the run/cycle creator;
+    // "collaborator" is another project member; "evaluator" is an invited
+    // blind reviewer routed via cycleEvaluators.
+    role: v.union(
+      v.literal("author"),
+      v.literal("collaborator"),
+      v.literal("evaluator"),
+    ),
+    phase: v.union(
+      v.literal("phase1"),
+      v.literal("phase2"),
+      v.literal("complete"),
+      v.literal("abandoned"),
+    ),
+    requirePhase1: v.boolean(),
+    requirePhase2: v.boolean(),
+    // Phase 1 cursor so resumes land on the last viewed card.
+    currentIndex: v.number(),
+    // Server-shuffled, frozen at session start. Blind labels here are
+    // session-scoped (not the run/cycle label) so two reviewers see different
+    // orderings. Each entry points at exactly one runOutput or cycleOutput.
+    outputOrder: v.array(
+      v.object({
+        runOutputId: v.optional(v.id("runOutputs")),
+        cycleOutputId: v.optional(v.id("cycleOutputs")),
+        sessionBlindLabel: v.string(),
+        testCaseId: v.optional(v.id("testCases")),
+      }),
+    ),
+    startedAt: v.number(),
+    phase1CompletedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_project_user", ["projectId", "userId"])
+    .index("by_user_status", ["userId", "phase"])
+    .index("by_run", ["runId"])
+    .index("by_cycle", ["cycleId"]),
+
+  // Phase 2 head-to-head matchups. Swiss-paired by the server so each round
+  // is generated from current standings; matchups are only ever between
+  // outputs of the same testCaseId (apples to apples). Winner feeds the
+  // Bradley-Terry scorer downstream.
+  reviewMatchups: defineTable({
+    sessionId: v.id("reviewSessions"),
+    round: v.number(),
+    pairIndex: v.number(),
+    // Both slots reference the same output kind as the session scope.
+    leftRunOutputId: v.optional(v.id("runOutputs")),
+    leftCycleOutputId: v.optional(v.id("cycleOutputs")),
+    rightRunOutputId: v.optional(v.id("runOutputs")),
+    rightCycleOutputId: v.optional(v.id("cycleOutputs")),
+    leftBlindLabel: v.string(),
+    rightBlindLabel: v.string(),
+    testCaseId: v.optional(v.id("testCases")),
+    winner: v.optional(
+      v.union(
+        v.literal("left"),
+        v.literal("right"),
+        v.literal("tie"),
+        v.literal("skip"),
+      ),
+    ),
+    reasonTags: v.array(
+      v.union(
+        v.literal("tone"),
+        v.literal("accuracy"),
+        v.literal("clarity"),
+        v.literal("length"),
+        v.literal("format"),
+        v.literal("relevance"),
+        v.literal("safety"),
+        v.literal("other"),
+      ),
+    ),
+    decidedAt: v.optional(v.number()),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_round", ["sessionId", "round"]),
 
   // Email invitations for anonymous evaluation via shareable links.
   evalInvitations: defineTable({
