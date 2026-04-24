@@ -193,6 +193,7 @@ export const create = mutation({
               scopeName,
               inviterName,
               token: existing.token,
+              blindMode: existing.blindMode,
             },
           );
           sent++;
@@ -229,6 +230,7 @@ export const create = mutation({
             scopeName,
             inviterName,
             token,
+            blindMode,
           },
         );
         sent++;
@@ -367,6 +369,9 @@ export const lookupByToken = query({
       role: invite.role,
       email: invite.email,
       shareable: invite.shareable,
+      // M26: undefined for non-reviewer roles; true/false for reviewer roles.
+      // Landing page copy branches on this.
+      blindMode: invite.blindMode,
       status: expired ? "expired" : invite.status,
       inviterName: inviter?.name ?? inviter?.email ?? "A teammate",
       expiresAt: invite.expiresAt,

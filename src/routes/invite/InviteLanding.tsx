@@ -16,6 +16,8 @@ type InviteMeta = {
   role: string;
   email: string;
   shareable: boolean;
+  // M26: undefined for non-reviewer roles.
+  blindMode?: boolean;
   status: "pending" | "accepted" | "revoked" | "expired";
   inviterName: string;
   expiresAt: number;
@@ -83,23 +85,37 @@ function InviteContent({ token }: { token: string }) {
 }
 
 function InviteHeader({ meta }: { meta: InviteMeta }) {
+  const isReviewerRole =
+    meta.role === "project_evaluator" || meta.role === "cycle_reviewer";
+  const verb =
+    meta.scope === "cycle"
+      ? "Evaluate"
+      : meta.scope === "project"
+        ? isReviewerRole
+          ? meta.blindMode === false
+            ? "Review"
+            : "Blind-review"
+          : "Collaborate on"
+        : "Join";
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">
         {meta.inviterName} invited you to
       </p>
       <h1 className="text-xl font-semibold">
-        {meta.scope === "cycle"
-          ? "Evaluate"
-          : meta.scope === "project"
-            ? "Collaborate on"
-            : "Join"}{" "}
-        {meta.scopeName}
+        {verb} {meta.scopeName}
       </h1>
       <p className="text-xs text-muted-foreground">
         Role: {readableRole(meta.role)}
         {meta.email ? ` · For ${meta.email}` : ""}
       </p>
+      {isReviewerRole && meta.blindMode !== undefined && (
+        <p className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
+          {meta.blindMode
+            ? "You'll rate outputs without seeing which prompt version or model produced them. Designed to keep feedback unbiased."
+            : "You'll see the full prompt, model, and outputs, and leave feedback the author can act on."}
+        </p>
+      )}
     </div>
   );
 }

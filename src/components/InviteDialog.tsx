@@ -46,7 +46,7 @@ const ROLE_OPTIONS: Record<Scope, RoleOption[]> = {
     { value: "org_owner", label: "Owner", description: "Full control including billing" },
   ],
   project: [
-    { value: "project_evaluator", label: "Evaluator", description: "Can rate runs (blind, no version details)" },
+    { value: "project_evaluator", label: "Reviewer", description: "Can rate runs and leave feedback. Toggle blind review below." },
     { value: "project_editor", label: "Editor", description: "Can edit prompt versions and test cases" },
     { value: "project_owner", label: "Owner", description: "Can manage collaborators" },
   ],
@@ -80,7 +80,11 @@ export function InviteDialog({
   );
   const [emails, setEmails] = useState("");
   const [shareable, setShareable] = useState(false);
+  const [blindMode, setBlindMode] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const isReviewerRole =
+    role === "project_evaluator" || role === "cycle_reviewer";
 
   async function handleSubmit() {
     const emailList = emails
@@ -101,6 +105,7 @@ export function InviteDialog({
         role,
         emails: shareable ? [] : emailList,
         shareable,
+        ...(isReviewerRole ? { blindMode } : {}),
       });
       if (shareable) {
         toast.success("Shareable link created.");
@@ -111,6 +116,7 @@ export function InviteDialog({
       }
       setEmails("");
       setShareable(false);
+      setBlindMode(true);
       onOpenChange(false);
     } catch (err) {
       toast.error(friendlyError(err, "Failed to send invitations."));
@@ -184,6 +190,25 @@ export function InviteDialog({
                 Separate multiple emails with commas, spaces, or newlines.
               </p>
             </div>
+          )}
+
+          {isReviewerRole && (
+            <label className="flex items-start gap-2 rounded-md border p-3 text-xs cursor-pointer">
+              <Checkbox
+                checked={blindMode}
+                onCheckedChange={(v) => setBlindMode(v === true)}
+                disabled={submitting}
+                className="mt-0.5"
+              />
+              <div className="space-y-0.5">
+                <p className="font-medium">Blind review</p>
+                <p className="text-muted-foreground">
+                  Hides the prompt, model, and version info. Recommended for
+                  unbiased rating. Turn off to invite a stakeholder (e.g. PM,
+                  legal) who needs full context.
+                </p>
+              </div>
+            </label>
           )}
 
           {allowShareable && scope === "cycle" && (

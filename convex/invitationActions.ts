@@ -14,24 +14,51 @@ const scopeValidator = v.union(
 
 type Scope = "org" | "project" | "cycle";
 
-function subjectFor(scope: Scope, scopeName: string): string {
+function subjectFor(
+  scope: Scope,
+  scopeName: string,
+  blindMode: boolean | undefined,
+): string {
   if (scope === "org") return `You've been invited to join ${scopeName}`;
-  if (scope === "project")
+  if (scope === "project") {
+    if (blindMode === false) {
+      return `You've been invited to review ${scopeName}`;
+    }
+    if (blindMode === true) {
+      return `You've been invited to blind-review ${scopeName}`;
+    }
     return `You've been invited to collaborate on ${scopeName}`;
+  }
   return `You've been invited to evaluate "${scopeName}"`;
 }
 
-function headlineFor(scope: Scope): string {
+function headlineFor(scope: Scope, blindMode: boolean | undefined): string {
   if (scope === "org") return "You're invited to join an organization";
-  if (scope === "project") return "You're invited to collaborate";
+  if (scope === "project") {
+    if (blindMode === false) return "You're invited to review a prompt";
+    if (blindMode === true)
+      return "You're invited to blind-review a prompt";
+    return "You're invited to collaborate";
+  }
   return "You're invited to evaluate";
 }
 
-function bodyFor(scope: Scope, scopeName: string, inviterName: string): string {
+function bodyFor(
+  scope: Scope,
+  scopeName: string,
+  inviterName: string,
+  blindMode: boolean | undefined,
+): string {
   if (scope === "org") {
     return `<p><strong>${inviterName}</strong> invited you to join <strong>${scopeName}</strong> on Blind Bench.</p>`;
   }
   if (scope === "project") {
+    if (blindMode === false) {
+      return `<p><strong>${inviterName}</strong> invited you to review the prompt <strong>${scopeName}</strong>.</p><p>You'll see the full prompt, model, and outputs, and leave feedback the author can act on.</p>`;
+    }
+    if (blindMode === true) {
+      return `<p><strong>${inviterName}</strong> invited you to blind-review the prompt <strong>${scopeName}</strong>.</p><p>Outputs are shuffled and labeled to remove bias — rate each one without seeing which prompt version or model produced it.</p>`;
+    }
     return `<p><strong>${inviterName}</strong> invited you to collaborate on the prompt <strong>${scopeName}</strong>.</p>`;
   }
   return `<p><strong>${inviterName}</strong> invited you to evaluate the review cycle <strong>${scopeName}</strong>.</p><p>Outputs are shuffled and labeled to remove bias. Rate each one as best, acceptable, or weak.</p>`;
@@ -44,13 +71,14 @@ export const sendInvitationEmail = internalAction({
     scopeName: v.string(),
     inviterName: v.string(),
     token: v.string(),
+    blindMode: v.optional(v.boolean()),
   },
   handler: async (_ctx, args) => {
     const url = `${SITE_URL}/invite/${args.token}`;
 
     if (!process.env.RESEND_API_KEY) {
       console.log(
-        `[DEV] Invitation email for ${args.recipientEmail} (${args.scope}): ${url}`,
+        `[DEV] Invitation email for ${args.recipientEmail} (${args.scope}, blind=${args.blindMode ?? "n/a"}): ${url}`,
       );
       return;
     }
@@ -59,10 +87,10 @@ export const sendInvitationEmail = internalAction({
     await resend.emails.send({
       from: "Blind Bench <noreply@blindbench.dev>",
       to: args.recipientEmail,
-      subject: subjectFor(args.scope, args.scopeName),
+      subject: subjectFor(args.scope, args.scopeName, args.blindMode),
       html: `
-        <h2>${headlineFor(args.scope)}</h2>
-        ${bodyFor(args.scope, args.scopeName, args.inviterName)}
+        <h2>${headlineFor(args.scope, args.blindMode)}</h2>
+        ${bodyFor(args.scope, args.scopeName, args.inviterName, args.blindMode)}
         <p><a href="${url}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">Accept invitation</a></p>
         <p style="color:#666;font-size:14px;">This link expires in ${args.scope === "cycle" ? "14 days" : "7 days"}.</p>
       `,
