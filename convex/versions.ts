@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
 import { validateTemplate } from "./lib/templateValidation";
 import {
@@ -364,6 +365,14 @@ export const update = mutation({
       }
     }
     await ctx.db.patch(args.versionId, { status: "current" as const });
+
+    // M26: notify non-blind reviewers (PMs/legal/etc.) that a new draft is
+    // live. Action handles the 24h-per-reviewer rate limit + Resend send.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.reviewerNotificationActions.sendNewDraftEmails,
+      { versionId: args.versionId },
+    );
   },
 });
 

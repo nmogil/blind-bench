@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { Id, Doc } from "../../../../convex/_generated/dataModel";
+import { toast } from "sonner";
 import { useProject } from "@/contexts/ProjectContext";
 import { MessageComposer } from "@/components/prompt/MessageComposer";
 import { type Annotation } from "@/components/tiptap/AnnotatedEditor";
@@ -671,10 +672,19 @@ export function VersionEditor() {
                 messages,
               )}
               onCreateAnnotation={(messageId, from, to, highlightedText, comment) => {
-                addPromptFeedback({
+                void addPromptFeedback({
                   promptVersionId: versionId as Id<"promptVersions">,
                   messageId,
                   annotationData: { from, to, highlightedText, comment },
+                }).then(() => {
+                  // M26: close the "did my feedback land?" loop for non-blind
+                  // reviewers. Editors don't need this — they see their own
+                  // feedback on their own draft and can act on it directly.
+                  if (isNonBlindReviewer) {
+                    toast.success(
+                      "Feedback submitted. The author will be notified, and you'll get an email when an improved draft is ready.",
+                    );
+                  }
                 });
               }}
               onUpdateAnnotation={(id, comment) => {

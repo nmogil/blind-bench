@@ -513,6 +513,19 @@ const schema = defineSchema({
     countB: v.number(),
   }),
 
+  // M26: dedup ledger for "new draft published" emails to non-blind
+  // reviewers. One row per (reviewer, project, version) so we can rate-limit
+  // to one email per reviewer-per-project-per-24h regardless of how many
+  // versions ship in that window.
+  reviewerNotifications: defineTable({
+    userId: v.id("users"),
+    projectId: v.id("projects"),
+    versionId: v.id("promptVersions"),
+    sentAt: v.number(),
+  })
+    .index("by_user_project", ["userId", "projectId"])
+    .index("by_version", ["versionId"]),
+
   // M8: AI Run Assistant — post-run insights
   runInsights: defineTable({
     runId: v.id("promptRuns"),
