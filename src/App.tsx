@@ -37,6 +37,7 @@ const ReviewRunStarter = lazy(() => import("./routes/review/ReviewStarter").then
 const ReviewCycleStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewCycleStarter })));
 const InviteLanding = lazy(() => import("./routes/invite/InviteLanding").then(m => ({ default: m.InviteLanding })));
 const InvitesInbox = lazy(() => import("./routes/invite/InvitesInbox").then(m => ({ default: m.InvitesInbox })));
+const ProjectReview = lazy(() => import("./routes/review/ProjectReview").then(m => ({ default: m.ProjectReview })));
 const RunConfigurator = lazy(() => import("./routes/orgs/projects/RunConfigurator").then(m => ({ default: m.RunConfigurator })));
 const CyclesList = lazy(() => import("./routes/orgs/projects/cycles/CyclesList").then(m => ({ default: m.CyclesList })));
 const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreator").then(m => ({ default: m.CycleCreator })));
@@ -66,6 +67,7 @@ export function App() {
           <Route path="/review/session/:sessionId" element={<SessionDeck />} />
           <Route path="/review/start/run/:runId" element={<ReviewRunStarter />} />
           <Route path="/review/start/cycle/:cycleId" element={<ReviewCycleStarter />} />
+          <Route path="/review/:projectId" element={<ProjectReview />} />
           <Route path="/orgs/:orgSlug" element={<OrgLayout />}>
             <Route index element={<OrgHome />} />
             <Route path="settings" element={<OrgSettings />} />

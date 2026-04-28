@@ -151,14 +151,14 @@ function AuthenticatedAccept({
     setAccepting(true);
     void acceptWithAuth({ token })
       .then((res) => {
-        navigate(routeForAccepted(res), { replace: true });
+        navigate(routeForAccepted(res, meta.blindMode), { replace: true });
       })
       .catch((err) => {
         ran.current = false;
         setAccepting(false);
         toast.error(friendlyError(err, "Failed to accept invitation."));
       });
-  }, [acceptWithAuth, currentUser, emailMismatch, navigate, token]);
+  }, [acceptWithAuth, currentUser, emailMismatch, meta.blindMode, navigate, token]);
 
   if (emailMismatch) {
     return (
@@ -221,16 +221,23 @@ function UnauthenticatedPath({
   );
 }
 
-function routeForAccepted(res: {
-  scope: "org" | "project" | "cycle";
-  scopeId: string;
-}): string {
+function routeForAccepted(
+  res: {
+    scope: "org" | "project" | "cycle";
+    scopeId: string;
+  },
+  blindMode: boolean | undefined,
+): string {
   if (res.scope === "cycle") {
     return `/review/start/cycle/${res.scopeId}`;
   }
   if (res.scope === "project") {
-    // Project routes are nested under an org slug we don't know yet; land on
-    // dashboard and let the root redirect bounce the user into the right org.
+    // M26: non-blind reviewers land on the simplified review home. Editors
+    // and blind evaluators bounce through the root redirect (org dashboard
+    // for editors; /eval inbox for blind evaluators).
+    if (blindMode === false) {
+      return `/review/${res.scopeId}`;
+    }
     return "/";
   }
   return "/";

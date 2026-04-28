@@ -183,7 +183,19 @@ export const list = query({
     const version = await ctx.db.get(args.versionId);
     if (!version) return [];
 
-    await requireProjectRole(ctx, version.projectId, ["owner", "editor"]);
+    // M26: non-blind reviewers can read runs (criterion #4 of #163). Blind
+    // evaluators stay denied — they only see runs through the session flow.
+    const { collaborator } = await requireProjectRole(
+      ctx,
+      version.projectId,
+      ["owner", "editor", "evaluator"],
+    );
+    if (
+      collaborator.role === "evaluator" &&
+      (collaborator.blindMode ?? true)
+    ) {
+      throw new Error("Permission denied");
+    }
 
     const runs = await ctx.db
       .query("promptRuns")
@@ -214,7 +226,19 @@ export const get = query({
     const run = await ctx.db.get(args.runId);
     if (!run) return null;
 
-    await requireProjectRole(ctx, run.projectId, ["owner", "editor"]);
+    // M26: non-blind reviewers can read runs (criterion #4 of #163). Blind
+    // evaluators stay denied.
+    const { collaborator } = await requireProjectRole(
+      ctx,
+      run.projectId,
+      ["owner", "editor", "evaluator"],
+    );
+    if (
+      collaborator.role === "evaluator" &&
+      (collaborator.blindMode ?? true)
+    ) {
+      throw new Error("Permission denied");
+    }
 
     const outputs = await ctx.db
       .query("runOutputs")

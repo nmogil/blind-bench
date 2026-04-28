@@ -89,7 +89,20 @@ export const get = query({
     const version = await ctx.db.get(args.versionId);
     if (!version) return null;
 
-    await requireProjectRole(ctx, version.projectId, ["owner", "editor"]);
+    // M26: non-blind reviewers can read versions just like editors. Blind
+    // evaluators stay denied — they reach prompt content only via the
+    // session-scoped blind surface.
+    const { collaborator } = await requireProjectRole(
+      ctx,
+      version.projectId,
+      ["owner", "editor", "evaluator"],
+    );
+    if (
+      collaborator.role === "evaluator" &&
+      (collaborator.blindMode ?? true)
+    ) {
+      throw new Error("Permission denied");
+    }
     return version;
   },
 });
@@ -97,7 +110,17 @@ export const get = query({
 export const getCurrent = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    const { collaborator } = await requireProjectRole(ctx, args.projectId, [
+      "owner",
+      "editor",
+      "evaluator",
+    ]);
+    if (
+      collaborator.role === "evaluator" &&
+      (collaborator.blindMode ?? true)
+    ) {
+      throw new Error("Permission denied");
+    }
 
     const versions = await ctx.db
       .query("promptVersions")

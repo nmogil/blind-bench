@@ -250,7 +250,13 @@ export const get = query({
       )
       .unique();
     if (!collaborator) throw new Error("Permission denied");
-    return { project, role: collaborator.role };
+    return {
+      project,
+      role: collaborator.role,
+      // M26: surfaces non-blind reviewer status to layouts so they can
+      // route open reviewers differently from blind ones.
+      blindMode: collaborator.blindMode ?? null,
+    };
   },
 });
 

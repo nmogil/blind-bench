@@ -32,10 +32,12 @@ export function ProjectLayout() {
     return <Navigate to={`/orgs/${orgSlug}`} replace />;
   }
 
-  const { project, role } = result;
+  const { project, role, blindMode } = result;
 
-  // Evaluators must not see any project content
-  if (role === "evaluator") {
+  // M26: blind evaluators must not see any project content. Non-blind
+  // reviewers fall through to the standard layout so deep links (run views,
+  // version pages) still work — their primary entry point is /review/:projectId.
+  if (role === "evaluator" && blindMode !== false) {
     return <Navigate to="/eval" replace />;
   }
 
