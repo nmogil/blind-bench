@@ -112,8 +112,8 @@ function InviteHeader({ meta }: { meta: InviteMeta }) {
       {isReviewerRole && meta.blindMode !== undefined && (
         <p className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
           {meta.blindMode
-            ? "You'll rate outputs without seeing which prompt version or model produced them. Designed to keep feedback unbiased."
-            : "You'll see the full prompt, model, and outputs, and leave feedback the author can act on."}
+            ? "You'll rate example outputs without seeing the prompt or other reviewers' comments. Designed to keep feedback unbiased."
+            : "You'll see the full prompt and leave feedback on example outputs. The author will act on what you write."}
         </p>
       )}
     </div>

@@ -28,6 +28,19 @@ A highlight + comment on a specific range of text, created via the Tiptap editor
 
 An image file stored in Convex file storage and wired into a run for vision models. Two flavors: **prompt attachments** live on a [[#Version]] and are included in every run of that version; **test-case attachments** live on a [[#Test case]] and are included only when that test case runs. Never stored as URLs — always resolved via `ctx.storage.getUrl()` at read time. See [[Blind Bench - Architecture#File Storage & DB Size]].
 
+### Blind Mode
+
+A per-invite, per-collaborator boolean flag (`projectCollaborators.blindMode`, `invitations.blindMode`) that gates whether a [[#Reviewer]] sees the prompt or only blinded [[#Output]]s. Introduced in M26. Only meaningful when `role === "evaluator"`; ignored for [[#Owner (role)]] / [[#Editor (role)]] / org roles.
+
+- **Blind reviewer** (`blindMode === true` or absent): today's evaluator behavior. Sees only A/B/C-labeled outputs and leaves [[#Output feedback]]. Cannot see the [[#Version]], the model, or who else has reviewed. Routed to `/eval`.
+- **Open reviewer** (`blindMode === false`): can read the prompt and outputs in full, sees author attribution on peer comments, and lands on `/review/:projectId`. Designed for non-technical stakeholders (PM, legal, domain expert) who need context to give useful feedback.
+
+**Rule 7 invariant** (from [[Blind Bench - UX Spec#10 Blind eval security rules]]): Blind Mode cannot retroactively re-blind information a reviewer has already seen. Switching a reviewer from blind → open is fine; the reverse is not, and the schema does not support changing the flag on a live row in v1 — it's set at invite time and propagates to `projectCollaborators` on accept.
+
+**Code literal:** the role string remains `"evaluator"` in `projectCollaborators.role` regardless of Blind Mode. The user-facing label is "Reviewer" (or "Blind reviewer") via `RoleBadge`. A future milestone may rename the literal to `"reviewer"`.
+
+Gating helper: `isBlindReviewer(ctx, projectId)` in `convex/lib/auth.ts`. Every blind-eval security filter rides on it instead of `role === "evaluator"`.
+
 ### Blind label
 
 The neutral identifier (`A`, `B`, `C`, ...) shown to an [[#Evaluator (role)]] in place of any version or run metadata. The `<BlindLabelBadge>` component in [[Blind Bench - UX Spec#5 Component inventory]] renders this. Blind labels are the only user-visible identifier on an [[#Output]] in the evaluator view.
@@ -107,6 +120,15 @@ A named placeholder (e.g., `{{customer_name}}`) that can appear in a [[#Version]
 ### Prompt feedback
 
 An [[#Annotation]] on a specific range of a [[#Version]]'s system message or user template. Distinct from [[#Output feedback]]. Feeds the [[#Optimizer meta-prompt]] alongside output feedback. Evaluators cannot leave prompt feedback (they don't see the prompt).
+
+### Reviewer
+
+User-facing label for a [[#Collaborator]] with `role === "evaluator"`. Two flavors, distinguished by [[#Blind Mode]]:
+
+- **Reviewer (open)** — `blindMode === false`. Sees the prompt, model, and peer comments. Primary persona: non-technical stakeholder (PM, legal, domain expert). Lands on `/review/:projectId`. Can leave [[#Prompt feedback]] and [[#Output feedback]] but cannot edit, run, or trigger optimization.
+- **Reviewer (blind)** — `blindMode === true` or absent. Today's `Evaluator (role)` behavior. Sees only A/B/C-labeled outputs in a session. Lands on `/eval`.
+
+The `evaluator` literal is retained in code (`projectCollaborators.role`, `cyclePreferences.source`) until a later rename milestone — see [[#Blind Mode]] for the code-literal note.
 
 ### Rollback
 

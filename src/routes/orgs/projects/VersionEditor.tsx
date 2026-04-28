@@ -429,26 +429,29 @@ export function VersionEditor() {
         </div>
       </div>
 
-      {/* Tab strip */}
-      <div className="flex items-center gap-1 border-b px-4">
-        <TabButton
-          label="Prompt"
-          active={activeTab === "prompt"}
-          onClick={() => switchTab("prompt")}
-        />
-        <TabButton
-          label="Feedback"
-          count={feedbackCount?.total}
-          active={activeTab === "feedback"}
-          onClick={() => switchTab("feedback")}
-        />
-        <TabButton
-          label="Runs"
-          count={recentRuns?.length}
-          active={activeTab === "runs"}
-          onClick={() => switchTab("runs")}
-        />
-      </div>
+      {/* Tab strip — Feedback / Runs are author concerns; reviewers stay on
+          a single Prompt view. */}
+      {!isNonBlindReviewer && (
+        <div className="flex items-center gap-1 border-b px-4">
+          <TabButton
+            label="Prompt"
+            active={activeTab === "prompt"}
+            onClick={() => switchTab("prompt")}
+          />
+          <TabButton
+            label="Feedback"
+            count={feedbackCount?.total}
+            active={activeTab === "feedback"}
+            onClick={() => switchTab("feedback")}
+          />
+          <TabButton
+            label="Runs"
+            count={recentRuns?.length}
+            active={activeTab === "runs"}
+            onClick={() => switchTab("runs")}
+          />
+        </div>
+      )}
 
       {/* Status messages */}
       {error && (
@@ -462,8 +465,10 @@ export function VersionEditor() {
         </div>
       )}
 
-      {/* Blind eval explanation — only on Prompt tab to keep other tabs clean */}
-      {activeTab === "prompt" && (
+      {/* Blind eval explanation — only on Prompt tab to keep other tabs clean.
+          Hidden for non-blind reviewers (this copy is for editors deciding
+          whether to send their work out for evaluation). */}
+      {activeTab === "prompt" && !isNonBlindReviewer && (
         <OnboardingCallout
           calloutKey="onboarding_blind_eval"
           className="mx-4 mt-2"
@@ -652,16 +657,26 @@ export function VersionEditor() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-medium">Messages</Label>
+              <Label className="text-sm font-medium">
+                {isNonBlindReviewer ? "Instructions" : "Messages"}
+              </Label>
             </div>
-            <OnboardingCallout
-              calloutKey="onboarding_write_template"
-              prerequisiteDismissed="onboarding_add_variable"
-              className="mb-2"
-            >
-              Author the turns you want sent to the LLM. Use {"{{variableName}}"}{" "}
-              anywhere — Blind Bench substitutes values per test case.
-            </OnboardingCallout>
+            {!isNonBlindReviewer && (
+              <OnboardingCallout
+                calloutKey="onboarding_write_template"
+                prerequisiteDismissed="onboarding_add_variable"
+                className="mb-2"
+              >
+                Author the turns you want sent to the LLM. Use {"{{variableName}}"}{" "}
+                anywhere — Blind Bench substitutes values per test case.
+              </OnboardingCallout>
+            )}
+            {isNonBlindReviewer && (
+              <p className="mb-3 rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Highlight any text below and add a comment to leave feedback for
+                the author. Your feedback shapes the next draft.
+              </p>
+            )}
             <MessageComposer
               messages={messages}
               onChange={setMessages}

@@ -54,12 +54,12 @@ function bodyFor(
   }
   if (scope === "project") {
     if (blindMode === false) {
-      return `<p><strong>${inviterName}</strong> invited you to review the prompt <strong>${scopeName}</strong>.</p><p>You'll see the full prompt, model, and outputs, and leave feedback the author can act on.</p>`;
+      return `<p><strong>${inviterName}</strong> invited you to review <strong>${scopeName}</strong>.</p><p>You'll see the full prompt and leave feedback on example outputs. The author will act on what you write.</p>`;
     }
     if (blindMode === true) {
-      return `<p><strong>${inviterName}</strong> invited you to blind-review the prompt <strong>${scopeName}</strong>.</p><p>Outputs are shuffled and labeled to remove bias — rate each one without seeing which prompt version or model produced it.</p>`;
+      return `<p><strong>${inviterName}</strong> invited you to blind-review <strong>${scopeName}</strong>.</p><p>Example outputs are shuffled and labeled to remove bias. Rate each one without seeing which draft produced it.</p>`;
     }
-    return `<p><strong>${inviterName}</strong> invited you to collaborate on the prompt <strong>${scopeName}</strong>.</p>`;
+    return `<p><strong>${inviterName}</strong> invited you to collaborate on <strong>${scopeName}</strong>.</p>`;
   }
   return `<p><strong>${inviterName}</strong> invited you to evaluate the review cycle <strong>${scopeName}</strong>.</p><p>Outputs are shuffled and labeled to remove bias. Rate each one as best, acceptable, or weak.</p>`;
 }

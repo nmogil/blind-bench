@@ -173,8 +173,14 @@ function MessageBlock({
   role: "system" | "developer" | "user" | "assistant";
   content: string;
 }) {
+  // Reviewer-friendly labels — "system message" / "user template" / etc.
+  // become "Instructions" / "Example question" / "Sample answer".
   const label =
-    role === "user" ? "User" : role === "assistant" ? "Assistant" : "System";
+    role === "user"
+      ? "Example question"
+      : role === "assistant"
+        ? "Sample answer"
+        : "Instructions";
   return (
     <div className="space-y-1.5">
       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -209,14 +215,14 @@ function RunsWaitingSection({
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        Runs waiting for your feedback
+        Examples waiting for your review
       </h2>
       {runs.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-card/50 p-6">
           <EmptyState
             icon={Inbox}
             heading="You're all caught up"
-            description="No runs are waiting for your feedback right now. New runs from the author will show up here automatically."
+            description="Nothing is waiting for your feedback right now. New examples from the author will show up here automatically."
           />
         </div>
       ) : (
@@ -240,7 +246,7 @@ function RunsWaitingSection({
                   </Avatar>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
-                      {run.testCaseName ?? "Untitled run"}
+                      {run.testCaseName ?? "Untitled example"}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {run.triggeredByName ?? "Author"} ·{" "}
