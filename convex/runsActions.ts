@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import {
   streamChatCompletion,
   type OpenRouterMessage,
@@ -11,6 +11,8 @@ import {
 import { captureEvent, captureException } from "./lib/posthog";
 import { readMessages, type PromptMessage } from "./lib/messages";
 
+const TEMPLATE_TOKEN_PATTERN = /\{\{(\w+)\}\}/g;
+
 /**
  * Replace {{varName}} placeholders with values from the test case.
  */
@@ -18,9 +20,121 @@ function substituteVariables(
   template: string,
   variableValues: Record<string, string>,
 ): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, name: string) => {
+  return template.replace(TEMPLATE_TOKEN_PATTERN, (match, name: string) => {
     return variableValues[name] ?? match;
   });
+}
+
+type ImageVarInfo = {
+  required: boolean;
+};
+
+/**
+ * Build a content[] array for a single user message, splicing image_url blocks
+ * at every {{imageVar}} token position. Surrounding text segments become text
+ * blocks; text-typed variables substitute inline. Returns `null` when the
+ * message contains zero image tokens — caller falls back to the plain string
+ * path so non-vision runs stay unchanged on the wire.
+ */
+async function buildUserContent(
+  ctx: { storage: { get: (id: Id<"_storage">) => Promise<Blob | null> } },
+  rawText: string,
+  variableValues: Record<string, string>,
+  imageVars: Map<string, ImageVarInfo>,
+  variableAttachments: Record<string, Id<"_storage">>,
+  testCaseLabel: string,
+): Promise<MessageContent | null> {
+  if (imageVars.size === 0) return null;
+
+  // Quick scan — if the message references no image variables, skip the
+  // expensive blob fetch path entirely.
+  let hasImageToken = false;
+  TEMPLATE_TOKEN_PATTERN.lastIndex = 0;
+  let scan: RegExpExecArray | null;
+  while ((scan = TEMPLATE_TOKEN_PATTERN.exec(rawText)) !== null) {
+    if (imageVars.has(scan[1]!)) {
+      hasImageToken = true;
+      break;
+    }
+  }
+  if (!hasImageToken) return null;
+
+  const parts: Array<
+    { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }
+  > = [];
+  let cursor = 0;
+  TEMPLATE_TOKEN_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = TEMPLATE_TOKEN_PATTERN.exec(rawText)) !== null) {
+    const name = match[1]!;
+    const start = match.index;
+    const end = start + match[0].length;
+    const imageInfo = imageVars.get(name);
+
+    if (!imageInfo) {
+      // Not an image variable — leave the token in place; the inline text
+      // substitution pass below will resolve it like any other text var.
+      continue;
+    }
+
+    // Flush preceding text (with text variables substituted) up to the token.
+    if (start > cursor) {
+      const prefix = substituteVariables(
+        rawText.slice(cursor, start),
+        variableValues,
+      );
+      if (prefix.length > 0) parts.push({ type: "text", text: prefix });
+    }
+
+    const storageId = variableAttachments[name];
+    if (!storageId) {
+      if (imageInfo.required) {
+        throw new Error(
+          `Required image variable {{${name}}} has no value on test case ${testCaseLabel}`,
+        );
+      }
+      // Optional + missing: substitute empty string (drop the token entirely).
+    } else {
+      const blob = await ctx.storage.get(storageId);
+      if (!blob) {
+        throw new Error(
+          `Image variable {{${name}}} references missing storage on test case ${testCaseLabel}`,
+        );
+      }
+      const dataUrl = await blobToDataUrl(blob);
+      parts.push({ type: "image_url", image_url: { url: dataUrl } });
+    }
+
+    cursor = end;
+  }
+
+  // Flush trailing text after the last token.
+  if (cursor < rawText.length) {
+    const tail = substituteVariables(
+      rawText.slice(cursor),
+      variableValues,
+    );
+    if (tail.length > 0) parts.push({ type: "text", text: tail });
+  }
+
+  return parts;
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  // Chunk to avoid blowing the stack on large files (5MB ≈ 5M iterations
+  // through String.fromCharCode.apply otherwise).
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)),
+    );
+  }
+  const base64 = btoa(binary);
+  const mime = blob.type || "application/octet-stream";
+  return `data:${mime};base64,${base64}`;
 }
 
 export const executeRunAction = internalAction({
@@ -42,7 +156,14 @@ export const executeRunAction = internalAction({
 
     // 1. Load full context
     const context = await ctx.runQuery(internal.runs.getRunContext, { runId });
-    const { run, version, testCase, promptAttachments, organizationId } = context;
+    const {
+      run,
+      version,
+      testCase,
+      variables,
+      promptAttachments,
+      organizationId,
+    } = context;
 
     // 2. Decrypt org's OpenRouter key
     let apiKey: string;
@@ -81,8 +202,11 @@ export const executeRunAction = internalAction({
       ctx,
       authoredMessages,
       testCase.variableValues,
+      testCase.variableAttachments ?? {},
+      variables,
       testCase.attachmentIds,
       promptAttachments.map((a) => a.storageId),
+      run.testCaseId ?? null,
     );
 
     // 6. Fire 3 parallel streaming calls
@@ -165,29 +289,78 @@ export const executeRunAction = internalAction({
 });
 
 async function buildDispatchMessages(
-  ctx: { storage: { getUrl: (id: Id<"_storage">) => Promise<string | null> } },
+  ctx: {
+    storage: {
+      get: (id: Id<"_storage">) => Promise<Blob | null>;
+      getUrl: (id: Id<"_storage">) => Promise<string | null>;
+    };
+  },
   authored: PromptMessage[],
   variableValues: Record<string, string>,
+  variableAttachments: Record<string, Id<"_storage">>,
+  projectVariables: Doc<"projectVariables">[],
   testCaseAttachmentIds: Id<"_storage">[],
   promptAttachmentIds: Id<"_storage">[],
+  testCaseId: Id<"testCases"> | null,
 ): Promise<OpenRouterMessage[]> {
+  const imageVars = new Map<string, ImageVarInfo>();
+  for (const pv of projectVariables) {
+    if (pv.type === "image") {
+      imageVars.set(pv.name, { required: pv.required });
+    }
+  }
+
   const allAttachmentIds = [...promptAttachmentIds, ...testCaseAttachmentIds];
   const lastUserIndex = findLastIndex(authored, (m) => m.role === "user");
+  const testCaseLabel = testCaseId ?? "(quick run)";
 
   const out: OpenRouterMessage[] = [];
   for (let i = 0; i < authored.length; i++) {
     const m = authored[i]!;
     const rawText =
       m.role === "assistant" ? (m.content ?? "") : m.content;
+
+    // Image variables are user-only (M21.3 enforces this at save time, but
+    // we still treat non-user roles as plain-text-substituted to be safe).
+    let imageContent: MessageContent | null = null;
+    if (m.role === "user") {
+      imageContent = await buildUserContent(
+        ctx,
+        rawText,
+        variableValues,
+        imageVars,
+        variableAttachments,
+        String(testCaseLabel),
+      );
+    }
+
+    const isLastUser = m.role === "user" && i === lastUserIndex;
+
+    if (imageContent !== null) {
+      const parts = imageContent as Array<
+        | { type: "text"; text: string }
+        | { type: "image_url"; image_url: { url: string } }
+      >;
+      // Append legacy promptAttachments + testCase.attachmentIds to the last
+      // user message so existing vision runs keep working.
+      if (isLastUser && allAttachmentIds.length > 0) {
+        for (const storageId of allAttachmentIds) {
+          const url = await ctx.storage.getUrl(storageId);
+          if (url) {
+            parts.push({ type: "image_url", image_url: { url } });
+          }
+        }
+      }
+      out.push({ role: "user", content: parts });
+      continue;
+    }
+
     const text = substituteVariables(rawText, variableValues);
 
-    // Attach vision parts to the last user message so existing vision runs
-    // keep working. Non-user messages always pass text-only content.
-    if (
-      m.role === "user" &&
-      i === lastUserIndex &&
-      allAttachmentIds.length > 0
-    ) {
+    // Legacy attachment path — no image-var splicing in this message, but
+    // promptAttachments / testCase.attachmentIds still need to ride on the
+    // last user turn.
+    if (isLastUser && allAttachmentIds.length > 0) {
       const content: MessageContent = [{ type: "text", text }];
       for (const storageId of allAttachmentIds) {
         const url = await ctx.storage.getUrl(storageId);

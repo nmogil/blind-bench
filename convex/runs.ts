@@ -410,6 +410,10 @@ export const getRunContext = internalQuery({
     const effectiveTestCase = testCase ?? {
       variableValues: (run.inlineVariables ?? {}) as Record<string, string>,
       attachmentIds: [] as Array<import("./_generated/dataModel").Id<"_storage">>,
+      variableAttachments: {} as Record<
+        string,
+        import("./_generated/dataModel").Id<"_storage">
+      >,
     };
 
     const project = await ctx.db.get(version.projectId);
