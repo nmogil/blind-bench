@@ -8,7 +8,9 @@ import {
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// Hardcoded fallback models — mirrors src/lib/models.ts
+// Hardcoded fallback models — mirrors src/lib/models.ts.
+// inputModalities is derived from supportsVision: vision models always include
+// "image"; OpenRouter refresh overwrites these with the live values.
 const FALLBACK_MODELS = [
   { modelId: "anthropic/claude-opus-4", name: "Claude Opus 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true, promptPricing: 15, completionPricing: 75 },
   { modelId: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", contextWindow: 200000, supportsVision: true, promptPricing: 3, completionPricing: 15 },
@@ -29,6 +31,10 @@ const FALLBACK_MODELS = [
   { modelId: "deepseek/deepseek-r1", name: "DeepSeek R1", provider: "DeepSeek", contextWindow: 163840, supportsVision: false, promptPricing: 0.55, completionPricing: 2.19 },
 ];
 
+function fallbackInputModalities(supportsVision: boolean): string[] {
+  return supportsVision ? ["text", "image"] : ["text"];
+}
+
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export const list = query({
@@ -43,6 +49,7 @@ export const list = query({
       // Return fallback shape without persisting
       return FALLBACK_MODELS.map((m) => ({
         ...m,
+        inputModalities: fallbackInputModalities(m.supportsVision),
         _id: null,
         lastRefreshedAt: 0,
       }));
@@ -55,6 +62,7 @@ export const list = query({
         provider: m.provider,
         contextWindow: m.contextWindow,
         supportsVision: m.supportsVision,
+        inputModalities: m.inputModalities,
         promptPricing: m.promptPricing,
         completionPricing: m.completionPricing,
         _id: m._id,
@@ -108,7 +116,7 @@ export const refreshAction = internalAction({
         id: string;
         name: string;
         context_length?: number;
-        architecture?: { modality?: string };
+        architecture?: { modality?: string; input_modalities?: string[] };
         pricing?: { prompt?: string; completion?: string };
       }>;
     };
@@ -129,13 +137,22 @@ export const refreshAction = internalAction({
         // Convert from per-token string to per-1M-tokens number
         const promptPrice = parseFloat(m.pricing!.prompt!) * 1_000_000;
         const completionPrice = parseFloat(m.pricing!.completion!) * 1_000_000;
+        const inputModalities = Array.isArray(m.architecture?.input_modalities)
+          ? m.architecture!.input_modalities!
+          : undefined;
+        // Prefer input_modalities when present; modality string is a coarser
+        // fallback for older catalog entries.
+        const supportsVision = inputModalities
+          ? inputModalities.includes("image")
+          : (m.architecture?.modality ?? "").includes("image");
 
         return {
           modelId: m.id,
           name: m.name,
           provider,
           contextWindow: m.context_length ?? 0,
-          supportsVision: (m.architecture?.modality ?? "").includes("image"),
+          supportsVision,
+          inputModalities,
           promptPricing: Math.round(promptPrice * 100) / 100,
           completionPricing: Math.round(completionPrice * 100) / 100,
           lastRefreshedAt: Date.now(),
@@ -164,6 +181,7 @@ export const upsertModels = internalMutation({
         provider: v.string(),
         contextWindow: v.number(),
         supportsVision: v.boolean(),
+        inputModalities: v.optional(v.array(v.string())),
         promptPricing: v.number(),
         completionPricing: v.number(),
         lastRefreshedAt: v.number(),
@@ -195,6 +213,7 @@ export const seedFromHardcoded = internalMutation({
     for (const model of FALLBACK_MODELS) {
       await ctx.db.insert("modelCatalog", {
         ...model,
+        inputModalities: fallbackInputModalities(model.supportsVision),
         lastRefreshedAt: Date.now(),
       });
     }

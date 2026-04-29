@@ -10,6 +10,7 @@ import { requireProjectRole } from "./lib/auth";
 import { getBlindLabels, validateSlotConfigs } from "./lib/slotConfig";
 import { collectReferencedVariables } from "./lib/templateValidation";
 import { readMessages } from "./lib/messages";
+import { modelSupportsImages } from "./lib/modelCapabilities";
 
 const CONCURRENT_CAP = 10;
 
@@ -50,12 +51,15 @@ export const execute = mutation({
 
     // Verify test case belongs to same project (when using test case)
     let testCaseVarValues: Record<string, string> | undefined;
+    let testCaseHasImages = false;
     if (args.testCaseId) {
       const testCase = await ctx.db.get(args.testCaseId);
       if (!testCase || testCase.projectId !== version.projectId) {
         throw new Error("Test case not found");
       }
       testCaseVarValues = testCase.variableValues;
+      testCaseHasImages =
+        Object.keys(testCase.variableAttachments ?? {}).length > 0;
     }
 
     // Required-variable check — applies across every message in messages[] so
@@ -119,6 +123,22 @@ export const execute = mutation({
     const labels = isMix
       ? getBlindLabels(args.slotConfigs!.length)
       : getBlindLabels(3);
+
+    // M21.7: vision capability gate. If the test case binds image variables,
+    // every dispatched model must accept image input. Fail fast with a named
+    // model so the user can pick an alternative without waiting on a real run.
+    if (testCaseHasImages) {
+      const modelsToCheck = isMix
+        ? Array.from(new Set(args.slotConfigs!.map((s) => s.model)))
+        : [args.model];
+      for (const modelId of modelsToCheck) {
+        if (!(await modelSupportsImages(ctx, modelId))) {
+          throw new Error(
+            `Model ${modelId} doesn't support image inputs. Choose a vision-capable model.`,
+          );
+        }
+      }
+    }
 
     // Create run
     const runId = await ctx.db.insert("promptRuns", {

@@ -528,6 +528,12 @@ const schema = defineSchema({
     provider: v.string(),
     contextWindow: v.number(),
     supportsVision: v.boolean(),
+    // M21.7: raw `architecture.input_modalities` from OpenRouter (e.g.
+    // ["text", "image"]). Authoritative source for vision capability gating;
+    // `supportsVision` stays as the legacy boolean derived from `modality`.
+    // Absent on rows refreshed before M21.7 — readers must fall back to
+    // `supportsVision`.
+    inputModalities: v.optional(v.array(v.string())),
     promptPricing: v.number(),
     completionPricing: v.number(),
     lastRefreshedAt: v.number(),
