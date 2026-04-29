@@ -453,6 +453,15 @@ Reusable components referenced across the screen catalog. Each is a single well-
 - **`<ConcurrentRunGauge>`** — Small gauge showing in-flight runs vs the soft cap (e.g., "3 / 10 in flight"). Appears in the version editor's Run button area when runs > 0.
 - **`<EmptyState>`** — Illustration slot + headline + description + CTA button. Used across every list view. See [Section 9](#9-empty--error--loading-state-catalog) for the specific copies.
 - **`<CommandPalette>`** — `⌘K` fuzzy finder across projects, versions, test cases, runs, and primary actions ("New project", "New test case"). Keyboard-only navigation inside the palette.
+- **`<AnnotationToolbar>`** — Floating, draggable comment surface for the eval grid. Hosts `<LabelPicker>` + textarea + submit. See [§8.8](#88-annotation-toolbar-floating-draggable). Falls back to a bottom-sheet on touch / narrow viewports.
+- **`<LabelPicker>`** — Conventional-comments-style label picker with six categories (suggestion / issue / praise / question / nitpick / thought). Tonal pill, OKLch-derived tint background. See [§8.10](#810-conventional-label-picker).
+- **`<OptimizerMarker>`** — Sparkle gutter marker on lines the optimizer changed. Click → popover with per-change rationale. See [§8.9](#89-optimizer-markers-inline-sparkles).
+- **`<OptimizerHistory>`** — Sidebar/dock panel listing all optimizer runs for the current version, scroll-faded. See [§8.9](#89-optimizer-markers-inline-sparkles).
+- **`<LiveLogViewer>`** — Streaming pre-formatted output with smart auto-scroll (sticks to bottom unless user scrolls up). Shows a "Jump to bottom" pill on user scroll. Truncates oversized logs with a marker. Uses the `.streaming-cursor` token while live.
+- **`<OnboardingTour>`** — Multi-step first-run dialog with staggered spring animations. See [§8.12](#812-first-run-onboarding-tour).
+- **`<CountBadge>`** — Compact monospace badge for counts on tabs and headers (annotation count, eval column count, inbox count). Variants: `default`, `subtle`, `accent`.
+- **`<CopyButton>`** — Icon button with a 1.5s "Copied" flash. Variants: `overlay` (absolutely positioned over a code block) and `inline`. Falls back to a textarea-selection method when `navigator.clipboard` is unavailable (non-HTTPS contexts).
+- **`<ScrollFade>`** — Wrapper that renders top/bottom gradient masks when child content overflows. Uses `ResizeObserver` + scroll listener; respects `prefers-reduced-motion` (instant show/hide).
 
 ---
 
@@ -616,6 +625,89 @@ When the project is at the soft cap:
 - `<ConcurrentRunGauge>` at the top of the editor's right pane shows "10 / 10" with a warning color.
 - The mutation will also throw on the server side; the client catches this and re-surfaces the same message.
 
+### 8.8 Annotation toolbar (floating, draggable)
+
+The select-to-comment surface in the eval grid uses a floating toolbar instead of an anchored popover. Reason: grid cells are narrow, and an anchored popover occludes the very text being annotated.
+
+- **Spawn.** When a reviewer makes a text selection inside an output cell of the eval grid, `<AnnotationToolbar>` fades in near the trailing end of the selection (within ~12px). On touch devices and viewports < 768px the toolbar is replaced by a bottom-sheet modal (no drag).
+- **Drag handle.** The toolbar header is the drag handle. Cursor: `grab` → `grabbing` on press. Pointer events (so it works with mouse + pen + touch+keyboard equally). The toolbar is constrained to the viewport — it cannot be dragged off-screen.
+- **Position memory.** Last-used position is held in component state for the session only. **Not** localStorage — fresh page loads recenter on the next selection. A session-scoped position is enough to keep the toolbar out of the way as the user moves down a long output.
+- **Body.** Header (drag handle + close button) → `<LabelPicker>` (see [§8.10](#810-conventional-label-picker)) → comment textarea (autofocused) → submit + cancel.
+- **Keyboard.** `Esc` closes; `Cmd/Ctrl+Enter` submits; `Tab` cycles header → label picker → textarea → submit.
+- **Reduced motion.** Open/close fades, no spring; drag is unaffected.
+- **Blind-eval rule audit.** The toolbar DOM contains zero `data-version-id`, `data-run-id`, or any attribute carrying a real ID. Submission goes through the same opaque-token mutation as the existing inline annotation flow. Snapshot test in §10.
+
+### 8.9 Optimizer markers (inline sparkles)
+
+Inline markers indicate which lines in the current version were touched by the optimizer. They are the analogue of "AI-touched" markers in collaborative editors, scoped to the structured optimizer surface — Blind Bench has **no** free-form "Ask AI" chat.
+
+- **Visual.** A small sparkle icon (`✦` or Lucide `Sparkles`) rendered in the editor gutter on every line range present in the active optimizer run's `changes[].range`. Hairline-thin so it does not steal attention from the prompt text.
+- **States.**
+  - *Pending* (optimizer in flight, change emitted): pulse animation; respects `prefers-reduced-motion`.
+  - *Settled* (optimizer complete): static.
+  - *Hovered/focused*: subtle highlight on the corresponding line range.
+- **Click → popover.** Anchored to the marker. Shows the per-change `rationale` (one paragraph, from the structured optimizer output) and a "View full optimization run" link to the optimization detail screen.
+- **Count badge.** The number of marked lines on a version surfaces as a `<CountBadge>` on the version tab, so reviewers know at a glance which versions have AI-suggested edits.
+- **History thread.** A `<OptimizerHistory>` panel (rendered in the dock per [§8.11](#811-dock-layout)) lists all optimizer runs for the current version, newest first. Each entry: timestamp, model, truncated diff preview, expand-on-click. Wrapped in `<ScrollFade>` for long histories.
+- **Streaming cursor.** While an optimizer run is in flight, the previewed text in the popover ends with `.streaming-cursor` (per the streaming token in [§8.3](#83-streaming-output-render)).
+- **Blind-eval rule audit.** Markers and history must not render real version IDs. The marker's `data-*` attributes are limited to opaque change indices (`data-change-idx`). The history panel uses the same opaque tokens used elsewhere on the eval surface; for evaluators, the optimizer panel is hidden entirely (it is editor/owner-only).
+
+### 8.10 Conventional label picker
+
+Annotation comments carry a typed label drawn from a fixed taxonomy. The label is structured signal for the optimizer (e.g., "praise" and "issue" weight differently) and shared vocabulary for reviewers.
+
+| Label | Tone | Semantic |
+|---|---|---|
+| suggestion | info | Recommend a change |
+| issue | warning | Something wrong |
+| praise | success | Positive signal |
+| question | info | Needs clarification |
+| nitpick | muted | Minor, non-blocking |
+| thought | muted | Musing, not actionable |
+
+- **Component.** `<LabelPicker>` rendered inside `<AnnotationToolbar>` and inside the existing inline annotation popover. Active label is shown as a tonal pill; tone background derives from the OKLch tint tokens (no red/green per the design rule).
+- **Default.** New annotations default to `thought` (most neutral). Existing rows pre-launch default to `thought` per the no-backfill decision.
+- **Optional `blocking` flag.** Reserved for future use; the schema supports it but the UI surfaces it only on labels that opt in (`suggestion`, `issue`). Hidden on others.
+- **Accessibility.** Each option has an `aria-label` matching the label name; selected state is announced via `aria-selected`. Keyboard navigation: arrow keys cycle, `Enter` selects.
+- **Blind-eval rule audit.** Labels are visible to all reviewer roles, but the label name itself does not encode version metadata. Safe.
+
+### 8.11 Dock layout (multi-panel workspace)
+
+The editor, eval grid, annotations, optimizer history, and run logs all compete for screen real estate. The dock lets the user arrange and resize panels per their workflow instead of forcing a single layout.
+
+- **Engine.** `dockview-react`. Theme via CSS variables bridging to existing OKLch tokens; no hex hardcoded into dockview internals.
+- **Panel registry.** A typed `PANEL_TYPES` map with one component per type:
+  - `EDITOR` — version editor / Tiptap surface
+  - `EVAL_GRID` — output grid
+  - `ANNOTATIONS` — annotation list for the current run/version
+  - `OPTIMIZER_HISTORY` — see [§8.9](#89-optimizer-markers-inline-sparkles)
+  - `RUN_LOGS` — `<LiveLogViewer>` over the streaming run
+- **Default layouts** (per route, restored from localStorage if present):
+  - **Project detail / version editor**: Editor (left, 55%) | Eval grid (right-top) | Annotations (right-bottom tab on the same group)
+  - **Run detail**: Editor (left, collapsed to 0% by default) | Run logs (center) | Eval grid (right)
+  - **Evaluator session**: Eval grid (full); Annotations only as a right sidebar. Dock chrome simplified — no add-panel menu, no panel close. **Editor / optimizer-history / run-logs are not registered for evaluator sessions.**
+- **Chrome.** All panel headers read from the `--panel-header-h` CSS token so vertical rhythm aligns across panels. Non-essential panels have a close button; an "Add panel" affordance lives in the tab strip and is gated by route.
+- **Persistence.** User layout is saved per `(userId, route)` to `localStorage` (`bb.dock.<route>.<userId>`). Server-side persistence is out of scope for M27.
+- **Keyboard.** Arrow keys cycle through tabs in the focused group. Active panel announces via `aria-live="polite"`.
+- **Responsive.** Tablet (≥ 1024px): full dock. Mobile (< 1024px): falls back to a stacked single-column layout (no dock). Evaluator session on mobile already exists today and is unaffected.
+- **Blind-eval rule audit.** The evaluator-session registry deliberately excludes any panel that could leak version metadata. The localStorage key namespaces by user, so a user with multiple roles cannot cross-contaminate layouts.
+
+### 8.12 First-run onboarding tour
+
+A guided dialog that compresses the first-run cliff (sign-in → BYOK → project → version → eval) into a single funnel. Replaces the prior plan of inline callouts only when the user is opted into the tour; the inline callouts remain as the lower-friction fallback (see [§15](#15-onboarding)).
+
+- **Trigger.** First sign-in where `users.hasSeenOnboarding === false`. Skippable; resumable from `Settings → Onboarding`.
+- **Steps.**
+  1. **Welcome.** What Blind Bench is in one paragraph; CTA "Let's set up". Includes a 3-row key-takeaways table with severity badges (frictionless feedback, BYOK, blind-by-default).
+  2. **BYOK setup.** Why BYOK (you own your keys, no middleman), where to get a key (link to OpenRouter), and an inline form to paste + save the encrypted key. Until a valid key is saved, `Next` is disabled.
+  3. **Create a project.** Inline "Create project" CTA opens the existing dialog.
+  4. **Write your first prompt.** Lands in the editor with a sample variable pre-filled.
+  5. **Run your first eval.** Lands in the run view with a sample test case.
+  6. **Done.** Recap + link to docs; sets `hasSeenOnboarding = true`.
+- **Animation.** `motion/react` staggered springs (`stiffness: 220, damping: 24`, 40ms stagger) cascade the title → description → key-takeaways → CTA. `prefers-reduced-motion` disables animation entirely (instant render).
+- **Persistence.** `users.hasSeenOnboarding` and `users.onboardingStep` are stored in Convex; reopening the tour mid-flow restores the user to their last step.
+- **Blind-eval rule audit.** Tour copy is generic — no project, version, or model name appears in dialog text. Tour does not run on `/eval/*` routes; if a user is invited as a blind reviewer before completing the tour, the eval flow takes priority and the tour is dismissed silently.
+
 ---
 
 ## 9. Empty / error / loading state catalog
@@ -691,6 +783,14 @@ Every rule has an acceptance test format you can run in devtools.
 13. **View-source and devtools do not reveal version metadata in hidden DOM nodes or data attributes.** No `data-version-id`, no `data-run-id`, no hidden `<script>` blob with the full run object. All metadata stays on the server. **Test**: open devtools elements tab, grep for `data-version`, `data-run`, `version-id`, `run-id` — zero matches.
 
 **Design principle carried forward:** Blind eval is a security surface, not a UX convenience. When in doubt, strip metadata. When extending the eval pipeline, gate on `isBlindReviewer`, never on `role === "evaluator"`.
+
+**M27 surface additions — same rules apply:**
+
+- **Annotation toolbar (§8.8).** Snapshot test: render `<AnnotationToolbar>` inside an evaluator session, grep the rendered HTML for `data-version-id`, `data-run-id`, `version-id`, `run-id` — zero matches. Submission goes through the existing opaque-token annotation mutation; no new ID surface.
+- **Optimizer markers (§8.9).** The optimizer panels (`OPTIMIZER_HISTORY`) and inline markers are not registered for evaluator sessions per §8.11. Test: visit `/eval/:opaqueRunToken` as a blind reviewer, assert no element with class containing `optimizer-marker` or `optimizer-history` is rendered.
+- **Label picker (§8.10).** Label values are vocabulary, not metadata. They appear in evaluator views without leaking version info. Test: snapshot the picker DOM, assert no `data-version-*` / `data-run-*` attributes.
+- **Dock layout (§8.11).** Evaluator-session registry is a strict subset (`EVAL_GRID`, `ANNOTATIONS`). Test: instantiate the dock with `role: "evaluator"`, assert that calling `.addPanel({ id: "EDITOR" })` throws or no-ops.
+- **Onboarding tour (§8.12).** Tour does not run on `/eval/*` routes; it dismisses silently if the only role for the current user is evaluator. Test: sign in as evaluator-only, navigate to `/eval`, assert no `[data-tour]` element renders.
 
 ---
 
@@ -853,7 +953,9 @@ Three one-time callouts shown in order, dismissible, never shown again per user:
 2. **First completed run**: callout pointing at the output text. "Select any text and press `C` to leave a comment."
 3. **First annotation saved**: callout pointing at the Request Optimization button. "Optimize to turn your feedback into a new version."
 
-No modal tour. No video. No welcome screen. Good empty states and three inline hints are enough.
+### First-run onboarding tour (M27)
+
+For users who would benefit from a guided walkthrough — particularly first-time prompt engineers and reviewers landing in an unfamiliar product — `<OnboardingTour>` (see [§8.12](#812-first-run-onboarding-tour)) opens automatically on first sign-in. It is dismissible from the first frame and resumable from `Settings → Onboarding`. Inline callouts above remain as the lower-friction fallback for users who skip the tour.
 
 ---
 

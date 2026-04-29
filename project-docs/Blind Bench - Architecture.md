@@ -30,10 +30,11 @@ tags:
 8. [Cost Controls](#cost-controls)
 9. [File Storage & DB Size](#file-storage--db-size)
 10. [Convex Function Index](#convex-function-index)
-11. [Optimizer Meta-Prompt](#optimizer-meta-prompt)
-12. [Key Design Decisions](#key-design-decisions)
-13. [v1 Scope & Deferred](#v1-scope--deferred)
-14. [Next Steps](#next-steps)
+11. [Frontend UI Layers (M27)](#frontend-ui-layers-m27)
+12. [Optimizer Meta-Prompt](#optimizer-meta-prompt)
+13. [Key Design Decisions](#key-design-decisions)
+14. [v1 Scope & Deferred](#v1-scope--deferred)
+15. [Next Steps](#next-steps)
 
 ---
 
@@ -628,7 +629,62 @@ Handled by Convex Auth. No custom code beyond provider config (Google, GitHub, m
 - `editAndAcceptOptimization` — accept with user-supplied edits.
 
 ### `convex/optimizeActions.ts`
-- `runOptimizerAction` internal action — reads the current prompt + all feedback + meta context, runs the meta-prompt through OpenRouter, writes `generatedSystemMessage`, `generatedUserTemplate`, `changesSummary`, `changesReasoning`.
+- `runOptimizerAction` internal action — reads the current prompt + all feedback + meta context, runs the meta-prompt through OpenRouter, writes `generatedSystemMessage`, `generatedUserTemplate`, `changesSummary`, `changesReasoning`. As of M27.5, also emits a `changes: [{ range: { from, to }, rationale }]` array used by the inline optimizer markers in the UI.
+
+---
+
+## Frontend UI Layers (M27)
+
+The frontend is organized into three layers. M27 codifies this split so primitives stay reusable and feature surfaces stay scannable.
+
+### Primitives (`src/components/ui/`)
+
+The shadcn-derived primitive layer. New M27 additions:
+
+| Primitive | Purpose | Notes |
+|---|---|---|
+| `CountBadge` | Compact count display on tabs / column headers / inbox items | Variants: `default`, `subtle`, `accent`. Uses tabular monospace numerics. |
+| `CopyButton` | One-click copy with a "Copied" flash | Variants: `overlay` (absolutely positioned over a code block) and `inline`. Falls back to a textarea-selection method when `navigator.clipboard` is unavailable. |
+| `ScrollFade` | Gradient masks at top/bottom of overflowing scroll containers | `ResizeObserver` + scroll listener; respects `prefers-reduced-motion`. |
+| `LiveLogViewer` | Streaming log viewer with smart auto-scroll | Sticks to bottom unless the user scrolls up (then exposes a "Jump to bottom" pill). Truncates oversized logs with a leading `[earlier output truncated]` marker. |
+
+These all live alongside existing primitives (`button`, `dialog`, `dropdown-menu`, etc.) and use the OKLch token set in `src/index.css`.
+
+### Feature components (`src/components/`)
+
+Domain components composed from primitives. New M27 additions:
+
+| Component | Path | Composes |
+|---|---|---|
+| `<AnnotationToolbar>` | `src/components/annotations/` | floating drag layer + `<LabelPicker>` + textarea + submit |
+| `<LabelPicker>` | `src/components/annotations/` | tonal pills using OKLch tint tokens |
+| `<OptimizerMarker>` | `src/components/optimizer/` | Tiptap gutter decoration + popover |
+| `<OptimizerHistory>` | `src/components/optimizer/` | scroll-faded list of optimizer runs |
+| `<OnboardingTour>` | `src/components/onboarding/` | multi-step dialog with `motion/react` springs |
+
+### Dock layout (`src/components/dock/`)
+
+`dockview-react` (~50KB gzipped) is added as a dependency to host the multi-panel workspace. The integration is intentionally thin:
+
+- `panelRegistry.ts` — typed `PANEL_TYPES` map → React component for each panel kind (`EDITOR`, `EVAL_GRID`, `ANNOTATIONS`, `OPTIMIZER_HISTORY`, `RUN_LOGS`).
+- `Dock.tsx` — wraps `DockviewReact` with theme bridging from app OKLch tokens to dockview CSS variables.
+- `defaultLayouts.ts` — per-route default layout objects; restored from localStorage if present.
+- `useDockLayout.ts` — hook to persist user-edited layouts to localStorage at `bb.dock.<route>.<userId>`.
+
+**Tradeoffs.** Dockview brings drag-to-reorder, splittable groups, and tab strips out of the box. The cost is bundle size (~50KB gzipped) and a non-trivial CSS theming surface. Considered alternatives:
+
+- **Hand-rolled split-pane (e.g. `react-resizable-panels`).** Cheaper bundle but no tab strips or drag-to-rearrange, and we'd have to design the registry layer ourselves anyway. Rejected for M27.
+- **Allotment.** Similar feature set, similar weight, less active maintenance. Rejected.
+
+If bundle size becomes a concern post-launch, the dock is structurally encapsulated behind `Dock.tsx` and the registry — swapping engines later is a localized change.
+
+### Design tokens (M27.2)
+
+`src/index.css` adds a small set of foundational tokens used across all M27 components:
+
+- **OKLch tint backgrounds** derived from base brand colors via `oklch(from var(--primary) l c h / 0.12)` syntax. Tints exist for `primary`, `success`, `warning`, `destructive`, `info`. Used for annotation severity backgrounds, label picker tones, toast variants. Diff coloring continues to follow the rule: blue/purple, never red/green.
+- **`.streaming-cursor`** class with a 1Hz blink keyframe. Pause on `prefers-reduced-motion: reduce`. Used by `<StreamingOutputPanel>`, `<LiveLogViewer>`, and the optimizer marker popover.
+- **`--panel-header-h`** CSS variable (33px) shared by all panel headers (editor, eval grid, sidebar, dock chrome) so vertical rhythm aligns regardless of which panel is mounted.
 
 ---
 

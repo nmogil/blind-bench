@@ -22,7 +22,15 @@ Terms are listed alphabetically. Each is an `h3` heading so cross-references lik
 
 ### Annotation
 
-A highlight + comment on a specific range of text, created via the Tiptap editor. The canonical feedback primitive. Stored as `{ from, to, highlightedText, comment }` on either an [[#Output]] (output feedback) or a [[#Version]] (prompt feedback). See [[Blind Bench - Architecture#Data Model (Convex Schema)]].
+A highlight + comment on a specific range of text, created via the Tiptap editor. The canonical feedback primitive. Stored as `{ from, to, highlightedText, comment, label }` on either an [[#Output]] (output feedback) or a [[#Version]] (prompt feedback). The `label` field (M27.4) is one of `suggestion / issue / praise / question / nitpick / thought` — see [[#Annotation label]]. See [[Blind Bench - Architecture#Data Model (Convex Schema)]].
+
+### Annotation label
+
+The conventional-comments-style category attached to every [[#Annotation]]. Six values: `suggestion`, `issue`, `praise`, `question`, `nitpick`, `thought`. Each maps to a tone (info / warning / success / muted) used for the tonal pill background in `<LabelPicker>`. The label is structured signal for the [[#Optimizer meta-prompt]] — different labels carry different weight in the rewrite. Introduced in M27.4. Default value on new annotations is `thought`. See [[Blind Bench - UX Spec#8.10 Conventional label picker]].
+
+### Annotation toolbar
+
+The floating, draggable comment surface for the eval grid (M27.3). Replaces the anchored popover on the eval-grid surface only — the prompt editor continues to use its inline annotation popover. Falls back to a bottom-sheet modal on touch / narrow viewports. Position is session-scoped (not persisted). See [[Blind Bench - UX Spec#8.8 Annotation toolbar (floating, draggable)]].
 
 ### Attachment
 
@@ -57,6 +65,10 @@ A user who has been invited to a [[#Project]] and holds a role of [[#Owner (role
 
 A soft cap on in-flight runs per project (default 10), enforced in `runs.execute`. Exists to prevent a runaway optimizer loop from firing thousands of streaming calls against the [[#Organization]]'s BYOK key. The only cost guardrail in v1.
 
+### Dock
+
+The resizable, tabbable, rearrangeable multi-panel workspace shipped in M27.7. Powered by `dockview-react`. Hosts five panel types: `EDITOR`, `EVAL_GRID`, `ANNOTATIONS`, `OPTIMIZER_HISTORY`, `RUN_LOGS`. Per-route default layouts are persisted per-user to localStorage. Evaluator sessions use a strict subset of panels for blind-eval safety. See [[Blind Bench - UX Spec#8.11 Dock layout (multi-panel workspace)]] and [[Blind Bench - Architecture#Frontend UI Layers (M27)]].
+
 ### Draft
 
 A [[#Version]] status. A draft version can be edited and deleted. Once set to `active` it's immutable except for status transitions. Runs and feedback only make sense against non-draft versions in v1. See [[Blind Bench - Architecture#Data Model (Convex Schema)]].
@@ -84,6 +96,10 @@ The LLM gateway Blind Bench uses for every model call. Each [[#Organization]] su
 ### Optimization request
 
 A row in the `optimizationRequests` table representing one iteration of the optimize loop: feedback in, new prompt out, human review, accept/edit/reject. Each request is bound to a single [[#Version]]. If accepted, it spawns a new `promptVersions` row linked back via `resultingVersionId`. See [[Blind Bench - Architecture#How optimization executes]].
+
+### Optimizer marker
+
+The inline sparkle icon rendered in the Tiptap editor gutter on each line range the optimizer changed in the current [[#Version]]. Click reveals the per-change `rationale` from the optimizer's structured output. Introduced in M27.5; not visible on the evaluator (`/eval`) surface. See [[Blind Bench - UX Spec#8.9 Optimizer markers (inline sparkles)]].
 
 ### Optimizer meta-prompt
 
