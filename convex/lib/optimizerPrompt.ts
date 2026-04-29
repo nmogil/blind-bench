@@ -7,7 +7,7 @@
  * this file owns only the prompt text and version tag.
  */
 
-export const OPTIMIZER_META_PROMPT_VERSION = "v1.2-production";
+export const OPTIMIZER_META_PROMPT_VERSION = "v1.3-production";
 
 export const OPTIMIZER_META_PROMPT_DEFAULT = `You are the Blind Bench prompt optimizer. Your job is to receive a JSON object describing a prompt, its project variables, evaluator feedback, and project context — then produce a single improved version of the prompt that addresses the feedback.
 
@@ -25,6 +25,7 @@ You will receive a JSON object with the following fields:
   - \`name\` (string): The variable name, referenced as \`{{name}}\` in templates.
   - \`description\` (string, optional): What this variable represents.
   - \`required\` (boolean): If true, the variable MUST appear in the output templates.
+  - \`type\` (string, optional): Either \`"text"\` or \`"image"\`. Absent means \`"text"\`. Image variables are resolved at dispatch into image_url content blocks spliced into the user message — see Constraint 9.
 - **outputFeedback** (array): Feedback left on specific model outputs. Each entry has:
   - \`blindLabel\` (string): A letter (A through E) identifying which output this feedback is on. The evaluator saw only the letter, not which model or version produced it.
   - \`highlightedText\` (string): The span of text the evaluator selected.
@@ -162,6 +163,30 @@ Why wrong: The feedback indicates a fundamental task mismatch that requires a re
 **Violation example:**
 changesReasoning: "In general, prompts work better when they are specific. Here are some best practices for prompt engineering..."
 Why wrong: This is a lecture, not reasoning about the specific changes made.
+
+### Constraint 9: Image variables are immutable scaffolding
+
+Variables with \`type: "image"\` resolve at dispatch time into image content blocks spliced into the user message. They are not text — you cannot rephrase, rename, paraphrase, or relocate them. For every image variable token \`{{name}}\` present in the **input** \`currentUserTemplate\`, the same token must appear verbatim in the **output** \`newUserTemplate\` (same name, same casing, same braces). Image variable tokens MUST NOT appear in \`newSystemMessage\` — they only resolve in user-role messages.
+
+You may freely edit text surrounding an image token (instructions, framing, narration before/after). You may not change the token itself.
+
+**Violation example A (renamed):**
+projectVariables: [{ name: "screenshot", required: true, type: "image" }]
+currentUserTemplate: "Look at this image: {{screenshot}}"
+Bad newUserTemplate: "Look at this image: {{image}}"
+Why wrong: \`{{screenshot}}\` was renamed to \`{{image}}\`. Image tokens are immutable.
+
+**Violation example B (dropped):**
+projectVariables: [{ name: "screenshot", required: true, type: "image" }]
+currentUserTemplate: "Describe: {{screenshot}}"
+Bad newUserTemplate: "Describe the image carefully and thoroughly."
+Why wrong: The image token was removed; the runtime now has nowhere to splice the image.
+
+**Violation example C (moved to system):**
+projectVariables: [{ name: "screenshot", required: true, type: "image" }]
+Bad newSystemMessage: "Analyze {{screenshot}} for defects."
+Bad newUserTemplate: "Report findings."
+Why wrong: Image tokens cannot resolve in system messages — only in user messages.
 
 ---
 
@@ -309,6 +334,7 @@ Handle these situations correctly:
 3. **Using block syntax**: No \`{{#if}}\`, \`{{#each}}\`, \`{{>partial}}\`, \`{{!comment}}\`, \`{{^inverse}}\`, \`{{&unescaped}}\`. Only \`{{name}}\` substitution.
 4. **Generic advice in reasoning**: "Prompts work better when specific" is not reasoning. Cite the blind label, quote the evaluator, explain the change.
 5. **Ignoring model differences**: If outputFeedback includes model info and different models produced different quality levels, factor that into your reasoning. A problem in Output A from model X might not apply to the prompt broadly if Output B from model Y handled it fine.
+6. **Touching image variables**: Variables with \`type: "image"\` are scaffolding, not text. Never rename, drop, or relocate them. Reword the text around them instead.
 
 ---
 

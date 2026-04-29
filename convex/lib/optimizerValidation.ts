@@ -7,6 +7,9 @@ export interface OptimizerInput {
     name: string;
     description?: string;
     required: boolean;
+    /** M21.8: variable kind. Absent = "text" (legacy). Image variables are
+     * immutable scaffolding — see image-token preservation rules below. */
+    type?: "text" | "image";
   }>;
   outputFeedback: Array<{
     blindLabel: string;
@@ -58,9 +61,22 @@ export interface OptimizerOutput {
   }>;
 }
 
+/**
+ * `errorKind: "image_var"` is the only retryable failure today. The optimizer
+ * sometimes paraphrases or relocates image tokens despite Constraint 9, and a
+ * single corrective re-prompt usually fixes it. Other validation errors are
+ * structural and non-retryable.
+ */
+type ValidationErrorKind = "image_var" | "other";
+
 type ValidationResult =
   | { ok: true; output: OptimizerOutput }
-  | { ok: false; error: string };
+  | { ok: false; error: string; errorKind: ValidationErrorKind };
+
+const fail = (
+  error: string,
+  errorKind: ValidationErrorKind = "other",
+): ValidationResult => ({ ok: false, error, errorKind });
 
 /**
  * Validates raw JSON from the optimizer LLM against all 7 failure modes.
@@ -75,19 +91,15 @@ export function validateOptimizerOutput(
   try {
     parsed = JSON.parse(rawJson);
   } catch {
-    return {
-      ok: false,
-      error:
-        "The optimizer returned malformed output. Try again or adjust the meta-prompt.",
-    };
+    return fail(
+      "The optimizer returned malformed output. Try again or adjust the meta-prompt.",
+    );
   }
 
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return {
-      ok: false,
-      error:
-        "The optimizer returned malformed output. Try again or adjust the meta-prompt.",
-    };
+    return fail(
+      "The optimizer returned malformed output. Try again or adjust the meta-prompt.",
+    );
   }
 
   // 2. Missing required fields
@@ -102,10 +114,7 @@ export function validateOptimizerOutput(
     typeof changesReasoning !== "string" ||
     changesReasoning.trim() === ""
   ) {
-    return {
-      ok: false,
-      error: "The optimizer returned an incomplete response.",
-    };
+    return fail("The optimizer returned an incomplete response.");
   }
 
   // newSystemMessage must be string or null/undefined
@@ -114,14 +123,36 @@ export function validateOptimizerOutput(
     newSystemMessage !== undefined &&
     typeof newSystemMessage !== "string"
   ) {
-    return {
-      ok: false,
-      error: "The optimizer returned an incomplete response.",
-    };
+    return fail("The optimizer returned an incomplete response.");
   }
 
   const resolvedSystemMessage =
     typeof newSystemMessage === "string" ? newSystemMessage : null;
+
+  // M21.8: image variables are immutable scaffolding (Constraint 9). Checked
+  // before unknown-variable / required-variable so that a renamed or dropped
+  // image token surfaces as a retryable image_var failure rather than the
+  // generic non-retryable error those checks would emit.
+  const imageVarNames = new Set(
+    input.projectVariables.filter((v) => v.type === "image").map((v) => v.name),
+  );
+  for (const name of imageVarNames) {
+    const pattern = `{{${name}}}`;
+    if (resolvedSystemMessage?.includes(pattern)) {
+      return fail(
+        `The optimizer placed image variable \`{{${name}}}\` in the system message. Image tokens may only appear in the user template.`,
+        "image_var",
+      );
+    }
+    const inOldTemplate = input.currentUserTemplate.includes(pattern);
+    const inNewTemplate = (newUserTemplate as string).includes(pattern);
+    if (inOldTemplate && !inNewTemplate) {
+      return fail(
+        `The optimizer dropped or renamed image variable \`{{${name}}}\`. Image tokens are immutable scaffolding — they must be preserved verbatim in the user template.`,
+        "image_var",
+      );
+    }
+  }
 
   const variableNames = input.projectVariables.map((v) => v.name);
 
@@ -133,33 +164,31 @@ export function validateOptimizerOutput(
       : [];
     const allUnknown = [...new Set([...unknownFromUser, ...unknownFromSystem])];
     if (allUnknown.length > 0) {
-      return {
-        ok: false,
-        error: `The optimizer referenced unknown variable \`{{${allUnknown[0]}}}\`.`,
-      };
+      return fail(
+        `The optimizer referenced unknown variable \`{{${allUnknown[0]}}}\`.`,
+      );
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "Unsupported template syntax") {
-      return {
-        ok: false,
-        error: "The optimizer used unsupported template syntax.",
-      };
+      return fail("The optimizer used unsupported template syntax.");
     }
-    return { ok: false, error: msg };
+    return fail(msg);
   }
 
-  // 5. Dropped required variable
-  const requiredVars = input.projectVariables.filter((v) => v.required);
+  // 5. Dropped required variable. Skip image vars — handled earlier with a
+  // stricter (and retryable) check.
+  const requiredVars = input.projectVariables.filter(
+    (v) => v.required && v.type !== "image",
+  );
   for (const v of requiredVars) {
     const pattern = `{{${v.name}}}`;
     const inTemplate = (newUserTemplate as string).includes(pattern);
     const inSystem = resolvedSystemMessage?.includes(pattern) ?? false;
     if (!inTemplate && !inSystem) {
-      return {
-        ok: false,
-        error: `The optimizer dropped a required variable (\`{{${v.name}}}\`).`,
-      };
+      return fail(
+        `The optimizer dropped a required variable (\`{{${v.name}}}\`).`,
+      );
     }
   }
 
@@ -168,10 +197,7 @@ export function validateOptimizerOutput(
   const sameSystem =
     (resolvedSystemMessage ?? null) === (input.currentSystemMessage ?? null);
   if (sameTemplate && sameSystem) {
-    return {
-      ok: false,
-      error: "The optimizer returned the same prompt — nothing to review.",
-    };
+    return fail("The optimizer returned the same prompt — nothing to review.");
   }
 
   // 7. Reasoning without citation
@@ -182,11 +208,9 @@ export function validateOptimizerOutput(
     /\bsystem[_ ]message\b/i.test(reasoning) ||
     /\buser[_ ](message[_ ])?template\b/i.test(reasoning);
   if (!hasCitation) {
-    return {
-      ok: false,
-      error:
-        "The optimizer's reasoning was not grounded in specific feedback.",
-    };
+    return fail(
+      "The optimizer's reasoning was not grounded in specific feedback.",
+    );
   }
 
   // 8. Optional structured changes (M27.5). If present and well-formed, pass
