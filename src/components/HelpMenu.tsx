@@ -28,11 +28,13 @@ import {
   Info,
   FileText,
   Shield,
+  Sparkles,
 } from "lucide-react";
 
 export function HelpMenu() {
   const resetCallouts = useMutation(api.userPreferences.resetCallouts);
   const undismissCallout = useMutation(api.userPreferences.undismissCallout);
+  const setTourStatus = useMutation(api.userPreferences.setTourStatus);
   const navigate = useNavigate();
   const { openChecklist } = useOnboardingChecklist();
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -53,6 +55,14 @@ export function HelpMenu() {
           >
             <BookOpen className="mr-2 h-4 w-4" />
             Restart setup guide
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              void setTourStatus({ status: "in_progress", step: 0 })
+            }
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Replay first-run tour
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => toggleCheatSheet()}>
             <Keyboard className="mr-2 h-4 w-4" />

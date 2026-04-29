@@ -498,6 +498,20 @@ const schema = defineSchema({
   userPreferences: defineTable({
     userId: v.id("users"),
     dismissedCallouts: v.array(v.string()),
+    // M27.8: first-run tour state. tourStatus drives the tour modal:
+    //   "unstarted" — show on first sign-in (default for new users)
+    //   "in_progress" — resume at tourStep on next sign-in
+    //   "skipped" — user dismissed; reopenable from Settings
+    //   "completed" — user finished all six steps
+    tourStatus: v.optional(
+      v.union(
+        v.literal("unstarted"),
+        v.literal("in_progress"),
+        v.literal("skipped"),
+        v.literal("completed"),
+      ),
+    ),
+    tourStep: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
   // M8: Model catalog (global, refreshed from OpenRouter API)

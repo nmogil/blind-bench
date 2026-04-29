@@ -147,6 +147,7 @@ function AuthGateProtected() {
     <>
       <Authenticated>
         <Outlet />
+        <OnboardingTourMount />
       </Authenticated>
       <Unauthenticated>
         <Navigate to="/auth/sign-in" replace />
@@ -155,6 +156,27 @@ function AuthGateProtected() {
         <LoadingScreen />
       </AuthLoading>
     </>
+  );
+}
+
+const OnboardingTour = lazy(() =>
+  import("@/components/onboarding/OnboardingTour").then((m) => ({
+    default: m.OnboardingTour,
+  })),
+);
+
+/**
+ * The tour is gated to non-eval routes — evaluators have their own funnel.
+ * Wrapped in Suspense so the lazy chunk doesn't block the rest of the app.
+ */
+function OnboardingTourMount() {
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/eval")) {
+    return null;
+  }
+  return (
+    <Suspense fallback={null}>
+      <OnboardingTour />
+    </Suspense>
   );
 }
 

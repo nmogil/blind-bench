@@ -10,7 +10,52 @@ export const get = query({
       .query("userPreferences")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
-    return prefs ?? { dismissedCallouts: [] as string[] };
+    return (
+      prefs ?? {
+        dismissedCallouts: [] as string[],
+        tourStatus: undefined as
+          | "unstarted"
+          | "in_progress"
+          | "skipped"
+          | "completed"
+          | undefined,
+        tourStep: undefined as number | undefined,
+      }
+    );
+  },
+});
+
+// M27.8: tour state mutations
+export const setTourStatus = mutation({
+  args: {
+    status: v.union(
+      v.literal("unstarted"),
+      v.literal("in_progress"),
+      v.literal("skipped"),
+      v.literal("completed"),
+    ),
+    step: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    const patch: Record<string, unknown> = { tourStatus: args.status };
+    if (args.step !== undefined) patch.tourStep = args.step;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+    } else {
+      await ctx.db.insert("userPreferences", {
+        userId,
+        dismissedCallouts: [],
+        tourStatus: args.status,
+        tourStep: args.step,
+      });
+    }
   },
 });
 
