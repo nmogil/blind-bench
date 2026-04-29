@@ -50,3 +50,32 @@ export function collectReferencedVariables(templates: string[]): Set<string> {
   }
   return out;
 }
+
+/**
+ * M21.3: Image variables may only appear in user-role messages. OpenRouter
+ * normalization across providers is inconsistent for system/assistant images,
+ * and Anthropic's native API rejects them outright — so we lock down to the
+ * lowest common denominator. Throws on the first violation it finds.
+ */
+export function validateImageVariablePlacement(
+  messages: ReadonlyArray<{ role: string; content?: string }>,
+  imageVariableNames: ReadonlySet<string>,
+): void {
+  if (imageVariableNames.size === 0) return;
+  const pattern = /(?<!\\)\{\{([^}]+)\}\}/g;
+  for (const msg of messages) {
+    if (msg.role === "user") continue;
+    const content = msg.content ?? "";
+    if (!content) continue;
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(content)) !== null) {
+      const name = match[1]!.trim();
+      if (imageVariableNames.has(name)) {
+        throw new Error(
+          `Image variable {{${name}}} cannot appear in ${msg.role} messages — image variables are user-message-only`,
+        );
+      }
+    }
+  }
+}

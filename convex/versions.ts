@@ -2,7 +2,10 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireProjectRole } from "./lib/auth";
-import { validateTemplate } from "./lib/templateValidation";
+import {
+  validateImageVariablePlacement,
+  validateTemplate,
+} from "./lib/templateValidation";
 import {
   deriveLegacyFields,
   genMessageId,
@@ -173,8 +176,43 @@ async function autoCreateUnknownVariables(
       name: unknown[i]!,
       required: true,
       order: maxOrder + 1 + i,
+      type: "text",
     });
   }
+}
+
+async function loadImageVariableNames(
+  ctx: { db: import("./_generated/server").QueryCtx["db"] },
+  projectId: import("./_generated/dataModel").Id<"projects">,
+): Promise<Set<string>> {
+  const variables = await ctx.db
+    .query("projectVariables")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .take(200);
+  return new Set(variables.filter((v) => v.type === "image").map((v) => v.name));
+}
+
+// Build a {role, content}[] view for validation purposes — covers both the
+// messages[] path and the legacy systemMessage + userMessageTemplate path.
+function effectiveMessagesForValidation(
+  messages: PromptMessage[] | undefined,
+  legacy: {
+    systemMessage?: string;
+    userMessageTemplate: string;
+  },
+): { role: string; content?: string }[] {
+  if (messages) {
+    return messages.map((m) => ({
+      role: m.role,
+      content: m.role === "assistant" ? (m.content ?? "") : m.content,
+    }));
+  }
+  const out: { role: string; content?: string }[] = [];
+  if (legacy.systemMessage) {
+    out.push({ role: "system", content: legacy.systemMessage });
+  }
+  out.push({ role: "user", content: legacy.userMessageTemplate });
+  return out;
 }
 
 // Normalize a client-supplied messages[] array: preserve ids but fill in any
@@ -248,6 +286,12 @@ export const create = mutation({
         );
     await autoCreateUnknownVariables(ctx, args.projectId, texts);
 
+    // M21.3: image variables may only appear in user-role messages
+    validateImageVariablePlacement(
+      effectiveMessagesForValidation(messages, legacy),
+      await loadImageVariableNames(ctx, args.projectId),
+    );
+
     // Compute next version number and archive existing current version
     const existing = await ctx.db
       .query("promptVersions")
@@ -301,6 +345,8 @@ export const update = mutation({
 
     const updates: Record<string, unknown> = {};
 
+    let validationMessages: { role: string; content?: string }[];
+
     if (args.messages) {
       const normalized = normalizeMessages(args.messages);
       const legacy = deriveLegacyFields(normalized);
@@ -314,6 +360,7 @@ export const update = mutation({
         version.projectId,
         collectMessageTexts(normalized),
       );
+      validationMessages = effectiveMessagesForValidation(normalized, legacy);
     } else {
       // Legacy path — update single-string fields. Validate variable usage
       // against both the unchanged and incoming fields.
@@ -328,6 +375,11 @@ export const update = mutation({
           (s) => s.length > 0,
         ),
       );
+
+      validationMessages = effectiveMessagesForValidation(undefined, {
+        systemMessage: systemToValidate,
+        userMessageTemplate: templateToValidate,
+      });
 
       if (args.systemMessage !== undefined) updates.systemMessage = args.systemMessage;
       if (args.userMessageTemplate !== undefined)
@@ -351,6 +403,12 @@ export const update = mutation({
         if (patched) updates.messages = patched;
       }
     }
+
+    // M21.3: image variables may only appear in user-role messages
+    validateImageVariablePlacement(
+      validationMessages,
+      await loadImageVariableNames(ctx, version.projectId),
+    );
 
     await ctx.db.patch(args.versionId, updates);
 
