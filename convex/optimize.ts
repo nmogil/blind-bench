@@ -947,6 +947,7 @@ export const getOptimizationContext = internalQuery({
         name: v.name,
         description: v.description,
         required: v.required,
+        type: v.type,
       })),
       outputFeedback: outputFeedbackItems,
       overallNotes: overallNoteItems,

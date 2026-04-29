@@ -276,3 +276,113 @@ describe("validateOptimizerOutput", () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe("validateOptimizerOutput — M21.8 image variable guardrails", () => {
+  const imageInput: OptimizerInput = {
+    currentSystemMessage: "You are an image analyst.",
+    currentUserTemplate:
+      "Examine the screenshot: {{screenshot}} and report defects.",
+    projectVariables: [
+      { name: "screenshot", required: true, type: "image" },
+    ],
+    outputFeedback: [
+      {
+        blindLabel: "A",
+        highlightedText: "looks fine",
+        comment: "Missed obvious defect in the corner",
+      },
+    ],
+    overallNotes: [],
+    ratingDistribution: [],
+    headToHead: [],
+    promptFeedback: [],
+    metaContext: [],
+  };
+
+  test("preserves image token verbatim — passes", () => {
+    const result = validateOptimizerOutput(
+      JSON.stringify({
+        newSystemMessage:
+          "You are a defect-hunting image analyst. Inspect every region.",
+        newUserTemplate:
+          "Inspect this screenshot in detail: {{screenshot}}. List every visible defect, including subtle ones.",
+        changesSummary: "- Strengthened defect-hunting instructions",
+        changesReasoning:
+          "Output A missed an obvious defect; rewrote system_message and surrounding text to push exhaustive inspection.",
+      }),
+      imageInput,
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  test("dropped image token — rejected as retryable", () => {
+    const result = validateOptimizerOutput(
+      JSON.stringify({
+        newSystemMessage: "You are an image analyst.",
+        newUserTemplate:
+          "Examine the attached image carefully and report all defects.",
+        changesSummary: "- Removed redundant token",
+        changesReasoning:
+          "Output A wording in the user_template was tightened.",
+      }),
+      imageInput,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorKind).toBe("image_var");
+      expect(result.error).toContain("screenshot");
+    }
+  });
+
+  test("renamed image token — rejected as retryable", () => {
+    const result = validateOptimizerOutput(
+      JSON.stringify({
+        newSystemMessage: "You are an image analyst.",
+        newUserTemplate: "Examine: {{image}} and report defects.",
+        changesSummary: "- Renamed variable",
+        changesReasoning: "Output A user_template token was renamed for clarity.",
+      }),
+      imageInput,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorKind).toBe("image_var");
+    }
+  });
+
+  test("image token moved to system message — rejected as retryable", () => {
+    const result = validateOptimizerOutput(
+      JSON.stringify({
+        newSystemMessage:
+          "You are an image analyst examining {{screenshot}} for defects.",
+        newUserTemplate: "Report findings on the image.",
+        changesSummary: "- Moved token into system_message",
+        changesReasoning:
+          "Output A reasoning suggested the system_message could anchor the task.",
+      }),
+      imageInput,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorKind).toBe("image_var");
+      expect(result.error).toContain("system message");
+    }
+  });
+
+  test("text variable changes still tagged as 'other' (non-retryable)", () => {
+    const result = validateOptimizerOutput(
+      JSON.stringify({
+        newSystemMessage: "You are a helpful assistant.",
+        newUserTemplate: "Hello {{name}}, please help with {{task}}.",
+        changesSummary: "- No-op",
+        changesReasoning:
+          "Output A feedback didn't warrant changes to user_template.",
+      }),
+      baseInput,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errorKind).toBe("other");
+    }
+  });
+});

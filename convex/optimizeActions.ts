@@ -53,21 +53,43 @@ export const runOptimizerAction = internalAction({
       metaContext: context.metaContext,
     };
 
-    // 5. Call OpenRouter
+    // 5. Call OpenRouter — retry once on image-variable failures (Constraint 9
+    //    is a known soft spot; one corrective re-prompt typically resolves it).
+    const baseMessages = [
+      { role: "system" as const, content: getOptimizerPrompt() },
+      { role: "user" as const, content: JSON.stringify(optimizerInput) },
+    ];
     try {
-      const result = await chatCompletion({
+      let result = await chatCompletion({
         apiKey,
         model: context.request.optimizerModel,
-        messages: [
-          { role: "system", content: getOptimizerPrompt() },
-          { role: "user", content: JSON.stringify(optimizerInput) },
-        ],
+        messages: baseMessages,
         temperature: 0,
         responseFormat: { type: "json_object" },
       });
 
-      // 6. Validate the response
-      const validation = validateOptimizerOutput(result.content, optimizerInput);
+      let validation = validateOptimizerOutput(result.content, optimizerInput);
+
+      if (!validation.ok && validation.errorKind === "image_var") {
+        result = await chatCompletion({
+          apiKey,
+          model: context.request.optimizerModel,
+          messages: [
+            ...baseMessages,
+            { role: "assistant", content: result.content },
+            {
+              role: "user",
+              content:
+                `Your previous response violated Constraint 9: ${validation.error} ` +
+                `Re-emit the JSON object preserving every image variable token verbatim in newUserTemplate ` +
+                `and keeping image tokens out of newSystemMessage. Return ONLY the corrected JSON object.`,
+            },
+          ],
+          temperature: 0,
+          responseFormat: { type: "json_object" },
+        });
+        validation = validateOptimizerOutput(result.content, optimizerInput);
+      }
 
       if (!validation.ok) {
         await ctx.runMutation(internal.optimize.failOptimization, {
