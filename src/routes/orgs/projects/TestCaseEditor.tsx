@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useParams, Link } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImageVariableUploader } from "@/components/ImageVariableUploader";
 import { friendlyError } from "@/lib/errors";
 import { ArrowLeft, Paperclip } from "lucide-react";
+
+type StorageId = Id<"_storage">;
 
 export function TestCaseEditor() {
   const { projectId } = useProject();
@@ -25,9 +28,22 @@ export function TestCaseEditor() {
   );
   const variables = useQuery(api.variables.list, { projectId });
   const updateTestCase = useMutation(api.testCases.update);
+  const deleteImageBlob = useMutation(
+    api.imageVariableAttachments.deleteAttachment,
+  );
 
   const [name, setName] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [attachments, setAttachments] = useState<Record<string, StorageId>>({});
+  // Per-session metadata (filename, size) for freshly uploaded images so the
+  // UI can show those details before the test case is persisted.
+  const [pendingMeta, setPendingMeta] = useState<
+    Record<string, { filename: string; sizeBytes: number }>
+  >({});
+  // Storage IDs uploaded this session that are NOT yet persisted on the test
+  // case. If the user navigates away or replaces them, we delete the blob so
+  // we never leak orphans.
+  const pendingUploadsRef = useRef<Set<StorageId>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -43,16 +59,87 @@ export function TestCaseEditor() {
 
     setName(testCase.name);
 
-    // Merge: start with defaults from variables, overlay stored values
-    const merged: Record<string, string> = {};
+    const mergedValues: Record<string, string> = {};
     for (const v of variables) {
-      merged[v.name] = testCase.variableValues[v.name] ?? v.defaultValue ?? "";
+      mergedValues[v.name] =
+        testCase.variableValues[v.name] ?? v.defaultValue ?? "";
     }
-    setValues(merged);
+    setValues(mergedValues);
+
+    setAttachments(testCase.variableAttachments ?? {});
+    setPendingMeta({});
+    pendingUploadsRef.current = new Set();
   }, [initialized]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Best-effort orphan cleanup: any storage ID uploaded this session but not
+  // committed to the test case gets deleted on unmount.
+  useEffect(() => {
+    return () => {
+      const pending = pendingUploadsRef.current;
+      for (const storageId of pending) {
+        // Fire-and-forget — we're unmounting and don't want to block.
+        deleteImageBlob({ projectId, storageId }).catch(() => {});
+      }
+    };
+  }, [deleteImageBlob, projectId]);
+
+  function handleImageUploaded(
+    variableName: string,
+    storageId: StorageId,
+    meta: { filename: string; sizeBytes: number; mimeType: string },
+  ) {
+    // If the slot already held a pending (uploaded-but-unsaved) blob, free it
+    // immediately so a Replace doesn't leak.
+    const prev = attachments[variableName];
+    if (prev && pendingUploadsRef.current.has(prev)) {
+      pendingUploadsRef.current.delete(prev);
+      void deleteImageBlob({ projectId, storageId: prev }).catch(() => {});
+    }
+    pendingUploadsRef.current.add(storageId);
+    setAttachments((m) => ({ ...m, [variableName]: storageId }));
+    setPendingMeta((m) => ({
+      ...m,
+      [variableName]: { filename: meta.filename, sizeBytes: meta.sizeBytes },
+    }));
+  }
+
+  function handleImageRemoved(variableName: string) {
+    const prev = attachments[variableName];
+    if (prev && pendingUploadsRef.current.has(prev)) {
+      pendingUploadsRef.current.delete(prev);
+      void deleteImageBlob({ projectId, storageId: prev }).catch(() => {});
+    }
+    // Persisted (already-saved) blobs are deleted server-side on save, when
+    // testCases.update sees the slot disappear from variableAttachments.
+    setAttachments((m) => {
+      const next = { ...m };
+      delete next[variableName];
+      return next;
+    });
+    setPendingMeta((m) => {
+      const next = { ...m };
+      delete next[variableName];
+      return next;
+    });
+  }
+
+  function validateRequiredImages(): string | null {
+    if (!variables) return null;
+    for (const v of variables) {
+      if (v.type === "image" && v.required && !attachments[v.name]) {
+        return `Image variable "${v.name}" is required.`;
+      }
+    }
+    return null;
+  }
 
   async function handleSave() {
     if (!testCaseId) return;
+    const reqError = validateRequiredImages();
+    if (reqError) {
+      setError(reqError);
+      return;
+    }
     setSaving(true);
     setError("");
     setSuccess(false);
@@ -61,7 +148,10 @@ export function TestCaseEditor() {
         testCaseId: testCaseId as Id<"testCases">,
         name: name.trim(),
         variableValues: values,
+        variableAttachments: attachments,
       });
+      // Anything pending is now committed.
+      pendingUploadsRef.current = new Set();
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err) {
@@ -143,18 +233,31 @@ export function TestCaseEditor() {
                     {v.description}
                   </p>
                 )}
-                <Input
-                  id={`var-${v.name}`}
-                  value={values[v.name] ?? ""}
-                  onChange={(e) =>
-                    setValues((prev) => ({
-                      ...prev,
-                      [v.name]: e.target.value,
-                    }))
-                  }
-                  placeholder={v.defaultValue ?? ""}
-                  className="max-w-md"
-                />
+                {v.type === "image" ? (
+                  <ImageVariableUploader
+                    projectId={projectId}
+                    storageId={attachments[v.name] ?? null}
+                    pendingMeta={pendingMeta[v.name] ?? null}
+                    required={v.required}
+                    onUploaded={(storageId, meta) =>
+                      handleImageUploaded(v.name, storageId, meta)
+                    }
+                    onRemoved={() => handleImageRemoved(v.name)}
+                  />
+                ) : (
+                  <Input
+                    id={`var-${v.name}`}
+                    value={values[v.name] ?? ""}
+                    onChange={(e) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        [v.name]: e.target.value,
+                      }))
+                    }
+                    placeholder={v.defaultValue ?? ""}
+                    className="max-w-md"
+                  />
+                )}
               </div>
             ))}
           </div>

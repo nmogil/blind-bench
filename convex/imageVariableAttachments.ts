@@ -81,7 +81,16 @@ export const getUrl = query({
       "editor",
       "evaluator",
     ]);
-    return ctx.storage.getUrl(args.storageId);
+    const [url, metadata] = await Promise.all([
+      ctx.storage.getUrl(args.storageId),
+      ctx.db.system.get(args.storageId),
+    ]);
+    if (!url || !metadata) return null;
+    return {
+      url,
+      mimeType: metadata.contentType ?? "",
+      sizeBytes: metadata.size,
+    };
   },
 });
 

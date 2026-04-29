@@ -65,6 +65,13 @@ export const update = mutation({
     testCaseId: v.id("testCases"),
     name: v.optional(v.string()),
     variableValues: v.optional(v.record(v.string(), v.string())),
+    // M21.5: per-test-case image attachments keyed by variable name. When
+    // present, this is the authoritative new map; any prior storage IDs that
+    // are removed or replaced are deleted in the same transaction so we never
+    // leak orphan blobs.
+    variableAttachments: v.optional(
+      v.record(v.string(), v.id("_storage")),
+    ),
   },
   handler: async (ctx, args) => {
     const testCase = await ctx.db.get(args.testCaseId);
@@ -72,10 +79,23 @@ export const update = mutation({
 
     await requireProjectRole(ctx, testCase.projectId, ["owner", "editor"]);
 
-    const updates: Record<string, string | Record<string, string>> = {};
+    const updates: Record<string, unknown> = {};
     if (args.name !== undefined) updates.name = args.name;
     if (args.variableValues !== undefined)
       updates.variableValues = args.variableValues;
+
+    if (args.variableAttachments !== undefined) {
+      const previous = testCase.variableAttachments ?? {};
+      const next = args.variableAttachments;
+      // Delete blobs that are removed or replaced. Same-key, same-id pairs
+      // pass through untouched.
+      for (const [varName, prevId] of Object.entries(previous)) {
+        if (next[varName] !== prevId) {
+          await ctx.storage.delete(prevId);
+        }
+      }
+      updates.variableAttachments = next;
+    }
 
     await ctx.db.patch(args.testCaseId, updates);
   },
