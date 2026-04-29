@@ -44,6 +44,8 @@ import {
   Trash2,
   Plus,
   Check,
+  Image as ImageIcon,
+  Type,
 } from "lucide-react";
 
 export function Variables() {
@@ -153,6 +155,7 @@ export function Variables() {
                   <TableRow>
                     <TableHead className="w-10" />
                     <TableHead>Name</TableHead>
+                    <TableHead className="w-20">Type</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Default value</TableHead>
                     <TableHead className="w-20">Required</TableHead>
@@ -222,11 +225,32 @@ function SortableVariableRow({
         </button>
       </TableCell>
       <TableCell className="font-mono text-sm">{variable.name}</TableCell>
+      <TableCell>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                {variable.type === "image" ? (
+                  <ImageIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <Type className="h-3.5 w-3.5" />
+                )}
+                {variable.type === "image" ? "Image" : "Text"}
+              </span>
+            }
+          />
+          <TooltipContent>
+            {variable.type === "image"
+              ? "Image attachment provided per test case"
+              : "Plain text value"}
+          </TooltipContent>
+        </Tooltip>
+      </TableCell>
       <TableCell className="text-muted-foreground">
         {variable.description || "—"}
       </TableCell>
       <TableCell className="font-mono text-sm text-muted-foreground">
-        {variable.defaultValue || "—"}
+        {variable.type === "image" ? "—" : variable.defaultValue || "—"}
       </TableCell>
       <TableCell>
         {variable.required && (

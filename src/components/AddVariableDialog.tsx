@@ -13,6 +13,45 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { friendlyError } from "@/lib/errors";
+import { cn } from "@/lib/utils";
+import { Image as ImageIcon, Type } from "lucide-react";
+
+type VariableType = "text" | "image";
+
+function TypeOption({
+  selected,
+  disabled,
+  onSelect,
+  icon,
+  label,
+}: {
+  selected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        selected
+          ? "bg-background text-foreground shadow-sm"
+          : "text-muted-foreground hover:text-foreground",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
 
 interface AddVariableDialogProps {
   open: boolean;
@@ -33,6 +72,7 @@ export function AddVariableDialog({
   const [description, setDescription] = useState("");
   const [defaultValue, setDefaultValue] = useState("");
   const [required, setRequired] = useState(false);
+  const [type, setType] = useState<VariableType>("text");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,11 +84,13 @@ export function AddVariableDialog({
       setDescription(editingVariable.description ?? "");
       setDefaultValue(editingVariable.defaultValue ?? "");
       setRequired(editingVariable.required);
+      setType(editingVariable.type ?? "text");
     } else {
       setName("");
       setDescription("");
       setDefaultValue("");
       setRequired(false);
+      setType("text");
     }
     setError("");
   }, [editingVariable, open]);
@@ -65,7 +107,8 @@ export function AddVariableDialog({
           variableId: editingVariable._id,
           name: name.trim(),
           description: description.trim() || undefined,
-          defaultValue: defaultValue.trim() || undefined,
+          defaultValue:
+            type === "image" ? undefined : defaultValue.trim() || undefined,
           required,
         });
       } else {
@@ -73,8 +116,10 @@ export function AddVariableDialog({
           projectId,
           name: name.trim(),
           description: description.trim() || undefined,
-          defaultValue: defaultValue.trim() || undefined,
+          defaultValue:
+            type === "image" ? undefined : defaultValue.trim() || undefined,
           required,
+          type,
         });
       }
       onOpenChange(false);
@@ -96,6 +141,34 @@ export function AddVariableDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <div
+              role="radiogroup"
+              aria-label="Variable type"
+              className="inline-flex w-full rounded-md border bg-muted p-1"
+            >
+              <TypeOption
+                selected={type === "text"}
+                disabled={isEditing}
+                onSelect={() => setType("text")}
+                icon={<Type className="h-3.5 w-3.5" />}
+                label="Text"
+              />
+              <TypeOption
+                selected={type === "image"}
+                disabled={isEditing}
+                onSelect={() => setType("image")}
+                icon={<ImageIcon className="h-3.5 w-3.5" />}
+                label="Image"
+              />
+            </div>
+            {isEditing && (
+              <p className="text-xs text-muted-foreground">
+                Variable type is locked after creation.
+              </p>
+            )}
+          </div>
           <div className="space-y-2">
             <Label htmlFor="var-name">Name</Label>
             <Input
@@ -120,15 +193,17 @@ export function AddVariableDialog({
               placeholder="The customer's full name"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="var-default">Default value (optional)</Label>
-            <Input
-              id="var-default"
-              value={defaultValue}
-              onChange={(e) => setDefaultValue(e.target.value)}
-              placeholder="World"
-            />
-          </div>
+          {type === "text" && (
+            <div className="space-y-2">
+              <Label htmlFor="var-default">Default value (optional)</Label>
+              <Input
+                id="var-default"
+                value={defaultValue}
+                onChange={(e) => setDefaultValue(e.target.value)}
+                placeholder="World"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Checkbox
               id="var-required"
