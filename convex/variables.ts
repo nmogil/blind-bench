@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
+import { safeDeleteStorage } from "./lib/storageCleanup";
 
 export const list = query({
   args: { projectId: v.id("projects") },
@@ -136,6 +137,24 @@ export const deleteVariable = mutation({
         throw new Error(
           `This variable is used in version ${version.versionNumber}. Remove the reference first.`,
         );
+      }
+    }
+
+    // M21.10: image-typed variable removal cascades to per-test-case
+    // attachments. Delete the storage blob and patch the testCase to drop
+    // the now-stale key.
+    if ((variable.type ?? "text") === "image") {
+      const testCases = await ctx.db
+        .query("testCases")
+        .withIndex("by_project", (q) => q.eq("projectId", variable.projectId))
+        .take(500);
+      for (const tc of testCases) {
+        const attachments = tc.variableAttachments;
+        if (!attachments || !(variable.name in attachments)) continue;
+        const storageId = attachments[variable.name]!;
+        await safeDeleteStorage(ctx, storageId);
+        const { [variable.name]: _removed, ...rest } = attachments;
+        await ctx.db.patch(tc._id, { variableAttachments: rest });
       }
     }
 
