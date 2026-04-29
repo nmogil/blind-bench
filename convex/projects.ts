@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireAuth, requireOrgRole, requireProjectRole } from "./lib/auth";
+import { safeDeleteStorage } from "./lib/storageCleanup";
 
 // ===== Meta Context (owner only) =====
 
@@ -289,6 +290,21 @@ export const deleteProject = mutation({
       .take(500);
     for (const c of collabs) {
       await ctx.db.delete(c._id);
+    }
+
+    // M21.10: cascade-delete image variable blobs across every test case in
+    // the project so the storage account doesn't accumulate orphans when a
+    // project is removed. Only image attachments are cleaned up here — other
+    // entity rows (testCases, runs, versions, etc.) are intentionally left
+    // for the broader cleanup story.
+    const testCases = await ctx.db
+      .query("testCases")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .take(500);
+    for (const tc of testCases) {
+      for (const storageId of Object.values(tc.variableAttachments ?? {})) {
+        await safeDeleteStorage(ctx, storageId);
+      }
     }
 
     await ctx.db.delete(args.projectId);
