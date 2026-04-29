@@ -32,6 +32,7 @@ const APP_TABLES: TableNames[] = [
   "runComments",
   "outputPreferences",
   "evaluatorNotifications",
+  "reviewerNotifications",
   "feedbackDigests",
   "optimizationRequests",
   "userPreferences",
