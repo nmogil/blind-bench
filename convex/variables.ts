@@ -23,9 +23,17 @@ export const add = mutation({
     description: v.optional(v.string()),
     defaultValue: v.optional(v.string()),
     required: v.boolean(),
+    type: v.optional(v.union(v.literal("text"), v.literal("image"))),
   },
   handler: async (ctx, args) => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+
+    const type = args.type ?? "text";
+    if (type === "image" && args.defaultValue !== undefined) {
+      throw new Error(
+        "Image variables cannot have a default value — supply images per test case",
+      );
+    }
 
     // Validate name uniqueness within the project
     const existing = await ctx.db
@@ -45,9 +53,10 @@ export const add = mutation({
       projectId: args.projectId,
       name: args.name,
       description: args.description,
-      defaultValue: args.defaultValue,
+      defaultValue: type === "image" ? undefined : args.defaultValue,
       required: args.required,
       order: maxOrder + 1,
+      type,
     });
   },
 });
@@ -65,6 +74,15 @@ export const update = mutation({
     if (!variable) throw new Error("Variable not found");
 
     await requireProjectRole(ctx, variable.projectId, ["owner", "editor"]);
+
+    // Image variables MAY NOT have a default value — reject silently-undefined
+    // legacy rows by treating absent type as "text".
+    const type = variable.type ?? "text";
+    if (type === "image" && args.defaultValue !== undefined) {
+      throw new Error(
+        "Image variables cannot have a default value — supply images per test case",
+      );
+    }
 
     // If name is changing, validate uniqueness (exclude self)
     if (args.name !== undefined && args.name !== variable.name) {

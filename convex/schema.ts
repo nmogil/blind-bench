@@ -71,6 +71,10 @@ const schema = defineSchema({
     defaultValue: v.optional(v.string()),
     required: v.boolean(),
     order: v.number(),
+    // M21.1: Variable type. Absent on pre-M21 rows — readers must default
+    // to "text". Locked after creation; image variables MAY NOT have
+    // defaultValue (per-test-case via testCases.variableAttachments).
+    type: v.optional(v.union(v.literal("text"), v.literal("image"))),
   }).index("by_project", ["projectId"]),
 
   // M2: Test Cases
@@ -81,6 +85,9 @@ const schema = defineSchema({
     attachmentIds: v.array(v.id("_storage")),
     order: v.number(),
     createdById: v.id("users"),
+    // M21.1: Per-test-case image attachments keyed by variable name. Spliced
+    // into user messages as image_url content blocks at dispatch (M21.6).
+    variableAttachments: v.optional(v.record(v.string(), v.id("_storage"))),
   }).index("by_project", ["projectId"]),
 
   // M2: Prompt Versions & Attachments
