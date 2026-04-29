@@ -39,6 +39,11 @@ import {
   REASON_TAGS,
   isCardReviewed,
 } from "./types";
+import {
+  TestCaseContextPanel,
+  type ProjectVariable,
+  type TestCaseContext,
+} from "./TestCaseContextPanel";
 
 const SPRING = { type: "spring" as const, stiffness: 260, damping: 30 };
 
@@ -47,8 +52,8 @@ const SWIPE_VELOCITY_THRESHOLD = 500;
 
 type FlashPhaseProps = {
   outputs: ReviewOutput[];
-  prompt: string;
-  input: string;
+  testCases: Record<string, TestCaseContext>;
+  variables: ProjectVariable[];
   cardStates: Record<string, CardState>;
   updateCard: (id: string, patch: Partial<CardState>) => void;
   addAnnotation: (id: string, annotation: InlineAnnotation) => void;
@@ -57,8 +62,8 @@ type FlashPhaseProps = {
 
 export function FlashPhase({
   outputs,
-  prompt,
-  input,
+  testCases,
+  variables,
   cardStates,
   updateCard,
   addAnnotation,
@@ -73,6 +78,10 @@ export function FlashPhase({
   const current = outputs[currentIdx];
   const currentState = current ? cardStates[current.id] : undefined;
   const next = outputs[currentIdx + 1];
+  const currentTestCase =
+    current?.testCaseId !== null && current?.testCaseId !== undefined
+      ? (testCases[current.testCaseId] ?? null)
+      : null;
 
   const goNext = useCallback(() => {
     setState(([i]) => [Math.min(i + 1, outputs.length - 1), 1]);
@@ -170,19 +179,14 @@ export function FlashPhase({
           onClick={() => setShowInputPanel((v) => !v)}
           className="mt-3 w-full rounded-md border border-dashed px-2 py-2 text-left text-xs text-muted-foreground hover:bg-background"
         >
-          {showInputPanel ? "Hide" : "Show"} input
+          {showInputPanel ? "Hide" : "Show"} test case
         </button>
         {showInputPanel && (
-          <div className="mt-2 rounded-md border bg-background p-2.5 text-xs">
-            <div className="mb-1 font-medium text-foreground">Prompt</div>
-            <pre className="whitespace-pre-wrap text-muted-foreground">
-              {prompt}
-            </pre>
-            <div className="mt-2 mb-1 font-medium text-foreground">Input</div>
-            <pre className="whitespace-pre-wrap text-muted-foreground">
-              {input}
-            </pre>
-          </div>
+          <TestCaseContextPanel
+            testCase={currentTestCase}
+            variables={variables}
+            className="mt-2"
+          />
         )}
       </aside>
 

@@ -122,6 +122,11 @@ export const get = query({
     const outputs = await loadOutputsForSession(ctx, session);
     const ratings = await loadRatings(ctx, session);
     const annotations = await loadAnnotations(ctx, session);
+    // M21.9: test case context for the input panel — variable values + image
+    // thumbnails. Test cases are input identity (shared across versions in a
+    // cycle) so they don't leak version/run attribution. Image URLs are
+    // opaque Convex storage tokens.
+    const { testCases, variables } = await loadTestCaseContext(ctx, session);
     const matchups = await ctx.db
       .query("reviewMatchups")
       .withIndex("by_session", (q) => q.eq("sessionId", session._id))
@@ -200,6 +205,8 @@ export const get = query({
         suggestedRounds,
       },
       outputs,
+      testCases,
+      variables,
       ratings,
       annotations,
       matchups: matchups
@@ -952,12 +959,14 @@ async function loadOutputsForSession(
     key: string;
     blindLabel: string;
     content: string;
+    testCaseId: Id<"testCases"> | null;
   }[]
 > {
   const out: {
     key: string;
     blindLabel: string;
     content: string;
+    testCaseId: Id<"testCases"> | null;
   }[] = [];
   for (const entry of session.outputOrder) {
     let content = "";
@@ -972,9 +981,112 @@ async function loadOutputsForSession(
       key: outputKey(entry),
       blindLabel: entry.sessionBlindLabel,
       content,
+      testCaseId: entry.testCaseId ?? null,
     });
   }
   return out;
+}
+
+// M21.9: build a per-testCase context map for the input panel. Visited test
+// cases are deduped across the session's outputOrder. Image URLs come from
+// ctx.storage.getUrl — opaque tokens, no version/run attribution.
+async function loadTestCaseContext(
+  ctx: QueryCtx,
+  session: Doc<"reviewSessions">,
+): Promise<{
+  testCases: Record<
+    string,
+    {
+      id: Id<"testCases">;
+      name: string;
+      variableValues: Record<string, string>;
+      imageVariables: Array<{
+        name: string;
+        url: string;
+        sizeBytes: number;
+        mimeType: string;
+      }>;
+    }
+  >;
+  variables: Array<{
+    name: string;
+    type: "text" | "image";
+    description: string | null;
+  }>;
+}> {
+  const projectVariables = await ctx.db
+    .query("projectVariables")
+    .withIndex("by_project", (q) => q.eq("projectId", session.projectId))
+    .take(200);
+
+  const variables = projectVariables
+    .sort((a, b) => a.order - b.order)
+    .map((v) => ({
+      name: v.name,
+      type: (v.type ?? "text") as "text" | "image",
+      description: v.description ?? null,
+    }));
+
+  const imageVarNames = new Set(
+    variables.filter((v) => v.type === "image").map((v) => v.name),
+  );
+
+  const seen = new Set<string>();
+  const testCases: Record<
+    string,
+    {
+      id: Id<"testCases">;
+      name: string;
+      variableValues: Record<string, string>;
+      imageVariables: Array<{
+        name: string;
+        url: string;
+        sizeBytes: number;
+        mimeType: string;
+      }>;
+    }
+  > = {};
+
+  for (const entry of session.outputOrder) {
+    if (!entry.testCaseId) continue;
+    const key = entry.testCaseId as string;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const tc = await ctx.db.get(entry.testCaseId);
+    if (!tc || tc.projectId !== session.projectId) continue;
+
+    const imageVariables: Array<{
+      name: string;
+      url: string;
+      sizeBytes: number;
+      mimeType: string;
+    }> = [];
+    const attachments = tc.variableAttachments ?? {};
+    for (const [varName, storageId] of Object.entries(attachments)) {
+      if (!imageVarNames.has(varName)) continue;
+      const [url, metadata] = await Promise.all([
+        ctx.storage.getUrl(storageId as Id<"_storage">),
+        ctx.db.system.get(storageId as Id<"_storage">),
+      ]);
+      if (!url || !metadata) continue;
+      imageVariables.push({
+        name: varName,
+        url,
+        sizeBytes: metadata.size,
+        mimeType: metadata.contentType ?? "",
+      });
+    }
+
+    testCases[key] = {
+      id: entry.testCaseId,
+      name: tc.name,
+      variableValues: tc.variableValues,
+      imageVariables,
+    };
+  }
+
+  return { testCases, variables };
 }
 
 async function loadRatings(

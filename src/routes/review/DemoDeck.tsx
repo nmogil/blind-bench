@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { FlashPhase } from "./FlashPhase";
 import { BattlePhase } from "./BattlePhase";
 import { CheatSheetDialog } from "./CheatSheetDialog";
-import { MOCK_INPUT, MOCK_OUTPUTS, MOCK_PROMPT, generateRoundRobinMatchups } from "./mockData";
+import { MOCK_OUTPUTS, generateRoundRobinMatchups } from "./mockData";
 import {
   type CardState,
   type InlineAnnotation,
@@ -154,8 +154,8 @@ export function DemoDeck() {
         {phase === "phase1" && (
           <FlashPhase
             outputs={MOCK_OUTPUTS}
-            prompt={MOCK_PROMPT}
-            input={MOCK_INPUT}
+            testCases={{}}
+            variables={[]}
             cardStates={cardStates}
             updateCard={updateCard}
             addAnnotation={addAnnotation}

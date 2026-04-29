@@ -108,6 +108,7 @@ export function SessionDeck() {
             id: o.key,
             blindLabel: o.blindLabel,
             content: o.content,
+            testCaseId: o.testCaseId ?? null,
           }))
         : [],
     [data],
@@ -378,8 +379,8 @@ export function SessionDeck() {
         {phase === "phase1" && (
           <FlashPhase
             outputs={outputs}
-            prompt=""
-            input=""
+            testCases={data.testCases}
+            variables={data.variables}
             cardStates={cardStates}
             updateCard={updateCard}
             addAnnotation={addAnnotationCb}

@@ -6,6 +6,7 @@ export type ReviewOutput = {
   id: string;
   blindLabel: string;
   content: string;
+  testCaseId: string | null;
 };
 
 export type InlineAnnotation = {
