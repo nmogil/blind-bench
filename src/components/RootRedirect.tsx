@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function RootRedirect() {
   const orgs = useQuery(api.organizations.listMyOrgs);
   const sampleInfo = useQuery(api.sampleSeed.getMySampleProject);
-  const prefs = useQuery(api.userPreferences.get);
   const ensureFirstRunSeed = useMutation(api.sampleSeed.ensureFirstRunSeed);
   const seededRef = useRef(false);
   const [seedError, setSeedError] = useState(false);
@@ -26,7 +25,7 @@ export function RootRedirect() {
       .catch(() => setSeedError(true));
   }, [orgs, ensureFirstRunSeed]);
 
-  if (orgs === undefined || sampleInfo === undefined || prefs === undefined) {
+  if (orgs === undefined || sampleInfo === undefined) {
     return <Loading />;
   }
 
@@ -43,8 +42,9 @@ export function RootRedirect() {
   const first = orgs[0];
   if (!first) return <Navigate to="/onboarding" replace />;
 
-  const isFirstRun =
-    prefs.tourStatus === undefined && !sampleInfo.hasNonSampleProject;
+  // M28.6: tour-modal removal — first-run routing now relies solely on
+  // "user has not yet created a real project," not the legacy tourStatus flag.
+  const isFirstRun = !sampleInfo.hasNonSampleProject;
 
   if (isFirstRun && sampleInfo.sample?.orgSlug) {
     const target = firstRunTarget(sampleInfo.sample, sampleInfo.sample.orgSlug);

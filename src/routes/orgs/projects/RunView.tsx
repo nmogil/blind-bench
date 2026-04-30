@@ -175,6 +175,20 @@ export function RunView() {
 
       {/* Dynamic output grid */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {run.outputs.length === 0 && run.status !== "failed" && (
+          // M28.5: pre-activation eval-grid empty state — outputs haven't
+          // materialized yet (pending or running). Forward-looking copy that
+          // names the next user action ("select any phrase to leave feedback")
+          // before any text is on screen.
+          <div className="rounded-lg border border-dashed bg-muted/20 p-10 text-center">
+            <p className="text-sm">
+              Outputs will stream in here.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Select any phrase to leave feedback.
+            </p>
+          </div>
+        )}
         <div
           className={cn("grid gap-4", {
             "grid-cols-1 sm:grid-cols-2": run.outputs.length === 2,

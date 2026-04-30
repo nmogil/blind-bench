@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OnboardingCallout } from "@/components/OnboardingCallout";
+import { NextActionRing } from "@/components/copilot/NextActionRing";
 import { VersionFeedbackContent } from "./cycles/VersionDashboard";
 import { VersionRunsTab } from "./cycles/VersionRunsTab";
 
@@ -561,13 +562,19 @@ export function VersionEditor() {
           )}
 
           {/* Run CTA */}
-          <Link
-            to={`/orgs/${orgSlug}/projects/${projectId}/run?versionId=${versionId}`}
-            className={cn(buttonVariants({ variant: cycleData?.hasCompletedRun ? "outline" : "default", size: "sm" }), "w-full gap-1.5")}
+          <NextActionRing
+            target="run_eval"
+            disabled={project.isSample === true}
+            className="w-full"
           >
-            <Play className="h-3.5 w-3.5" />
-            Run this version
-          </Link>
+            <Link
+              to={`/orgs/${orgSlug}/projects/${projectId}/run?versionId=${versionId}`}
+              className={cn(buttonVariants({ variant: cycleData?.hasCompletedRun ? "outline" : "default", size: "sm" }), "w-full gap-1.5")}
+            >
+              <Play className="h-3.5 w-3.5" />
+              Run this version
+            </Link>
+          </NextActionRing>
 
           {/* Recent runs */}
           {recentRuns && recentRuns.length > 0 && (
@@ -575,18 +582,35 @@ export function VersionEditor() {
               <h4 className="text-xs font-medium text-muted-foreground">
                 Recent runs
               </h4>
-              {recentRuns.slice(0, 3).map((run) => (
-                <Link
-                  key={run._id}
-                  to={`/orgs/${orgSlug}/projects/${projectId}/runs/${run._id}`}
-                  className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors"
-                >
-                  <span className="text-muted-foreground">
-                    {new Date(run._creationTime).toLocaleTimeString()}
-                  </span>
-                  <RunStatusPill status={run.status} />
-                </Link>
-              ))}
+              {recentRuns.slice(0, 3).map((run, index) => {
+                // Only the most-recent row registers the leave_feedback ring,
+                // so the panel's "exactly one target at a time" rule holds.
+                const link = (
+                  <Link
+                    to={`/orgs/${orgSlug}/projects/${projectId}/runs/${run._id}`}
+                    className="flex items-center justify-between rounded-md border px-2 py-1.5 text-xs hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="text-muted-foreground">
+                      {new Date(run._creationTime).toLocaleTimeString()}
+                    </span>
+                    <RunStatusPill status={run.status} />
+                  </Link>
+                );
+                return index === 0 ? (
+                  <NextActionRing
+                    key={run._id}
+                    target="leave_feedback"
+                    disabled={
+                      project.isSample === true || run.status !== "completed"
+                    }
+                    className="w-full"
+                  >
+                    {link}
+                  </NextActionRing>
+                ) : (
+                  <div key={run._id}>{link}</div>
+                );
+              })}
             </div>
           )}
 

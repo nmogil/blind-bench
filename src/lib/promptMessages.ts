@@ -80,7 +80,7 @@ export function rolePlaceholder(role: PromptMessageRole): string {
     case "developer":
       return "Instructions the model should prioritize over user input...";
     case "user":
-      return "Hello {{customer_name}}, ...";
+      return "Translate: {{text}}";
     case "assistant":
       return "Prior assistant turn (optional — useful for few-shot examples)";
   }

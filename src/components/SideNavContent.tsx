@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
 import { FolderOpen, Key, Settings, Users, Plus } from "lucide-react";
+import { NextActionRing } from "@/components/copilot/NextActionRing";
 
 interface SideNavContentProps {
   /** Called when the "+" button is clicked. */
@@ -40,17 +41,19 @@ export function SideNavContent({
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Prompts
         </span>
-        <button
-          type="button"
-          onClick={() => {
-            onNewProject();
-            onNavigate?.();
-          }}
-          aria-label="New prompt"
-          className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
+        <NextActionRing target="write_prompt">
+          <button
+            type="button"
+            onClick={() => {
+              onNewProject();
+              onNavigate?.();
+            }}
+            aria-label="New prompt"
+            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </NextActionRing>
       </div>
 
       {projects === undefined ? (

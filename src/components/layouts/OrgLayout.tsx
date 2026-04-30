@@ -21,7 +21,7 @@ import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutCheatSheet } from "@/components/ShortcutCheatSheet";
 import { PostHogOrgGroupBridge } from "@/components/PostHogOrgGroupBridge";
-import { OnboardingChecklistProvider } from "@/components/OnboardingChecklistSheet";
+import { CopilotPanel } from "@/components/CopilotPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function OrgLayout() {
@@ -73,23 +73,22 @@ export function OrgLayout() {
           openNewProjectDialog: () => setShowNewProject(true),
         }}
       >
-        <OnboardingChecklistProvider>
-          <div className="flex min-h-screen flex-col">
-            <TopBar />
-            <div className="flex flex-1">
-              <SideNav onNewProject={() => setShowNewProject(true)} />
-              <main className="flex-1 overflow-auto">
-                <Outlet />
-              </main>
-            </div>
+        <div className="flex min-h-screen flex-col">
+          <TopBar />
+          <div className="flex flex-1">
+            <SideNav onNewProject={() => setShowNewProject(true)} />
+            <main className="flex-1 overflow-auto">
+              <Outlet />
+            </main>
+            <CopilotPanel />
           </div>
-          <NewProjectDialog
-            open={showNewProject}
-            onOpenChange={setShowNewProject}
-          />
-          <CommandPalette />
-          <ShortcutCheatSheet />
-        </OnboardingChecklistProvider>
+        </div>
+        <NewProjectDialog
+          open={showNewProject}
+          onOpenChange={setShowNewProject}
+        />
+        <CommandPalette />
+        <ShortcutCheatSheet />
       </OrgLayoutCtx.Provider>
     </OrgProvider>
   );

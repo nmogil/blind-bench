@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { friendlyError, sanitizeStoredError } from "@/lib/errors";
+import { NextActionRing } from "@/components/copilot/NextActionRing";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -447,10 +448,15 @@ function ReviewView({
             >
               Cancel edit
             </Button>
-            <Button onClick={handleEditAndAccept} disabled={saving}>
-              <Check className="mr-1.5 h-3.5 w-3.5" />
-              {saving ? "Saving..." : "Save and accept"}
-            </Button>
+            <NextActionRing
+              target="accept_optimizer"
+              disabled={optimization.isSample === true}
+            >
+              <Button onClick={handleEditAndAccept} disabled={saving}>
+                <Check className="mr-1.5 h-3.5 w-3.5" />
+                {saving ? "Saving..." : "Save and accept"}
+              </Button>
+            </NextActionRing>
           </>
         ) : (
           <>
@@ -462,10 +468,15 @@ function ReviewView({
               <Pencil className="mr-1.5 h-3.5 w-3.5" />
               Edit and accept
             </Button>
-            <Button onClick={handleAccept} disabled={saving}>
-              <Check className="mr-1.5 h-3.5 w-3.5" />
-              {saving ? "Accepting..." : "Accept"}
-            </Button>
+            <NextActionRing
+              target="accept_optimizer"
+              disabled={optimization.isSample === true}
+            >
+              <Button onClick={handleAccept} disabled={saving}>
+                <Check className="mr-1.5 h-3.5 w-3.5" />
+                {saving ? "Accepting..." : "Accept"}
+              </Button>
+            </NextActionRing>
           </>
         )}
       </div>

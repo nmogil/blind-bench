@@ -4,7 +4,6 @@ import { api } from "../../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { useOrgLayout } from "@/components/layouts/OrgLayout";
 import { EmptyState } from "@/components/EmptyState";
-import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClipboardCheck, FolderOpen, ChevronRight, Sparkles } from "lucide-react";
 
@@ -47,10 +46,6 @@ export function OrgHome() {
           ))}
         </div>
       )}
-
-      <div className="mt-4">
-        <OnboardingChecklist variant="inline" />
-      </div>
 
       <div className="mt-6">
         {projects === undefined ? (

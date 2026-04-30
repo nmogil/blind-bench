@@ -3,8 +3,6 @@ import { useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
 import { toggleCheatSheet } from "@/lib/shortcutCheatSheetState";
-import { useOnboardingChecklist } from "@/components/OnboardingChecklistSheet";
-import { ONBOARDING_CHECKLIST_KEY } from "@/components/OnboardingChecklist";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   HelpCircle,
-  BookOpen,
   Keyboard,
   RotateCcw,
   MessageCircle,
@@ -28,15 +25,18 @@ import {
   Info,
   FileText,
   Shield,
-  Sparkles,
+  Compass,
 } from "lucide-react";
 
 export function HelpMenu() {
   const resetCallouts = useMutation(api.userPreferences.resetCallouts);
-  const undismissCallout = useMutation(api.userPreferences.undismissCallout);
-  const setTourStatus = useMutation(api.userPreferences.setTourStatus);
+  const setCopilotDismissed = useMutation(
+    api.userPreferences.setCopilotDismissed,
+  );
+  const setCopilotCollapsed = useMutation(
+    api.userPreferences.setCopilotCollapsed,
+  );
   const navigate = useNavigate();
-  const { openChecklist } = useOnboardingChecklist();
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
@@ -49,20 +49,14 @@ export function HelpMenu() {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem
             onClick={async () => {
-              await undismissCallout({ calloutKey: ONBOARDING_CHECKLIST_KEY });
-              openChecklist();
+              await Promise.all([
+                setCopilotDismissed({ dismissed: false }),
+                setCopilotCollapsed({ collapsed: false }),
+              ]);
             }}
           >
-            <BookOpen className="mr-2 h-4 w-4" />
-            Restart setup guide
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() =>
-              void setTourStatus({ status: "in_progress", step: 0 })
-            }
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            Replay first-run tour
+            <Compass className="mr-2 h-4 w-4" />
+            Show setup co-pilot
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => toggleCheatSheet()}>
             <Keyboard className="mr-2 h-4 w-4" />

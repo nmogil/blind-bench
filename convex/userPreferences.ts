@@ -20,8 +20,81 @@ export const get = query({
           | "completed"
           | undefined,
         tourStep: undefined as number | undefined,
+        copilotCollapsed: undefined as boolean | undefined,
+        copilotDismissed: undefined as boolean | undefined,
+        copilotDismissedRings: [] as string[],
       }
     );
+  },
+});
+
+// M28.3: co-pilot panel visibility — collapse to icon rail and full dismiss.
+export const setCopilotCollapsed = mutation({
+  args: { collapsed: v.boolean() },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { copilotCollapsed: args.collapsed });
+    } else {
+      await ctx.db.insert("userPreferences", {
+        userId,
+        dismissedCallouts: [],
+        copilotCollapsed: args.collapsed,
+      });
+    }
+  },
+});
+
+export const setCopilotDismissed = mutation({
+  args: { dismissed: v.boolean() },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { copilotDismissed: args.dismissed });
+    } else {
+      await ctx.db.insert("userPreferences", {
+        userId,
+        dismissedCallouts: [],
+        copilotDismissed: args.dismissed,
+      });
+    }
+  },
+});
+
+// M28.4: append a step key to the user's dismissed-rings list. Idempotent —
+// repeated dismissals for the same key are a no-op.
+export const dismissCopilotRing = mutation({
+  args: { target: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const existing = await ctx.db
+      .query("userPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      const current = existing.copilotDismissedRings ?? [];
+      if (current.includes(args.target)) return;
+      await ctx.db.patch(existing._id, {
+        copilotDismissedRings: [...current, args.target],
+      });
+    } else {
+      await ctx.db.insert("userPreferences", {
+        userId,
+        dismissedCallouts: [],
+        copilotDismissedRings: [args.target],
+      });
+    }
   },
 });
 

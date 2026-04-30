@@ -4,6 +4,7 @@ import {
   query,
   internalMutation,
   internalQuery,
+  type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -17,6 +18,45 @@ import {
 } from "./lib/messages";
 
 const OPTIMIZER_MODEL = "anthropic/claude-sonnet-4";
+
+/**
+ * M28.7: activation tracking. Fires a PostHog `activation_completed` event the
+ * first time a user accepts an optimizer-suggested version, and stamps
+ * `users.firstActivationAt` so subsequent acceptances are silent. Idempotent
+ * by construction — re-running with a non-null `firstActivationAt` is a no-op.
+ *
+ * Pre-existing activated users are never retroactively flagged: they have no
+ * `firstActivationAt` today and won't get one until they accept again. That's
+ * the intended clean cutover per the M28.7 spec.
+ */
+async function maybeRecordActivation(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  args: {
+    requestId: Id<"optimizationRequests">;
+    versionId: Id<"promptVersions">;
+    isSampleFlow: boolean;
+  },
+): Promise<void> {
+  if (args.isSampleFlow) return;
+
+  const user = await ctx.db.get(userId);
+  if (!user) return;
+  if (user.firstActivationAt !== undefined) return;
+
+  const now = Date.now();
+  await ctx.db.patch(userId, { firstActivationAt: now });
+
+  await ctx.scheduler.runAfter(0, internal.analyticsActions.track, {
+    event: "activation_completed",
+    distinctId: userId as string,
+    properties: {
+      time_since_signup_ms: now - user._creationTime,
+      optimization_request_id: args.requestId as string,
+      version_id: args.versionId as string,
+    },
+  });
+}
 
 // M18: The v1 optimizer meta-prompt is single-turn — it only reasons about a
 // system message and one user template. Until we teach it to rewrite arbitrary
@@ -316,6 +356,15 @@ export const acceptOptimization = mutation({
       },
     });
 
+    // M28.7: activation telemetry — the user has accepted their first
+    // optimizer-suggested version. Skip for sample-project flow so seeded
+    // demos can't satisfy activation. Idempotent via users.firstActivationAt.
+    await maybeRecordActivation(ctx, userId, {
+      requestId: args.requestId,
+      versionId: newVersionId,
+      isSampleFlow: request.isSample === true,
+    });
+
     // M10: Notify evaluators that their feedback was used
     await ctx.scheduler.runAfter(
       0,
@@ -442,6 +491,14 @@ export const editAndAcceptOptimization = mutation({
       reviewedById: userId,
       reviewedAt: Date.now(),
       resultingVersionId: newVersionId,
+    });
+
+    // M28.7: activation telemetry — edit-and-accept counts as activation too,
+    // since the user committed to a v2 derived from the optimizer. Idempotent.
+    await maybeRecordActivation(ctx, userId, {
+      requestId: args.requestId,
+      versionId: newVersionId,
+      isSampleFlow: request.isSample === true,
     });
 
     return newVersionId;

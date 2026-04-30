@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useProject } from "@/contexts/ProjectContext";
-import { useOrg } from "@/contexts/OrgContext";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
 import { RollbackConfirmationDialog } from "@/components/RollbackConfirmationDialog";
 import { Button } from "@/components/ui/button";
@@ -17,13 +16,6 @@ import {
 } from "@/components/ui/tooltip";
 import { friendlyError } from "@/lib/errors";
 import {
-  ArrowRight,
-  CheckCircle2,
-  Circle,
-  FlaskConical,
-  FileText,
-  Key,
-  Lightbulb,
   MessageSquare,
   Play,
   Plus,
@@ -34,16 +26,11 @@ import { cn } from "@/lib/utils";
 
 export function Versions() {
   const { projectId } = useProject();
-  const { orgId, role: orgRole } = useOrg();
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const navigate = useNavigate();
   const versions = useQuery(api.versions.list, { projectId });
   const createVersion = useMutation(api.versions.create);
   const deleteVersion = useMutation(api.versions.deleteVersion);
-
-  // Setup checklist queries (only needed when versions list is empty)
-  const keyStatus = useQuery(api.openRouterKeys.hasKey, { orgId });
-  const testCases = useQuery(api.testCases.list, { projectId });
 
   const [error, setError] = useState("");
   const [rollbackTarget, setRollbackTarget] = useState<{
@@ -68,6 +55,21 @@ export function Versions() {
       setError(friendlyError(err, "Failed to create draft."));
     }
   }
+
+  // M28.5: empty Versions list pre-opens the editor — the user lands directly
+  // in a fresh draft without an extra click. Guarded by a ref so the auto-draft
+  // fires at most once per mount even if React re-runs the effect.
+  const autoDraftStarted = useRef(false);
+  useEffect(() => {
+    if (versions === undefined) return;
+    if (versions.length > 0) return;
+    if (autoDraftStarted.current) return;
+    autoDraftStarted.current = true;
+    void handleNewDraft();
+    // handleNewDraft is stable enough for this one-shot effect; deps would
+    // re-trigger the auto-draft and double-create.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions]);
 
   async function handleDelete(versionId: Id<"promptVersions">) {
     setError("");
@@ -107,15 +109,16 @@ export function Versions() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {versions.length === 0 ? (
-        <SetupChecklist
-          orgSlug={orgSlug!}
-          projectId={projectId}
-          isOwner={orgRole === "owner"}
-          hasKey={keyStatus?.hasKey ?? false}
-          hasTestCases={(testCases?.length ?? 0) > 0}
-          testCaseCount={testCases?.length ?? 0}
-          onCreateDraft={handleNewDraft}
-        />
+        // M28.5: auto-draft useEffect above is mid-flight. Show a minimal
+        // hand-off so the screen isn't blank during the create + navigate
+        // round-trip. The `Write your first prompt` copy lives as the
+        // editor's placeholder once the user lands there.
+        <div className="max-w-lg space-y-3" role="status" aria-live="polite">
+          <p className="text-sm text-muted-foreground">
+            Opening the editor…
+          </p>
+          <Skeleton className="h-32 w-full" />
+        </div>
       ) : (
         <div className="max-w-2xl">
           {versions.map((version, index) => {
@@ -279,187 +282,3 @@ export function Versions() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Setup checklist — shown when the project has no versions yet
-// ---------------------------------------------------------------------------
-
-function SetupChecklist({
-  orgSlug,
-  projectId,
-  isOwner,
-  hasKey,
-  hasTestCases,
-  testCaseCount,
-  onCreateDraft,
-}: {
-  orgSlug: string;
-  projectId: string;
-  isOwner: boolean;
-  hasKey: boolean;
-  hasTestCases: boolean;
-  testCaseCount: number;
-  onCreateDraft: () => void;
-}) {
-  const steps = [
-    ...(isOwner
-      ? [{ key: "api-key", done: hasKey }]
-      : []),
-    { key: "prompt", done: false },
-    { key: "test-cases", done: hasTestCases },
-  ];
-  const nextStep = steps.find((s) => !s.done)?.key ?? null;
-
-  return (
-    <div className="max-w-lg space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Get started by setting up your prompt:
-      </p>
-
-      <div className="space-y-1">
-        {isOwner && (
-          <SetupStep
-            done={hasKey}
-            isNext={nextStep === "api-key"}
-            icon={Key}
-            label="Set up your OpenRouter API key"
-            sublabel="Required to run prompts against LLM models"
-            to={`/orgs/${orgSlug}/settings/openrouter-key`}
-            doneLabel="API key configured"
-          />
-        )}
-        <button
-          onClick={onCreateDraft}
-          className={cn(
-            "flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
-            nextStep === "prompt"
-              ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
-              : "border-border hover:bg-muted/50",
-          )}
-        >
-          <div className="mt-0.5">
-            <Circle
-              className={cn(
-                "h-5 w-5",
-                nextStep === "prompt"
-                  ? "text-primary"
-                  : "text-muted-foreground/40",
-              )}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Write your first prompt
-              </span>
-            </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Create a prompt template with {"{{variables}}"} for dynamic parts
-            </p>
-          </div>
-          {nextStep === "prompt" && (
-            <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          )}
-        </button>
-        <SetupStep
-          done={hasTestCases}
-          isNext={nextStep === "test-cases"}
-          icon={FlaskConical}
-          label="Add test cases"
-          sublabel="Provide input values to test your prompt with"
-          to={`/orgs/${orgSlug}/projects/${projectId}/run`}
-          doneLabel={`${testCaseCount} test case${testCaseCount === 1 ? "" : "s"}`}
-        />
-      </div>
-
-      <HowItWorks />
-    </div>
-  );
-}
-
-function SetupStep({
-  done,
-  isNext,
-  icon: Icon,
-  label,
-  sublabel,
-  to,
-  doneLabel,
-}: {
-  done: boolean;
-  isNext: boolean;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  sublabel: string;
-  to: string;
-  doneLabel: string;
-}) {
-  return (
-    <Link
-      to={to}
-      className={cn(
-        "flex items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
-        done
-          ? "border-sky-200 bg-sky-50/50 dark:border-sky-900/40 dark:bg-sky-950/20"
-          : isNext
-            ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
-            : "border-border hover:bg-muted/50",
-      )}
-    >
-      <div className="mt-0.5">
-        {done ? (
-          <CheckCircle2 className="h-5 w-5 text-sky-700 dark:text-sky-300" />
-        ) : (
-          <Circle
-            className={cn(
-              "h-5 w-5",
-              isNext ? "text-primary" : "text-muted-foreground/40",
-            )}
-          />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <Icon
-            className={cn(
-              "h-4 w-4 shrink-0",
-              done
-                ? "text-sky-700 dark:text-sky-300"
-                : "text-muted-foreground",
-            )}
-          />
-          <span
-            className={cn(
-              "text-sm font-medium",
-              done && "text-sky-700 dark:text-sky-300",
-            )}
-          >
-            {done ? doneLabel : label}
-          </span>
-        </div>
-        {!done && (
-          <p className="mt-0.5 text-xs text-muted-foreground">{sublabel}</p>
-        )}
-      </div>
-      {isNext && !done && (
-        <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-      )}
-    </Link>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <div className="rounded-lg border border-dashed p-4">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Lightbulb className="h-4 w-4 text-muted-foreground" />
-        How it works
-      </div>
-      <ol className="mt-2 space-y-1.5 text-xs text-muted-foreground list-decimal list-inside">
-        <li>Write a prompt template with {"{{variables}}"}</li>
-        <li>Select test cases and models on the Run page, then execute</li>
-        <li>Evaluate outputs blind, get feedback, iterate</li>
-      </ol>
-    </div>
-  );
-}

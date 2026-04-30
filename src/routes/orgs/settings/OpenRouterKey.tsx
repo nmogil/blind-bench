@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { friendlyError } from "@/lib/errors";
+import { NextActionRing } from "@/components/copilot/NextActionRing";
 import { Key, ExternalLink } from "lucide-react";
 
 function formatRelativeTime(timestamp: number): string {
@@ -116,9 +117,11 @@ function OpenRouterKeyForm() {
               <p className="text-sm text-sky-700 dark:text-sky-300">Key saved successfully.</p>
             )}
 
-            <Button type="submit" disabled={saving || !key.trim()}>
-              {saving ? "Saving..." : "Save key"}
-            </Button>
+            <NextActionRing target="add_key">
+              <Button type="submit" disabled={saving || !key.trim()}>
+                {saving ? "Saving..." : "Save key"}
+              </Button>
+            </NextActionRing>
           </form>
 
           <p className="text-xs text-muted-foreground pt-2 border-t">

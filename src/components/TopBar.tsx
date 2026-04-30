@@ -4,7 +4,6 @@ import { UserMenu } from "@/components/UserMenu";
 import { HelpMenu } from "@/components/HelpMenu";
 import { NotificationBell } from "@/components/NotificationBell";
 import { MobileNavDrawer } from "@/components/MobileNavDrawer";
-import { OnboardingProgressChip } from "@/components/OnboardingProgressChip";
 import { toggleCommandPalette } from "@/lib/commandPaletteState";
 import { toggleCheatSheet } from "@/lib/shortcutCheatSheetState";
 import { LayoutDashboard, Search } from "lucide-react";
@@ -64,7 +63,6 @@ export function TopBar({ variant = "default" }: TopBarProps) {
               </kbd>
               <span>Shortcuts</span>
             </button>
-            <OnboardingProgressChip />
             <HelpMenu />
           </>
         )}

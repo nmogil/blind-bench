@@ -5,6 +5,23 @@ import { v } from "convex/values";
 const schema = defineSchema({
   ...authTables,
 
+  // M28.7: extend the Convex Auth users table with `firstActivationAt`. Set
+  // exactly once when the user accepts their first optimizer suggestion. All
+  // other fields mirror the upstream `authTables.users` shape; if Convex Auth
+  // adds fields, mirror them here too.
+  users: defineTable({
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    firstActivationAt: v.optional(v.number()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
+
   // M1: Organizations & Projects
   organizations: defineTable({
     name: v.string(),
@@ -538,6 +555,15 @@ const schema = defineSchema({
       ),
     ),
     tourStep: v.optional(v.number()),
+    // M28.3: Co-pilot side panel visibility. `copilotCollapsed` shrinks to an
+    // icon-only rail; `copilotDismissed` hides it entirely (reopenable from the
+    // help menu). Absent = expanded + visible.
+    copilotCollapsed: v.optional(v.boolean()),
+    copilotDismissed: v.optional(v.boolean()),
+    // M28.4: keys whose <NextActionRing> has been clicked at least once.
+    // Append-only; once a ring is dismissed it stays dismissed forever for
+    // that user, so the same target never pulses again on later sessions.
+    copilotDismissedRings: v.optional(v.array(v.string())),
   }).index("by_user", ["userId"]),
 
   // M8: Model catalog (global, refreshed from OpenRouter API)

@@ -237,6 +237,47 @@
   }
 }
 
+/* M28.4 — single-target pulse drawn by <NextActionRing>. The host span sits
+   around the action button; the ring is an absolutely-positioned overlay that
+   pulses for 4s post-mount, then settles into a static border. */
+.bb-next-action-ring-host {
+  position: relative;
+  display: inline-flex;
+}
+.bb-next-action-ring-host > .bb-next-action-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 0.6rem;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 2px oklch(from var(--primary) l c h / 0.55),
+    0 0 0 0 oklch(from var(--primary) l c h / 0);
+  animation: bb-next-action-ring-pulse 1.6s ease-in-out infinite;
+  /* Decay token: parent flips data-decayed=true at 4s and pulse stops. */
+}
+.bb-next-action-ring-host[data-decayed="true"] > .bb-next-action-ring {
+  animation: none;
+  box-shadow: 0 0 0 1.5px oklch(from var(--primary) l c h / 0.45);
+}
+@keyframes bb-next-action-ring-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px oklch(from var(--primary) l c h / 0.55),
+      0 0 0 0 oklch(from var(--primary) l c h / 0.0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px oklch(from var(--primary) l c h / 0.7),
+      0 0 14px 6px oklch(from var(--primary) l c h / 0.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb-next-action-ring-host > .bb-next-action-ring {
+    animation: none;
+    box-shadow: 0 0 0 1.5px oklch(from var(--primary) l c h / 0.55);
+  }
+}
+
 /* Markdown rendering inside ProseMirror-based editors.
    Only nodes produced by the markdown-enabled StarterKit config appear here;
    plain-mode editors disable heading/list/blockquote/code nodes entirely. */

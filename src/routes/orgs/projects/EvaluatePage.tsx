@@ -1,5 +1,5 @@
 import { useQuery } from "convex/react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { useProject } from "@/contexts/ProjectContext";
 import { CycleStatusPill } from "@/components/CycleStatusPill";
@@ -11,6 +11,7 @@ import { ArrowRight, ClipboardCheck, Layers, Plus } from "lucide-react";
 export function EvaluatePage() {
   const { projectId, role } = useProject();
   const { orgSlug } = useParams<{ orgSlug: string }>();
+  const navigate = useNavigate();
 
   const cycles = useQuery(
     api.reviewCycles.list,
@@ -80,8 +81,12 @@ export function EvaluatePage() {
       {!hasAnything ? (
         <EmptyState
           icon={ClipboardCheck}
-          heading="No evaluations yet"
-          description="Run your prompt first, then come back here to evaluate outputs blind via a Review Cycle."
+          heading="Pool runs into a Review Cycle to evaluate them blind"
+          description="Once you have completed runs, group them here so reviewers can rate outputs without seeing which version produced what."
+          action={{
+            label: "Start a cycle",
+            onClick: () => navigate(`${basePath}/cycles/new`),
+          }}
         />
       ) : (
         <div className="max-w-2xl space-y-6">

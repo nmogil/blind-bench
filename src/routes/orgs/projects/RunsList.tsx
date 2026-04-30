@@ -6,7 +6,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { RunStatusPill } from "@/components/RunStatusPill";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
-import { GitCompareArrows, Play } from "lucide-react";
+import { ArrowRight, GitCompareArrows, Play } from "lucide-react";
 
 export function RunsList() {
   const { projectId } = useProject();
@@ -83,9 +83,7 @@ export function RunsList() {
 
       <div className="mt-6 space-y-2">
         {versions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Create a version and run it to see results here.
-          </p>
+          <RunsEmptyState orgSlug={orgSlug!} projectId={projectId} />
         ) : (
           <RunsContent
             versions={versions}
@@ -118,18 +116,7 @@ function RunsContent({
     versions.length === 1 && firstVersionRuns && firstVersionRuns.length === 0;
 
   if (showHint) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No runs yet.{" "}
-        <Link
-          to={`/orgs/${orgSlug}/projects/${projectId}/run`}
-          className="text-primary hover:underline"
-        >
-          Configure a new run
-        </Link>{" "}
-        to see results here.
-      </p>
-    );
+    return <RunsEmptyState orgSlug={orgSlug} projectId={projectId} />;
   }
 
   return (
@@ -197,6 +184,32 @@ function VersionRunsSection({
           <RunStatusPill status={run.status} />
         </Link>
       ))}
+    </div>
+  );
+}
+
+// M28.5: pre-activation empty state — actionable copy + a named next step
+// (open the versions list so the user can hit Run on a specific version).
+function RunsEmptyState({
+  orgSlug,
+  projectId,
+}: {
+  orgSlug: string;
+  projectId: string;
+}) {
+  return (
+    <div className="max-w-lg space-y-3 rounded-lg border border-dashed p-5">
+      <p className="text-sm">
+        Click <span className="font-medium">Run</span> on a version to evaluate
+        it across three models.
+      </p>
+      <Link
+        to={`/orgs/${orgSlug}/projects/${projectId}/versions`}
+        className={buttonVariants({ size: "sm", variant: "outline" })}
+      >
+        Go to versions
+        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+      </Link>
     </div>
   );
 }

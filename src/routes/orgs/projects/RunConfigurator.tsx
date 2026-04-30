@@ -14,6 +14,7 @@ import { SuggestionCards } from "@/components/SuggestionCards";
 import { ConcurrentRunGauge } from "@/components/ConcurrentRunGauge";
 import { EmptyState } from "@/components/EmptyState";
 import { VersionStatusPill } from "@/components/VersionStatusPill";
+import { ByokGateModal } from "@/components/ByokGateModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -155,6 +156,9 @@ export function RunConfigurator() {
   const executeRun = useMutation(api.runs.execute);
   const createTestCase = useMutation(api.testCases.create);
   const requestSuggestions = useMutation(api.runAssistant.requestSuggestions);
+
+  // M28.6: BYOK gate — opens when the user attempts Run with no key.
+  const [byokGateOpen, setByokGateOpen] = useState(false);
 
   // --- Step 1: Version selection (multi-select) ---
   const [selectedVersionIds, setSelectedVersionIds] = useState<Set<string>>(
@@ -469,9 +473,10 @@ export function RunConfigurator() {
   // Step 4: Validation
   // ---------------------------------------------------------------------------
 
+  // M28.6: missing-key case is no longer a "disabled reason" — instead it
+  // gates the Run click below by opening the BYOK modal. The button stays
+  // enabled so the user has a single, obvious action surface.
   const runDisabledReason = (() => {
-    if (!keyStatus?.hasKey)
-      return "Set your OpenRouter key to run prompts.";
     if (selectedVersionIds.size === 0) return "Select at least one version.";
     if (selectedTestCaseIds.size === 0)
       return "Select at least one test case.";
@@ -491,6 +496,14 @@ export function RunConfigurator() {
 
   const handleRunAll = useCallback(async () => {
     if (running || runDisabledReason || selectedVersionIds.size === 0) return;
+
+    // M28.6: BYOK gate — fire only on the action attempt (Run click), not on
+    // page load. Owner sees a CTA that drops them on the key form; non-owners
+    // see the ask-your-admin variant.
+    if (!keyStatus?.hasKey) {
+      setByokGateOpen(true);
+      return;
+    }
 
     setRunning(true);
     setError("");
@@ -550,6 +563,7 @@ export function RunConfigurator() {
   }, [
     running,
     runDisabledReason,
+    keyStatus?.hasKey,
     selectedVersionIds,
     selectedTestCaseIds,
     runMode,
@@ -1273,6 +1287,8 @@ export function RunConfigurator() {
           </div>
         </div>
       </StepSection>
+
+      <ByokGateModal open={byokGateOpen} onOpenChange={setByokGateOpen} />
     </div>
   );
 }
