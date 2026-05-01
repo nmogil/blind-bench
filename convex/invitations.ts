@@ -604,24 +604,12 @@ async function materializeMembership(
   const project = await ctx.db.get(cycle.projectId);
   if (!project) throw new Error("Project not found");
 
-  // Ensure org membership so reviewSessions.start's requireProjectRole gate
-  // can see the caller.
-  const orgMembership = await ctx.db
-    .query("organizationMembers")
-    .withIndex("by_org_and_user", (q) =>
-      q.eq("organizationId", project.organizationId).eq("userId", userId),
-    )
-    .unique();
-  if (!orgMembership) {
-    await ctx.db.insert("organizationMembers", {
-      organizationId: project.organizationId,
-      userId,
-      role: "member",
-    });
-  }
-
-  // Ensure the user shows up as a project evaluator (required by
-  // resolveScopeOrThrow → requireProjectRole).
+  // Cycle reviewers are NOT auto-added to the inviter's org. They get a
+  // projectCollaborators evaluator row (sufficient for requireProjectRole on
+  // the review session pipeline) and nothing else — leaving them with zero
+  // orgs of their own means RootRedirect's first-run seed will provision
+  // them a personal workspace after they finish reviewing, instead of
+  // stranding them on someone else's dashboard as a low-privilege "member".
   const existingCollab = await ctx.db
     .query("projectCollaborators")
     .withIndex("by_project_and_user", (q) =>
