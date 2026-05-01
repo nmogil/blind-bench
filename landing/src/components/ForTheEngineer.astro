@@ -1,12 +1,13 @@
 ---
-// Speaks to the engineer buyer-influencer: they ship the prompts and need
-// honest sign-off from PMs / legal / marketing without scheduling a meeting.
-// Intentionally no CTAs — CtaFooter is the single closing conversion band.
+// Speaks to the engineer buyer-influencer: shows the artifact they take home.
+// Distinct from ApplyPanel (in-app v3→v4 diff). This is what lands in their
+// editor: a prompt file with cited changes, ready to ship.
+// Intentionally no CTAs. CtaFooter is the single closing conversion band.
 ---
 
-<section class="py-14 lg:py-20">
-  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-    <div class="reveal">
+<section class="py-16 lg:py-24">
+  <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+    <div class="reveal mx-auto max-w-2xl">
       <p
         class="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase"
       >
@@ -15,16 +16,162 @@
       <h2
         class="mt-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
       >
-        Stop chasing sign-off in Slack.
+        The artifact you take home.
       </h2>
       <p
-        class="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg"
+        class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg"
       >
-        You wrote the prompt. You need honest feedback from the people who know
-        &ldquo;good&rdquo; &mdash; without scheduling a meeting or waiting on a
-        thread. Send one link. Get structured, blind, traceable feedback back
-        as prompt edits. BYOK, no per-seat billing.
+        Every blind review produces one file: the new prompt, with each change
+        cited to the comment that drove it. Copy it, paste it, ship it.
       </p>
+    </div>
+
+    <div class="reveal-scale mt-10 lg:mt-12">
+      <div
+        class="overflow-hidden rounded-2xl border border-border bg-card shadow-2xl ring-1 ring-foreground/5"
+      >
+        <div
+          class="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2.5 sm:px-5"
+        >
+          <div class="flex items-center gap-2">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              class="text-muted-foreground"
+            >
+              <path
+                fill="currentColor"
+                d="M4 1.5A1.5 1.5 0 0 0 2.5 3v10A1.5 1.5 0 0 0 4 14.5h8a1.5 1.5 0 0 0 1.5-1.5V5.621a1.5 1.5 0 0 0-.44-1.06l-3.12-3.122A1.5 1.5 0 0 0 8.878 1H4Z"
+              />
+            </svg>
+            <span class="font-mono text-[11px] text-muted-foreground">
+              prompts/customer-support.md
+            </span>
+            <span
+              class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-medium text-primary"
+            >
+              v3 &rarr; v4
+            </span>
+          </div>
+          <span
+            class="hidden font-mono text-[10px] text-muted-foreground/70 sm:inline"
+          >
+            via Blind Bench
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_minmax(240px,320px)]">
+          <div class="border-b border-border lg:border-r lg:border-b-0">
+            <pre
+              class="m-0 overflow-x-auto bg-transparent p-5 font-mono text-[13px] leading-relaxed text-foreground/85 sm:p-6"
+            ><code><span class="diff-line diff-line-removed"><span class="diff-marker">-</span> You are a <span class="diff-removed">helpful</span> customer support agent. Answer the user&rsquo;s <span class="diff-removed">question</span>.</span>
+<span class="diff-line diff-line-added"><span class="diff-marker">+</span> You are a customer support agent.</span>
+<span class="diff-line diff-line-added"><span class="diff-marker">+</span> <span class="diff-added">Be friendly and professional. Write like a helpful coworker,</span></span>
+<span class="diff-line diff-line-added"><span class="diff-marker">+</span> <span class="diff-added">not a corporate robot.</span></span>
+<span class="diff-line diff-line-added"><span class="diff-marker">+</span> <span class="diff-added">Avoid formal openers (&ldquo;Dear valued customer&rdquo;) and</span></span>
+<span class="diff-line diff-line-added"><span class="diff-marker">+</span> <span class="diff-added">form-letter phrases (&ldquo;I understand your concern&rdquo;).</span></span>
+<span class="diff-line diff-line-added"><span class="diff-marker">+</span> <span class="diff-added">Get to the point and be warm.</span></span></code></pre>
+          </div>
+
+          <aside class="bg-muted/20 p-5 sm:p-6">
+            <p
+              class="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              Trace
+            </p>
+            <ul class="mt-3 space-y-3">
+              <li class="space-y-1.5">
+                <p
+                  class="text-xs leading-relaxed text-foreground/80"
+                >
+                  &ldquo;Reads like a corporate form letter.&rdquo;
+                </p>
+                <p
+                  class="font-mono text-[10px] text-muted-foreground"
+                >
+                  &rarr; v4 lines 4&ndash;5
+                </p>
+              </li>
+              <li class="space-y-1.5">
+                <p
+                  class="text-xs leading-relaxed text-foreground/80"
+                >
+                  &ldquo;&lsquo;I understand your concern&rsquo; is filler.&rdquo;
+                </p>
+                <p
+                  class="font-mono text-[10px] text-muted-foreground"
+                >
+                  &rarr; v4 lines 5&ndash;6
+                </p>
+              </li>
+            </ul>
+          </aside>
+        </div>
+
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-3 sm:px-5"
+        >
+          <span class="font-mono text-[11px] text-muted-foreground">
+            Use your own API key. No per-seat billing.
+          </span>
+          <span
+            class="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+            >
+              <path
+                fill="currentColor"
+                d="M4 1.5A1.5 1.5 0 0 0 2.5 3v9A1.5 1.5 0 0 0 4 13.5h6V12H4V3h7v3.5h1.5V3A1.5 1.5 0 0 0 11 1.5H4Z M13 8.5h-1V12H8.5v1H12v3.5h1V13h3.5v-1H13V8.5Z"
+              />
+            </svg>
+            Copy markdown
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 </section>
+
+<style>
+  .diff-line {
+    display: block;
+    padding: 0.05em 0.25em;
+    margin: 0 -0.25em;
+    border-radius: 3px;
+  }
+  .diff-line-removed {
+    background-color: color-mix(in oklch, var(--step-3) 8%, transparent);
+  }
+  .diff-line-added {
+    background-color: color-mix(in oklch, var(--primary) 6%, transparent);
+  }
+  .diff-marker {
+    display: inline-block;
+    width: 1ch;
+    margin-right: 0.5ch;
+    color: color-mix(in oklch, var(--muted-foreground) 80%, transparent);
+    user-select: none;
+  }
+  .diff-line-removed .diff-marker {
+    color: var(--step-3);
+  }
+  .diff-line-added .diff-marker {
+    color: var(--primary);
+  }
+  .diff-removed {
+    color: var(--step-3);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in oklch, var(--step-3) 50%, transparent);
+  }
+  .diff-added {
+    color: var(--primary);
+    font-weight: 500;
+  }
+</style>

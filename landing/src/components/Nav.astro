@@ -16,7 +16,7 @@ const SIGNIN_URL = `${APP_URL}/auth/sign-in`;
   >
     <a
       href="/"
-      class="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      class="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
       aria-label="Blind Bench home"
     >
       <svg
@@ -58,7 +58,7 @@ const SIGNIN_URL = `${APP_URL}/auth/sign-in`;
       <a
         href="#how-it-works"
         data-nav-section-link="how-it-works"
-        class="nav-link nav-section-link text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        class="nav-link nav-section-link text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
       >
         How it works
       </a>
@@ -67,7 +67,7 @@ const SIGNIN_URL = `${APP_URL}/auth/sign-in`;
     <div class="flex items-center gap-3">
       <a
         href={SIGNIN_URL}
-        class="nav-link hidden text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:inline-flex"
+        class="nav-link hidden text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:inline-flex"
       >
         Sign in
       </a>
@@ -113,59 +113,33 @@ const SIGNIN_URL = `${APP_URL}/auth/sign-in`;
   }
 
   .nav-logo-icon {
-    color: #fff;
-    transition: color 300ms;
-  }
-  .site-nav[data-scrolled='true'] .nav-logo-icon {
     color: var(--primary);
   }
 
   .nav-brand {
-    color: #fff;
-    transition: color 300ms;
-  }
-  .site-nav[data-scrolled='true'] .nav-brand {
     color: var(--foreground);
   }
 
   .nav-link {
-    color: rgba(255, 255, 255, 0.75);
+    color: color-mix(in oklch, var(--foreground) 75%, transparent);
+    transition: color 200ms ease-out;
   }
   .nav-link:hover {
-    color: #fff;
-  }
-  .site-nav[data-scrolled='true'] .nav-link {
-    color: color-mix(in oklch, var(--foreground) 75%, transparent);
-  }
-  .site-nav[data-scrolled='true'] .nav-link:hover {
     color: var(--foreground);
   }
 
   .nav-cta {
-    background-color: #fff;
-    color: #0a0a0a;
-  }
-  .site-nav[data-scrolled='true'] .nav-cta {
     background-color: var(--foreground);
     color: var(--background);
   }
 
-  /* Focus ring must be visible against whatever sits behind the button,
-     which is the body background at the top of the page (light or dark
-     depending on the user's color scheme), and the frosted nav once
-     scrolled. var(--ring) adapts across both schemes and both states. */
   .nav-cta:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
-  .site-nav[data-scrolled='true'] .focus-visible\:outline-white:focus-visible {
-    outline-color: var(--ring);
-  }
-
   /* Active-section indicator: a 1px underline that slides in under the link
-     when its target section is in the viewport. Tracks the same color as
-     the link itself in both hero and scrolled states. */
+     when its target section is in the viewport. */
   .nav-section-link {
     position: relative;
   }
@@ -185,19 +159,15 @@ const SIGNIN_URL = `${APP_URL}/auth/sign-in`;
     transform: scaleX(1);
   }
   .nav-section-link[data-active='true'] {
-    color: #fff;
-  }
-  .site-nav[data-scrolled='true'] .nav-section-link[data-active='true'] {
     color: var(--foreground);
   }
 </style>
 
 <script>
   const nav = document.getElementById('site-nav');
-  // Hero section is the closest positioned ancestor of the sentinel marker.
-  const hero = document
-    .querySelector<HTMLElement>('[data-nav-sentinel]')
-    ?.closest('section');
+  // Pages with a hero use [data-nav-hero] on the hero <section>. Pages
+  // without one (legal layouts, etc.) fall through to the scroll-Y fallback.
+  const hero = document.querySelector<HTMLElement>('[data-nav-hero]');
 
   if (nav) {
     const NAV_HEIGHT = 56;

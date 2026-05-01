@@ -17,7 +17,7 @@ const steps = [
     eyebrow: 'Share',
     title: 'Send one link. No login.',
     description:
-      'Reviewers see outputs blind — no model names, no version numbers — and highlight the lines they like or hate right in the browser.',
+      'Reviewers see outputs blind, with no model names or version numbers, and highlight the lines they like or hate right in the browser.',
   },
   {
     number: '03',
@@ -42,13 +42,13 @@ const steps = [
         </span>
       </h2>
       <p class="mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg">
-        Draft, get blind reviewer feedback, and apply concrete prompt edits —
-        without leaving a tab open for your reviewers.
+        Draft, get blind reviewer feedback, and apply concrete prompt edits.
+        No need to leave a tab open for your reviewers.
       </p>
     </div>
   </div>
 
-  <!-- Sticky split: diagram (left) + step blocks (right) — wider container -->
+  <!-- Sticky split: diagram (left) + step blocks (right). Wider container. -->
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="journey-scroller mt-14 lg:mt-20">
       <div class="grid grid-cols-1 gap-12 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-10 xl:gap-16">
@@ -171,7 +171,7 @@ const steps = [
       window.addEventListener('resize', onScroll);
       update();
 
-      // Hash support: #demo-section (used by Nav + CtaFooter) — anchor
+      // Hash support: #demo-section (used by Nav + CtaFooter). Anchor
       // scroll still works because <SharePanel> keeps id="demo-section".
       // The scroll listener will pick up the resulting position and set
       // the diagram to step 2 automatically.

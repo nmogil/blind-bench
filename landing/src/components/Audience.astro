@@ -12,7 +12,7 @@ const audiences = [
   {
     title: 'VP Marketing',
     scenario:
-      'Rates brand voice on five responses without seeing which model or which draft &mdash; feedback lands without bias.',
+      'Rates brand voice on five responses without seeing which model or which draft. Feedback lands without bias.',
   },
   {
     title: 'Head of CX',
@@ -40,7 +40,7 @@ const audiences = [
     <dl class="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-8">
       {
         audiences.map((a, i) => (
-          <div class={`reveal reveal-delay-${i + 1} rounded-xl border border-border/60 bg-card p-5 sm:p-6`}>
+          <div class={`reveal reveal-delay-${Math.min(i + 1, 4)} rounded-xl border border-border/60 bg-card p-5 sm:p-6`}>
             <dt class="text-sm font-semibold text-foreground">{a.title}</dt>
             <dd
               class="mt-2 text-sm leading-relaxed text-muted-foreground"

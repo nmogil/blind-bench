@@ -1,59 +1,28 @@
 ---
 import ArrowRight from '../icons/ArrowRight.astro';
 import ArrowDown from '../icons/ArrowDown.astro';
-import Grainient from './Grainient.astro';
 
 const APP_URL = 'https://app.blindbench.dev';
 ---
 
-<section class="relative -mt-14 overflow-hidden bg-neutral-950 pt-14 text-white">
-  <Grainient
-    class="hero-grainient"
-    color1="#94a3b8"
-    color2="#5227FF"
-    color3="#000000"
-    timeSpeed={0.25}
-    zoom={0.9}
-    contrast={1.5}
-    opacity={1}
-  />
-  <!-- Static fallback for prefers-reduced-motion users -->
-  <div
-    aria-hidden="true"
-    class="hero-grainient-fallback pointer-events-none absolute inset-0"
-  ></div>
-  <!-- Readability scrim: darkens the left column where text sits,
-       preserves motion visibility on the right. -->
-  <div
-    aria-hidden="true"
-    class="pointer-events-none absolute inset-0 bg-gradient-to-r from-neutral-950/80 via-neutral-950/40 to-transparent"
-  ></div>
-  <!-- Mobile-only flat scrim. At phone widths the text column spans the
-       full viewport, so the horizontal gradient's fade-out sits behind the
-       copy. An extra flat layer keeps the headline legible on small screens. -->
-  <div
-    aria-hidden="true"
-    class="pointer-events-none absolute inset-0 bg-neutral-950/45 sm:hidden"
-  ></div>
-  <!-- Vertical polish: slight top vignette, stronger bottom fade for section seam -->
-  <div
-    aria-hidden="true"
-    class="pointer-events-none absolute inset-0 bg-gradient-to-b from-neutral-950/30 via-transparent to-neutral-950/50"
-  ></div>
+<section
+  data-nav-hero
+  class="relative bg-background pt-14 text-foreground"
+>
   <div
     class="relative mx-auto max-w-5xl px-4 pt-24 pb-24 sm:px-6 lg:px-8 lg:pt-36 lg:pb-32"
   >
     <div class="hero-animate mx-auto max-w-3xl">
       <p
-        class="font-mono text-[11px] tracking-[0.18em] text-white/70 uppercase"
+        class="font-mono text-[11px] tracking-[0.18em] text-muted-foreground uppercase"
       >
-        Google Docs for AI evaluation
+        Frictionless reviewer feedback
       </p>
 
       <h1
-        class="mt-6 text-[2rem] font-semibold leading-[1.12] tracking-tight text-white sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem]"
+        class="mt-6 text-[2rem] font-semibold leading-[1.05] tracking-tight sm:text-[2.75rem] md:text-[3.5rem] lg:text-[4rem]"
       >
-        Get feedback from{' '}
+        Your{' '}
         <span class="hero-rotator" data-hero-rotator>
           <span
             class="hero-rotator-clip"
@@ -63,14 +32,13 @@ const APP_URL = 'https://app.blindbench.dev';
           ></span>
         </span>
         <br />
-        to ship better AI products.
+        vote on prompts in 30 seconds.
       </h1>
 
       <p
-        class="mt-6 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
+        class="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
       >
-        One shareable link. No account. Comments become prompt edits,
-        automatically.
+        One shareable link. No login. No methodology to learn.
       </p>
 
       <div
@@ -79,7 +47,7 @@ const APP_URL = 'https://app.blindbench.dev';
         <a
           href={APP_URL}
           data-hero-cta="get_started"
-          class="inline-flex items-center justify-center rounded-md bg-white px-6 py-3 text-sm font-semibold text-neutral-950 transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          class="inline-flex items-center justify-center rounded-md bg-foreground px-6 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
         >
           Get started
           <ArrowRight class="ml-2 h-4 w-4" />
@@ -87,58 +55,31 @@ const APP_URL = 'https://app.blindbench.dev';
         <a
           href="#how-it-works"
           data-hero-cta="see_how"
-          class="inline-flex items-center justify-center rounded-md border border-white/30 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          class="inline-flex items-center justify-center rounded-md border border-border bg-background px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
         >
           See how it works
           <ArrowDown class="ml-1.5 h-4 w-4" />
         </a>
       </div>
-
-      <p class="mt-8 text-xs text-white/60">
-        Free in beta &middot; BYOK &middot; No per-seat billing
-      </p>
     </div>
-    <!-- Sentinel for the Nav.astro IntersectionObserver. When this element
-         scrolls above the nav, the nav flips from transparent to solid. -->
-    <div
-      data-nav-sentinel
-      aria-hidden="true"
-      class="pointer-events-none absolute bottom-0 left-0 h-px w-px"
-    ></div>
   </div>
 </section>
 
 <style>
-  /* Fallback gradient for reduced-motion users — Grainient hides itself,
-     this matches the sign-in page fallback. */
-  .hero-grainient-fallback {
-    background: linear-gradient(
-      100deg,
-      #94a3b8 0%,
-      #5227ff 55%,
-      #000000 100%
-    );
-    opacity: 0;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hero-grainient-fallback {
-      opacity: 1;
-    }
-  }
-
-  /* Rotating persona in the H1. A <br> in the markup parks this slot at the
-     end of line 1, so the rotator's width changes don't push any sibling
-     text around. */
   .hero-rotator {
     display: inline-block;
     vertical-align: baseline;
-    color: #ddd6fe;
+    color: var(--primary);
     font-weight: 700;
     letter-spacing: -0.01em;
     text-decoration-line: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 0.16em;
-    text-decoration-color: rgba(221, 214, 254, 0.55);
+    text-decoration-color: color-mix(
+      in oklch,
+      var(--primary) 55%,
+      transparent
+    );
   }
 
   .hero-rotator-clip {
@@ -168,7 +109,7 @@ const APP_URL = 'https://app.blindbench.dev';
   );
 
   if (rotator && rotatorActive) {
-    const ROLES = ['PMs', 'legal', 'marketing', 'customers', 'experts'];
+    const ROLES = ['PMs', 'lawyers', 'marketers', 'customers', 'experts'];
     const DWELL_MS = 2000;
     const STAGGER_MS = 25; // matches React Bits staggerDuration 0.025
     const ENTER_MS = 420;
@@ -183,7 +124,7 @@ const APP_URL = 'https://app.blindbench.dev';
     let paused = false;
     let animating = false;
 
-    // staggerFrom: 'last' — last char animates first, first char animates last.
+    // staggerFrom: 'last'. Last char animates first, first char animates last.
     function delayFor(i: number, total: number): number {
       return (total - 1 - i) * STAGGER_MS;
     }
@@ -194,7 +135,7 @@ const APP_URL = 'https://app.blindbench.dev';
       chars.forEach((ch, i) => {
         const span = document.createElement('span');
         span.className = 'hero-rotator-char';
-        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        span.textContent = ch === ' ' ? ' ' : ch;
         rotatorActive!.appendChild(span);
         if (animate) {
           span.animate(
@@ -248,7 +189,7 @@ const APP_URL = 'https://app.blindbench.dev';
       animating = false;
     }
 
-    // Initial paint — no entering animation on first load.
+    // Initial paint. No entering animation on first load.
     renderChars(ROLES[0], false);
 
     if (!reducedMotion && ROLES.length > 1) {
@@ -268,7 +209,7 @@ const APP_URL = 'https://app.blindbench.dev';
   }
 
   // Instrument CTA clicks with the persona that was visible at click time.
-  // Passive learning — no A/B experiment setup needed — tells us which
+  // Passive learning: no A/B experiment setup needed; tells us which
   // persona correlates with conversion.
   document
     .querySelectorAll<HTMLElement>('[data-hero-cta]')
