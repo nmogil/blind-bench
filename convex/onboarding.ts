@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { requireAuth, requireOrgRole } from "./lib/auth";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 
 /**
  * Compute onboarding progress for the current user in an org.
@@ -104,9 +104,24 @@ export const getProgress = query({
 });
 
 /**
- * M28.3: Co-pilot panel progress. Five steps tied directly to user activity in
- * the current org — no progress table, all derived from real data. Sample
- * (auto-seeded) rows never count: the user has to do the action themselves.
+ * M29.7: Co-pilot panel ambient steps. Tuned for the new welcome-screen
+ * onboarding flow where the user lands in a real, mutable project from
+ * minute zero — BYOK is inline at the run button, so add_key is gone, and
+ * "leave_feedback" is replaced by the M29.6 collab nudge card.
+ *
+ * The four ambient steps:
+ *
+ *   1. write_prompt — project has a prompt with non-empty content
+ *   2. run_eval — project has a completed run
+ *   3. compare_model — user has executed a multi-model "mix" run (>=2
+ *      distinct models in slotConfigs) so they've felt the comparison value
+ *   4. promote_test_case — project has at least one saved test case (the
+ *      welcome-paste path doesn't auto-create one; this nudges the user to
+ *      promote inline variables to a reusable case)
+ *
+ * Steps are computed on the user's first owned project (firstProjectId);
+ * once the user has multiple projects the panel switches to suggestions mode
+ * via firstActivationAt.
  */
 export const copilotProgress = query({
   args: { orgId: v.id("organizations") },
@@ -118,129 +133,86 @@ export const copilotProgress = query({
       "member",
     ]);
 
-    const [user, key, allProjects] = await Promise.all([
+    const [user, projects] = await Promise.all([
       ctx.db.get(userId),
-      ctx.db
-        .query("openRouterKeys")
-        .withIndex("by_org", (q) => q.eq("organizationId", args.orgId))
-        .unique(),
       ctx.db
         .query("projects")
         .withIndex("by_org", (q) => q.eq("organizationId", args.orgId))
         .collect(),
     ]);
 
-    const projects = allProjects.filter((p) => !p.isSample);
     const firstProjectId: Id<"projects"> | null = projects[0]?._id ?? null;
 
-    const hasKey = key !== null;
-
-    let hasNonSampleVersion = false;
+    let hasPromptContent = false;
     let hasCompletedRun = false;
-    let hasAcceptedOptimization = false;
-
-    // Track non-sample run output ids so we can scope outputFeedback membership
-    // back to this org's surface area without scanning every annotation.
-    const nonSampleVersionIds: Id<"promptVersions">[] = [];
-    const nonSampleRunIds: Id<"promptRuns">[] = [];
+    let hasMultiModelRun = false;
+    let hasSavedTestCase = false;
 
     for (const project of projects) {
-      const versions = await ctx.db
-        .query("promptVersions")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .collect();
-      for (const v of versions) {
-        if (!v.isSample) {
-          hasNonSampleVersion = true;
-          nonSampleVersionIds.push(v._id);
+      if (!hasPromptContent) {
+        const versions = await ctx.db
+          .query("promptVersions")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .collect();
+        if (versions.some((v) => versionHasContent(v))) {
+          hasPromptContent = true;
         }
       }
 
-      const runs = await ctx.db
-        .query("promptRuns")
-        .withIndex("by_project_and_status", (q) =>
-          q.eq("projectId", project._id),
-        )
-        .collect();
-      for (const r of runs) {
-        if (r.isSample) continue;
-        nonSampleRunIds.push(r._id);
-        if (r.status === "completed") hasCompletedRun = true;
-      }
-
-      if (!hasAcceptedOptimization) {
-        const optimizations = await ctx.db
-          .query("optimizationRequests")
+      if (!hasCompletedRun || !hasMultiModelRun) {
+        const runs = await ctx.db
+          .query("promptRuns")
           .withIndex("by_project_and_status", (q) =>
-            q.eq("projectId", project._id),
+            q.eq("projectId", project._id).eq("status", "completed"),
           )
           .collect();
-        if (
-          optimizations.some(
-            (o) => !o.isSample && o.reviewStatus === "accepted",
-          )
-        ) {
-          hasAcceptedOptimization = true;
-        }
-      }
-    }
-
-    // leave_feedback: any non-sample annotation authored by this user against
-    // any surface in this org. Cheaper to walk the user's feedback rows and
-    // filter than to walk every output. Includes both prompt-template feedback
-    // (promptFeedback) and run-output feedback (outputFeedback).
-    let hasFeedback = false;
-    if (nonSampleVersionIds.length > 0) {
-      const promptFeedback = await ctx.db
-        .query("promptFeedback")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
-      const versionIdSet = new Set(nonSampleVersionIds.map((id) => id as string));
-      if (promptFeedback.some((f) => versionIdSet.has(f.promptVersionId as string))) {
-        hasFeedback = true;
-      }
-    }
-    if (!hasFeedback && nonSampleRunIds.length > 0) {
-      const outputFeedback = await ctx.db
-        .query("outputFeedback")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
-      if (outputFeedback.length > 0) {
-        const runIdSet = new Set(nonSampleRunIds.map((id) => id as string));
-        for (const fb of outputFeedback) {
-          if (fb.isSample) continue;
-          const output = await ctx.db.get(fb.outputId);
-          if (output && runIdSet.has(output.runId as string)) {
-            hasFeedback = true;
-            break;
+        for (const r of runs) {
+          hasCompletedRun = true;
+          const slotModels = new Set(
+            (r.slotConfigs ?? []).map((s) => s.model).filter(Boolean),
+          );
+          if (r.mode === "mix" && slotModels.size >= 2) {
+            hasMultiModelRun = true;
           }
         }
+      }
+
+      if (!hasSavedTestCase) {
+        const tc = await ctx.db
+          .query("testCases")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .first();
+        if (tc) hasSavedTestCase = true;
+      }
+
+      if (
+        hasPromptContent &&
+        hasCompletedRun &&
+        hasMultiModelRun &&
+        hasSavedTestCase
+      ) {
+        break;
       }
     }
 
     const steps = {
-      add_key: hasKey,
-      write_prompt: hasNonSampleVersion,
+      write_prompt: hasPromptContent,
       run_eval: hasCompletedRun,
-      leave_feedback: hasFeedback,
-      accept_optimizer: hasAcceptedOptimization,
+      compare_model: hasMultiModelRun,
+      promote_test_case: hasSavedTestCase,
     };
     const order: (keyof typeof steps)[] = [
-      "add_key",
       "write_prompt",
       "run_eval",
-      "leave_feedback",
-      "accept_optimizer",
+      "compare_model",
+      "promote_test_case",
     ];
     const doneCount = order.filter((id) => steps[id]).length;
     const isComplete = doneCount === order.length;
 
-    // M28.7: surfacing the activation timestamp lets the co-pilot panel
-    // (M28.8) flip from "guidance" mode to "suggestions" mode reactively.
     const firstActivationAt = user?.firstActivationAt;
 
-    // M28.8: lightweight signals the panel uses to rank static suggestions.
-    // Cheap counts only — no scans of feedback / runs / annotations here.
+    // M28.8: lightweight signal the panel uses to rank static suggestions.
     const orgMembers = await ctx.db
       .query("organizationMembers")
       .withIndex("by_org", (q) => q.eq("organizationId", args.orgId))
@@ -259,6 +231,20 @@ export const copilotProgress = query({
     };
   },
 });
+
+function versionHasContent(version: Doc<"promptVersions">): boolean {
+  if (version.messages) {
+    for (const m of version.messages) {
+      const content = m.role === "assistant" ? (m.content ?? "") : m.content;
+      if (content.trim().length > 0) return true;
+    }
+    return false;
+  }
+  return (
+    (version.userMessageTemplate ?? "").trim().length > 0 ||
+    (version.systemMessage ?? "").trim().length > 0
+  );
+}
 
 const COLLAB_NUDGE_DISMISS_KEY = "copilot_collab_nudge";
 
