@@ -2,14 +2,40 @@
  * One-off admin utilities. Manually invoked via `npx convex run`.
  *
  * DO NOT call these from the client. Every function here is destructive or
- * privileged — they're guarded by an explicit CONFIRM string to make
- * accidental fires obvious.
+ * privileged. Wipe functions are guarded by two layers:
+ *
+ *   1. **Env gate** — `WIPE_ENABLED` must equal `"true"` on the deployment
+ *      (set in the Convex dashboard env vars). Default-off means a freshly
+ *      provisioned prod deployment cannot be wiped without an explicit
+ *      opt-in. To wipe pre-launch (per the M25 no-backfill policy), set
+ *      `WIPE_ENABLED=true`, run the wipe, then unset.
+ *   2. **Date-stamped confirm** — `confirm` must equal `WIPE-YYYY-MM-DD`
+ *      where the date is today's UTC date. Prevents copy-paste of yesterday's
+ *      command and forces the operator to look up today's date before firing.
  */
 
 import { internalMutation, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { TableNames } from "./_generated/dataModel";
 import { v } from "convex/values";
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function assertWipeAllowed(confirm: string): void {
+  if (process.env.WIPE_ENABLED !== "true") {
+    throw new Error(
+      "Wipe is disabled on this deployment. Set WIPE_ENABLED=true in the Convex dashboard env vars to permit, then unset after.",
+    );
+  }
+  const expected = `WIPE-${todayUtc()}`;
+  if (confirm !== expected) {
+    throw new Error(
+      `Stale or missing confirmation. Pass confirm: "${expected}" (today's UTC date).`,
+    );
+  }
+}
 
 // Application tables to wipe. Auth tables (users, authAccounts,
 // authSessions…) are intentionally omitted so the current user stays signed
@@ -61,9 +87,7 @@ export const wipeTableBatch = internalMutation({
     confirm: v.string(),
   },
   handler: async (ctx, args) => {
-    if (args.confirm !== "YES-WIPE-DATA") {
-      throw new Error("Missing confirmation");
-    }
+    assertWipeAllowed(args.confirm);
     // Cast is safe because we only ever call this with names from APP_TABLES.
     const batch = await ctx.db
       .query(args.table as TableNames)
@@ -78,16 +102,14 @@ export const wipeTableBatch = internalMutation({
 export const wipeAll = internalAction({
   args: { confirm: v.string() },
   handler: async (ctx, args) => {
-    if (args.confirm !== "YES-WIPE-DATA") {
-      throw new Error("Missing confirmation");
-    }
+    assertWipeAllowed(args.confirm);
     const summary: Record<string, number> = {};
     for (const table of APP_TABLES) {
       let total = 0;
       while (true) {
         const res = await ctx.runMutation(internal.admin.wipeTableBatch, {
           table,
-          confirm: "YES-WIPE-DATA",
+          confirm: args.confirm,
         });
         total += res.deleted;
         if (res.done) break;

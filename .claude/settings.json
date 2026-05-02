@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(npx convex run admin:wipeAll:*)",
+      "Bash(npx convex run admin:wipeAll)",
+      "Bash(npx convex run admin:wipeTableBatch:*)",
+      "Bash(npx convex run admin:wipeTableBatch)",
+      "Bash(./node_modules/.bin/convex run admin:wipeAll:*)",
+      "Bash(./node_modules/.bin/convex run admin:wipeAll)",
+      "Bash(./node_modules/.bin/convex run admin:wipeTableBatch:*)",
+      "Bash(./node_modules/.bin/convex run admin:wipeTableBatch)",
+      "Bash(node_modules/.bin/convex run admin:wipeAll:*)",
+      "Bash(node_modules/.bin/convex run admin:wipeAll)",
+      "Bash(node_modules/.bin/convex run admin:wipeTableBatch:*)",
+      "Bash(node_modules/.bin/convex run admin:wipeTableBatch)"
+    ]
+  }
+}
