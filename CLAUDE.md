@@ -73,6 +73,16 @@ npm run build        # Type-check + build for production
 npx convex deploy    # Deploy Convex functions to production
 ```
 
+### Pre-launch wipe (M25 no-backfill policy)
+
+Wipe utilities in `convex/admin.ts` are gated by two server-side checks; see the JSDoc there for the full rationale.
+
+1. In the Convex dashboard, set `WIPE_ENABLED=true` on the target deployment.
+2. `npx convex run admin:wipeAll '{"confirm":"WIPE-YYYY-MM-DD"}'` — the date must be today's UTC date.
+3. **Unset `WIPE_ENABLED` immediately after.** It is sticky; leaving it set leaves the gate open.
+
+Claude Code denies these commands by default (`.claude/settings.json`); approve the prompt only when you genuinely intend to wipe.
+
 ## Environment Variables (Convex Dashboard)
 
 - `GOOGLE_CLIENT_ID` — Google OAuth client ID
