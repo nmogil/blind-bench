@@ -409,27 +409,39 @@ async function runSingleOutput(params: {
   } = params;
 
   let finalUsage: StreamUsage | undefined;
+  let streamError: unknown;
 
-  await streamChatCompletion({
-    apiKey,
-    model,
-    messages,
-    temperature,
-    maxTokens,
-    onChunk: async ({ chunk, done, usage }) => {
-      if (chunk) {
-        await appendChunk(outputId, chunk);
-      }
-      if (done && usage) {
-        finalUsage = usage;
-      }
-    },
-  });
+  try {
+    await streamChatCompletion({
+      apiKey,
+      model,
+      messages,
+      temperature,
+      maxTokens,
+      onChunk: async ({ chunk, done, usage }) => {
+        if (chunk) {
+          await appendChunk(outputId, chunk);
+        }
+        if (done && usage) {
+          finalUsage = usage;
+        }
+      },
+    });
+  } catch (err) {
+    streamError = err;
+  }
 
+  // Always finalize so this slot's promise settles. Without this, a thrown
+  // stream leaves latencyMs unset and (combined with the run-level promise
+  // race) keeps the overall run pinned in "running" until the action times
+  // out. If the stream errored we still re-throw below so executeRunAction's
+  // Promise.allSettled records the failure.
   await finalize(outputId, {
     promptTokens: finalUsage?.promptTokens,
     completionTokens: finalUsage?.completionTokens,
     totalTokens: finalUsage?.totalTokens,
     latencyMs: Date.now() - startTime,
   });
+
+  if (streamError) throw streamError;
 }
