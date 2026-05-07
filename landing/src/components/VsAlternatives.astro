@@ -119,18 +119,44 @@ const rows = [
     </div>
 
     <div
-      class="reveal mx-auto mt-10 flex max-w-3xl items-start gap-3 rounded-xl border border-border/60 bg-card/60 px-5 py-4 text-sm leading-relaxed text-muted-foreground sm:px-6"
+      class="reveal mx-auto mt-12 max-w-3xl rounded-2xl border border-border/60 bg-card/80 p-6 sm:p-8"
     >
-      <span
-        class="font-mono text-[10px] tracking-[0.18em] text-primary uppercase mt-0.5"
+      <div class="flex items-center gap-2">
+        <span
+          class="font-mono text-[10px] tracking-[0.18em] text-primary uppercase"
+        >
+          Soon
+        </span>
+        <span
+          class="font-mono text-[10px] tracking-[0.18em] text-muted-foreground uppercase"
+        >
+          Bring your stack
+        </span>
+      </div>
+      <h3
+        class="mt-3 text-lg font-semibold tracking-tight text-foreground sm:text-xl"
       >
-        Soon
-      </span>
-      <p>
-        <span class="font-medium text-foreground">Integrations coming soon.</span>{' '}
-        Bring your traces from Langfuse, PostHog, or PromptLayer straight into a
-        review.
+        Pairs with the tracing tools you already use.
+      </h3>
+      <p
+        class="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base"
+      >
+        Pull runs from your tracing platform into a blind review, then push
+        reviewer scores back. Blind Bench is the human layer &mdash; your
+        stack stays the same.
       </p>
+      <ul
+        class="mt-5 flex flex-wrap gap-2"
+        aria-label="Tracing platforms with planned integrations"
+      >
+        {
+          ['Langfuse', 'Braintrust', 'PostHog', 'PromptLayer'].map((name) => (
+            <li class="rounded-md border border-border bg-background/60 px-2.5 py-1 font-mono text-xs text-muted-foreground">
+              {name}
+            </li>
+          ))
+        }
+      </ul>
     </div>
   </div>
 </section>
