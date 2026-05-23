@@ -48,12 +48,50 @@ const steps = [
     </div>
   </div>
 
+  <!-- Mobile-only sticky progress pill. The full diagram is hidden on
+       mobile (it would consume ~360px above the fold without ever being
+       visible while the steps scroll past). This compact bar reuses the
+       same data-active-step tracking so the active step still updates
+       visually as the user scrolls. -->
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:hidden">
+    <div
+      class="journey-mobile-progress sticky top-14 z-40 mt-10 -mx-4 border-y border-border/70 bg-background/85 px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:px-6"
+      data-journey-progress
+      data-active-step="0"
+      aria-hidden="true"
+    >
+      <ol class="flex items-center gap-2">
+        {
+          steps.map((s, i) => (
+            <>
+              <li
+                class="journey-progress-item flex flex-1 items-center justify-center gap-2 rounded-md px-2 py-1.5"
+                data-progress-item={i}
+              >
+                <span class="journey-progress-dot inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border bg-card font-mono text-[10px] font-semibold text-muted-foreground transition-[color,border-color,background-color,box-shadow] duration-300">
+                  {i + 1}
+                </span>
+                <span class="journey-progress-label truncate text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground transition-colors duration-300">
+                  {s.eyebrow}
+                </span>
+              </li>
+              {i < steps.length - 1 && (
+                <li class="h-px w-2 flex-shrink-0 bg-border/60" aria-hidden="true" />
+              )}
+            </>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+
   <!-- Sticky split: diagram (left) + step blocks (right) — wider container -->
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-    <div class="journey-scroller mt-14 lg:mt-20">
+    <div class="journey-scroller mt-8 lg:mt-20">
       <div class="grid grid-cols-1 gap-12 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-10 xl:gap-16">
-        <!-- Left: sticky diagram (desktop) / inline (mobile) -->
-        <div class="journey-sticky-col">
+        <!-- Left: sticky diagram (desktop only — mobile uses the compact
+             progress pill above) -->
+        <div class="journey-sticky-col hidden lg:block">
           <div class="journey-sticky-inner lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-7rem)] lg:items-center">
             <JourneyDiagram default={0} />
           </div>
@@ -98,13 +136,6 @@ const steps = [
 </section>
 
 <style>
-  /* Mobile (no sticky): center the diagram naturally above the first step. */
-  @media (max-width: 1023.98px) {
-    .journey-sticky-inner {
-      padding-bottom: 1.5rem;
-    }
-  }
-
   /* On desktop, give each step block enough vertical room so the sticky
      diagram has scroll distance to dwell on each. The min-height of the
      last block is reduced so the section ends near the bottom of its panel
@@ -120,6 +151,30 @@ const steps = [
       min-height: 0;
     }
   }
+
+  /* Mobile progress pill — active item picks up the primary color when the
+     parent's data-active-step matches. Mirrors the diagram highlight. */
+  .journey-mobile-progress[data-active-step='0'] .journey-progress-item[data-progress-item='0'] .journey-progress-dot,
+  .journey-mobile-progress[data-active-step='1'] .journey-progress-item[data-progress-item='1'] .journey-progress-dot,
+  .journey-mobile-progress[data-active-step='2'] .journey-progress-item[data-progress-item='2'] .journey-progress-dot {
+    color: var(--primary);
+    border-color: color-mix(in oklch, var(--primary) 60%, transparent);
+    background-color: color-mix(in oklch, var(--primary) 14%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 10%, transparent);
+  }
+
+  .journey-mobile-progress[data-active-step='0'] .journey-progress-item[data-progress-item='0'] .journey-progress-label,
+  .journey-mobile-progress[data-active-step='1'] .journey-progress-item[data-progress-item='1'] .journey-progress-label,
+  .journey-mobile-progress[data-active-step='2'] .journey-progress-item[data-progress-item='2'] .journey-progress-label {
+    color: var(--primary);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .journey-progress-dot,
+    .journey-progress-label {
+      transition: none;
+    }
+  }
 </style>
 
 <script>
@@ -128,17 +183,23 @@ const steps = [
   const section = document.getElementById('how-it-works');
   if (section) {
     const diagram = section.querySelector<DiagramEl>('[data-journey-diagram]');
+    const progress = section.querySelector<HTMLElement>('[data-journey-progress]');
     const stepEls = Array.from(
       section.querySelectorAll<HTMLElement>('[data-journey-step]'),
     );
 
-    if (diagram && stepEls.length) {
-      let active = Number(diagram.dataset.activeStep || '0');
+    // Either the desktop diagram OR the mobile progress bar is enough to
+    // run the tracker — both share the same data-active-step contract.
+    if ((diagram || progress) && stepEls.length) {
+      let active = Number(
+        diagram?.dataset.activeStep || progress?.dataset.activeStep || '0',
+      );
 
       const setActive = (i: number) => {
         if (i === active) return;
         active = i;
-        diagram.dataset.activeStep = String(i);
+        if (diagram) diagram.dataset.activeStep = String(i);
+        if (progress) progress.dataset.activeStep = String(i);
       };
 
       // Pick the step whose center is closest to the viewport's vertical center.

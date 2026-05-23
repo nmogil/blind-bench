@@ -55,6 +55,10 @@ const APP_URL = 'https://app.blindbench.dev';
       >
         Get feedback from{' '}
         <span class="hero-rotator" data-hero-rotator>
+          <!-- Invisible sizer reserves width of the longest persona so the
+               H1's line 1 never re-wraps as words rotate. Keep in sync with
+               the ROLES array below. -->
+          <span class="hero-rotator-sizer" aria-hidden="true">customers</span>
           <span
             class="hero-rotator-clip"
             data-hero-rotator-active
@@ -130,6 +134,7 @@ const APP_URL = 'https://app.blindbench.dev';
      end of line 1, so the rotator's width changes don't push any sibling
      text around. */
   .hero-rotator {
+    position: relative;
     display: inline-block;
     vertical-align: baseline;
     color: #ddd6fe;
@@ -141,7 +146,20 @@ const APP_URL = 'https://app.blindbench.dev';
     text-decoration-color: rgba(221, 214, 254, 0.55);
   }
 
+  /* Reserves layout width = longest persona word. Invisible but in-flow so
+     the parent (and its underline) stays sized to the widest case. */
+  .hero-rotator-sizer {
+    display: inline-block;
+    visibility: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Animated chars overlay the sizer; absolute positioning keeps them out
+     of normal flow so they don't double the rotator's width. */
   .hero-rotator-clip {
+    position: absolute;
+    inset: 0;
     display: inline-flex;
     overflow: hidden;
     white-space: nowrap;
