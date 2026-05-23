@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Doc, Id } from "../../convex/_generated/dataModel";
@@ -5,7 +6,12 @@ import { BlindLabelBadge } from "./BlindLabelBadge";
 import { RunStatusPill } from "./RunStatusPill";
 import { AnnotatedEditor } from "./tiptap/AnnotatedEditor";
 import type { EditorFormat } from "./tiptap/PromptEditor";
+import { useTypewriter } from "@/hooks/useTypewriter";
 import { cn } from "@/lib/utils";
+
+// User must scroll within this many px of the bottom for sticky-follow to engage.
+// Generous enough that small layout shifts don't count as "scrolled up".
+const STICKY_THRESHOLD_PX = 40;
 
 interface StreamingOutputPanelProps {
   output: Doc<"runOutputs">;
@@ -40,6 +46,39 @@ export function StreamingOutputPanel({
   const isStreaming = runStatus === "running";
   const isFailed = runStatus === "failed";
   const isCompleted = runStatus === "completed";
+
+  // Smooth out the backend's 80ms-batched chunks into per-frame character
+  // reveal. When the run ends, snap to the full text so the final byte lands
+  // immediately (no animation tail blocking annotations).
+  const displayed = useTypewriter(output.outputContent ?? "", {
+    active: isStreaming,
+  });
+
+  // Sticky auto-scroll: follow new text while the user is parked near the
+  // bottom; if they scroll up to read earlier text, leave them be until they
+  // return to the bottom on their own.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef(true);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      stickyRef.current = distanceFromBottom <= STICKY_THRESHOLD_PX;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    if (stickyRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [displayed, isStreaming]);
 
   // Feedback queries/mutations — only active when completed
   const feedback = useQuery(
@@ -126,14 +165,15 @@ export function StreamingOutputPanel({
         </div>
       ) : (
         <div
+          ref={scrollRef}
           className={cn(
             "flex-1 overflow-y-auto p-3 text-sm whitespace-pre-wrap font-mono leading-relaxed min-h-[200px]",
-            !output.outputContent && "text-muted-foreground italic",
+            !displayed && !isStreaming && "text-muted-foreground italic",
           )}
           aria-live="polite"
           data-ph-mask
         >
-          {output.outputContent ||
+          {displayed ||
             (isStreaming
               ? ""
               : isCompleted

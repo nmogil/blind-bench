@@ -411,6 +411,26 @@ async function runSingleOutput(params: {
   let finalUsage: StreamUsage | undefined;
   let streamError: unknown;
 
+  // Per-slot chunk batching. OpenRouter emits tokens individually (often
+  // 30-60/sec), and a per-token mutation triples that under 3 parallel slots,
+  // which floods the Convex subscription channel and makes the UI feel chunky.
+  // Buffer up to BATCH_CHARS or BATCH_MS and flush as one mutation. Flushes
+  // are chained via lastFlush so concurrent mutations can't reorder chunks
+  // (appendOutputChunk reads-then-patches outputContent).
+  const BATCH_MS = 80;
+  const BATCH_CHARS = 48;
+  let buffer = "";
+  let lastFlushAt = Date.now();
+  let lastFlush: Promise<unknown> = Promise.resolve();
+
+  const flush = () => {
+    if (buffer.length === 0) return;
+    const pending = buffer;
+    buffer = "";
+    lastFlushAt = Date.now();
+    lastFlush = lastFlush.then(() => appendChunk(outputId, pending));
+  };
+
   try {
     await streamChatCompletion({
       apiKey,
@@ -420,7 +440,10 @@ async function runSingleOutput(params: {
       maxTokens,
       onChunk: async ({ chunk, done, usage }) => {
         if (chunk) {
-          await appendChunk(outputId, chunk);
+          buffer += chunk;
+          if (buffer.length >= BATCH_CHARS || Date.now() - lastFlushAt >= BATCH_MS) {
+            flush();
+          }
         }
         if (done && usage) {
           finalUsage = usage;
@@ -430,6 +453,11 @@ async function runSingleOutput(params: {
   } catch (err) {
     streamError = err;
   }
+
+  // Drain any remaining buffered text before finalize so the completed view
+  // never shows truncated output, even on error.
+  flush();
+  await lastFlush;
 
   // Always finalize so this slot's promise settles. Without this, a thrown
   // stream leaves latencyMs unset and (combined with the run-level promise
