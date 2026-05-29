@@ -74,7 +74,6 @@ const APP_TABLES: TableNames[] = [
   "cycleFeedback",
   "reviewSessions",
   "reviewMatchups",
-  "guestIdentities",
   "invitations",
   "traceImports",
 ];

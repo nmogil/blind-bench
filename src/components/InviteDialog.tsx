@@ -133,7 +133,7 @@ export function InviteDialog({
         : "Invite reviewers";
   const description =
     scope === "cycle"
-      ? "Invitees will blind-evaluate this cycle. They can accept with an account or continue as a guest."
+      ? "Reviewers rate responses blind — no account needed. Anyone with the link can start in one click."
       : "Invitees will get an email with a link to accept.";
 
   return (
