@@ -294,7 +294,7 @@ describe("acceptInviteAsGuest — privilege gate", () => {
 
 describe("guest review pipeline", () => {
   test("a bare anonymous user (no invite accepted) cannot start a review", async () => {
-    const { t, ids, asGuest } = await seedGuestEnv();
+    const { ids, asGuest } = await seedGuestEnv();
     await expect(
       asGuest.mutation(api.reviewSessions.start, { cycleId: ids.cycleId }),
     ).rejects.toThrow(/Permission denied/);
