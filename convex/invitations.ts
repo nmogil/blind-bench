@@ -13,8 +13,12 @@
  *      a single project as `owner` / `editor` / `evaluator`. Independent
  *      of org membership: a project collaborator does *not* implicitly
  *      gain org-level read access.
- *   3. **Guest** (`guestIdentities`) — unauthenticated cycle reviewer
- *      identified by verified email. Separate principal type entirely.
+ *
+ * M30: there is no separate guest principal. A "guest" reviewer is an
+ * anonymous Convex Auth user (`isAnonymous: true`) that accepts a reviewer
+ * invite and is written into ring 2 as an `evaluator`. See
+ * `acceptInviteAsGuest` — the entire review pipeline then treats it like any
+ * other evaluator collaborator.
  *
  * # One-row-per-scope rule
  *
@@ -39,8 +43,9 @@
  * the seed-signal decoupling and commit `6e01dd7` for the cycle-invite
  * fix that motivated the rule.
  *
- * Guest principals may ONLY accept scope=cycle with role=cycle_reviewer.
- * Org/project invites require real auth.
+ * Anonymous guests may ONLY accept reviewer-role invites (`cycle_reviewer`,
+ * `project_evaluator`) — both resolve to an `evaluator` row. Owner/editor and
+ * all org invites require a real account.
  */
 
 import { v } from "convex/values";
@@ -556,33 +561,58 @@ export const acceptWithAuth = mutation({
 });
 
 /**
- * Guest accept (unauthenticated). Only allowed for scope=cycle,
- * role=cycle_reviewer. Creates/reuses a guestIdentities row keyed on the
- * invite email.
+ * M30: No-account guest accept. The caller is an *anonymous* Convex Auth user
+ * (minted client-side via `signIn("anonymous")` right before this call), so
+ * `getAuthUserId` resolves to a real `users` row and the entire review
+ * pipeline — `requireProjectRole`, `isBlindReviewer`, session/rating tables —
+ * works unchanged. The guest simply becomes an `evaluator` collaborator.
  *
- * For shareable invites the caller must provide `email` (public link,
- * self-attested). For targeted invites the email is pre-bound.
+ * Privilege gate: anonymous users may ONLY accept reviewer-role invites
+ * (`cycle_reviewer`, `project_evaluator`). Both resolve to an `evaluator`
+ * projectCollaborators row — never owner/editor/org access — so a guest can
+ * never escalate by presenting an org/project-owner token. Real signed-in
+ * users must use `acceptWithAuth` (which handles every scope).
+ *
+ * `displayName`/`email` are self-reported attribution stored on the anon user
+ * row so the cycle owner can tell guests apart. They are NOT auth credentials
+ * and are never verified.
  */
-export const acceptAsGuest = mutation({
+export const acceptInviteAsGuest = mutation({
   args: {
     token: v.string(),
-    // Required only for shareable invites; ignored otherwise.
-    email: v.optional(v.string()),
     displayName: v.optional(v.string()),
+    email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("Not authenticated");
+    // Real accounts carry richer identity and route through acceptWithAuth.
+    // Keeping guests on the anonymous path stops a signed-in user from
+    // accidentally laundering an owner invite down to evaluator access.
+    if (!user.isAnonymous) {
+      throw new Error("Signed-in users should accept with their account");
+    }
+
     const invite = await ctx.db
       .query("invitations")
       .withIndex("by_token", (q) => q.eq("token", args.token))
       .unique();
     if (!invite) throw new Error("Invitation not found");
-    if (invite.scope !== "cycle" || invite.role !== "cycle_reviewer") {
-      throw new Error("Guest acceptance is only allowed for cycle reviewers");
+
+    // The privilege gate — see the function-level comment.
+    if (
+      invite.role !== "cycle_reviewer" &&
+      invite.role !== "project_evaluator"
+    ) {
+      throw new Error("This invitation requires an account");
     }
+
     if (invite.status === "revoked") throw new Error("Invitation was revoked");
     if (invite.expiresAt < Date.now())
       throw new Error("This invitation has expired");
-
+    if (!invite.shareable && invite.status === "accepted")
+      throw new Error("Invitation was already accepted");
     if (
       invite.shareable &&
       invite.maxAccepts !== undefined &&
@@ -591,35 +621,25 @@ export const acceptAsGuest = mutation({
       throw new Error("This invitation has reached its response limit");
     }
 
-    const email = normalizeEmail(
-      invite.shareable ? args.email ?? "" : invite.email,
-    );
-    if (!email) throw new Error("Email is required");
+    // Self-reported attribution. Only fill blanks — never overwrite values the
+    // user already has (an anon user could accept a second invite).
+    const patch: { name?: string; email?: string } = {};
+    const trimmedName = args.displayName?.trim();
+    if (trimmedName && !user.name) patch.name = trimmedName.slice(0, 80);
+    const normalizedEmail = args.email ? normalizeEmail(args.email) : "";
+    if (normalizedEmail && !user.email) patch.email = normalizedEmail;
+    if (Object.keys(patch).length > 0) await ctx.db.patch(userId, patch);
 
-    // Find-or-create the guest identity.
-    const existingGuest = await ctx.db
-      .query("guestIdentities")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .unique();
-
-    let guestId: Id<"guestIdentities">;
-    const now = Date.now();
-    if (existingGuest) {
-      guestId = existingGuest._id;
-      if (args.displayName && !existingGuest.displayName) {
-        await ctx.db.patch(guestId, { displayName: args.displayName });
-      }
+    // Both reviewer roles land as an `evaluator` collaborator via the same
+    // per-scope acceptors used by acceptWithAuth — one membership row, blind
+    // semantics carried from the invite.
+    if (invite.scope === "cycle") {
+      await acceptCycleInvite(ctx, invite, userId);
     } else {
-      guestId = await ctx.db.insert("guestIdentities", {
-        email,
-        verifiedAt: now,
-        displayName: args.displayName,
-      });
+      await acceptProjectInvite(ctx, invite, userId);
     }
 
-    // Write the cycleEvaluator row as a guest marker? No — cycleEvaluators is
-    // userId-keyed. M25.5 will repoint evaluator tracking through invitations.
-    // For now we just mark the invite accepted.
+    const now = Date.now();
     if (invite.shareable) {
       await ctx.db.patch(invite._id, {
         acceptCount: invite.acceptCount + 1,
@@ -628,7 +648,7 @@ export const acceptAsGuest = mutation({
       await ctx.db.patch(invite._id, {
         status: "accepted",
         acceptedAt: now,
-        acceptedByGuestId: guestId,
+        acceptedByUserId: userId,
         acceptCount: invite.acceptCount + 1,
       });
     }
@@ -637,7 +657,7 @@ export const acceptAsGuest = mutation({
       scope: invite.scope,
       scopeId: invite.scopeId,
       role: invite.role,
-      guestIdentityId: guestId,
+      blindMode: invite.blindMode ?? true,
     };
   },
 });

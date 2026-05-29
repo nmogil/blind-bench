@@ -2,10 +2,19 @@ import Google from "@auth/core/providers/google";
 import { Resend } from "resend";
 import { convexAuth } from "@convex-dev/auth/server";
 import { Email } from "@convex-dev/auth/providers/Email";
+import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 
 export const { auth, signIn, signOut, store } = convexAuth({
   providers: [
     Google,
+    // M30: no-account guest reviewers. `signIn("anonymous")` mints a powerless
+    // user (isAnonymous: true) with NO memberships — it can see and do nothing
+    // on its own. Authorization comes solely from the invite-validated
+    // evaluator row written by `invitations.acceptInviteAsGuest`, which is the
+    // real gate. So enabling this provider does not widen access; a bare anon
+    // account is inert until it accepts a reviewer invite. Orphan anon accounts
+    // (signed in, never accepted) are reaped by the cleanupAnonUsers cron.
+    Anonymous,
     Email({
       id: "resend",
       authorize: undefined,

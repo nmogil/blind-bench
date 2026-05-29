@@ -20,7 +20,9 @@ const schema = defineSchema({
     firstActivationAt: v.optional(v.number()),
   })
     .index("email", ["email"])
-    .index("phone", ["phone"]),
+    .index("phone", ["phone"])
+    // M30: lets the cleanupAnonUsers cron sweep guest accounts cheaply.
+    .index("by_anonymous", ["isAnonymous"]),
 
   // M1: Organizations & Projects
   organizations: defineTable({
@@ -266,9 +268,6 @@ const schema = defineSchema({
     targetKind: v.optional(
       v.union(v.literal("inline"), v.literal("overall")),
     ),
-    // M25: when set, the author is a verified guest (no user account).
-    // Mutually exclusive with userId in practice; enforced in code.
-    guestIdentityId: v.optional(v.id("guestIdentities")),
     // M27.4: conventional-comments-style label. Optional for legacy rows;
     // new annotations always set it (default "thought") at write time.
     label: v.optional(
@@ -374,8 +373,6 @@ const schema = defineSchema({
     // so session resume can find prior ratings by this user. Absent on legacy
     // rows from before M19.
     reviewSessionId: v.optional(v.id("reviewSessions")),
-    // M25: guest principal attribution (see outputFeedback.guestIdentityId).
-    guestIdentityId: v.optional(v.id("guestIdentities")),
   })
     .index("by_run_user", ["runId", "userId"])
     .index("by_output", ["outputId"])
@@ -759,8 +756,6 @@ const schema = defineSchema({
     sessionId: v.optional(v.string()),
     // M19: links back to the review session that produced this rating.
     reviewSessionId: v.optional(v.id("reviewSessions")),
-    // M25: guest principal attribution (see outputFeedback.guestIdentityId).
-    guestIdentityId: v.optional(v.id("guestIdentities")),
   })
     .index("by_cycle", ["cycleId"])
     .index("by_cycle_user", ["cycleId", "userId"])
@@ -808,8 +803,6 @@ const schema = defineSchema({
     targetKind: v.optional(
       v.union(v.literal("inline"), v.literal("overall")),
     ),
-    // M25: guest principal attribution (see outputFeedback.guestIdentityId).
-    guestIdentityId: v.optional(v.id("guestIdentities")),
     // M27.4: conventional-comments-style label (see outputFeedback.label).
     label: v.optional(
       v.union(
@@ -839,11 +832,10 @@ const schema = defineSchema({
     // Exactly one of runId / cycleId is set (enforced in code).
     runId: v.optional(v.id("promptRuns")),
     cycleId: v.optional(v.id("reviewCycles")),
-    // M25: exactly one of {userId, guestIdentityId} is set. userId was
-    // required pre-M25 and remains the common case; guestIdentityId is set
-    // only when an unauthenticated guest accepts a cycle invite.
-    userId: v.optional(v.id("users")),
-    guestIdentityId: v.optional(v.id("guestIdentities")),
+    // The reviewer who owns this session. M30: guests are anonymous Convex
+    // Auth users (isAnonymous: true), so this is always a real users row —
+    // there is no separate guest principal.
+    userId: v.id("users"),
     // Reviewer's capacity for this session. "author" is the run/cycle creator;
     // "collaborator" is another project member; "evaluator" is an invited
     // blind reviewer routed via cycleEvaluators.
@@ -879,7 +871,6 @@ const schema = defineSchema({
   })
     .index("by_project_user", ["projectId", "userId"])
     .index("by_user_status", ["userId", "phase"])
-    .index("by_guest_status", ["guestIdentityId", "phase"])
     .index("by_run", ["runId"])
     .index("by_cycle", ["cycleId"]),
 
@@ -925,30 +916,12 @@ const schema = defineSchema({
     .index("by_session_round", ["sessionId", "round"]),
 
   // =========================================================================
-  // M25: Unified Invites & Guest Identities
+  // M25: Unified Invites (M30: guests are anonymous users, not a separate
+  // principal — see invitations.acceptInviteAsGuest)
   // =========================================================================
 
-  // A verified email identity for users who haven't created an account yet.
-  // Created lazily on first click of an invite link. If the guest later signs
-  // up with the same email, `promotedToUserId` is set and queries that fan
-  // out across both principals can follow the pointer.
-  //
-  // Attribution guarantees: every cyclePreferences / cycleFeedback /
-  // outputPreferences / outputFeedback row authored by a guest carries
-  // guestIdentityId, so cycle owners can see "3 reviewers (2 users + 1 guest:
-  // jane@example.com)" without exposing version identity.
-  guestIdentities: defineTable({
-    email: v.string(),
-    verifiedAt: v.number(),
-    displayName: v.optional(v.string()),
-    promotedToUserId: v.optional(v.id("users")),
-    promotedAt: v.optional(v.number()),
-  })
-    .index("by_email", ["email"])
-    .index("by_promoted_user", ["promotedToUserId"]),
-
   // Unified invitation table. `shareable: true` means a single token many
-  // guests can redeem. Targeted email invites have shareable=false and a
+  // people can redeem. Targeted email invites have shareable=false and a
   // single recipient email.
   invitations: defineTable({
     scope: v.union(
@@ -972,8 +945,10 @@ const schema = defineSchema({
       // project roles
       v.literal("project_owner"),
       v.literal("project_editor"),
+      // M30: project_evaluator + cycle_reviewer are the reviewer roles an
+      // anonymous guest may accept (both resolve to an evaluator row).
       v.literal("project_evaluator"),
-      // cycle roles (guests can only accept this)
+      // cycle roles
       v.literal("cycle_reviewer"),
     ),
 
@@ -998,12 +973,12 @@ const schema = defineSchema({
     invitedAt: v.number(),
     expiresAt: v.number(),
 
-    // Set when accepted. Exactly one of acceptedByUserId / acceptedByGuestId
-    // for shareable=false. For shareable=true, these are left empty on the
-    // root invite and acceptance is tracked via acceptCount + child
-    // guestIdentities / user membership rows.
+    // Set when a targeted (shareable=false) invite is accepted. M30: guests
+    // are anonymous users, so acceptance is always recorded against a real
+    // users row. For shareable=true this is left empty on the root invite and
+    // acceptance is tracked via acceptCount + the membership rows written on
+    // accept.
     acceptedByUserId: v.optional(v.id("users")),
-    acceptedByGuestId: v.optional(v.id("guestIdentities")),
     acceptedAt: v.optional(v.number()),
 
     acceptCount: v.number(),
