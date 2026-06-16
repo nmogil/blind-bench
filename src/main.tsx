@@ -5,8 +5,10 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { initPostHog } from "./lib/posthog";
+import { initSentry } from "./lib/sentry";
 import "./index.css";
 
+initSentry();
 initPostHog();
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);

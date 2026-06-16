@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { posthog } from "@/lib/posthog";
+import { Sentry } from "@/lib/sentry";
 
 interface Props {
   children: ReactNode;
@@ -23,6 +24,10 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     posthog.captureException(error, {
       react_component_stack: info.componentStack,
       source: "react_error_boundary",
+    });
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: info.componentStack } },
+      tags: { source: "react_error_boundary" },
     });
   }
 
