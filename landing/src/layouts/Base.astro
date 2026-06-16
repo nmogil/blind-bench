@@ -67,6 +67,11 @@ const posthogHost = import.meta.env.PUBLIC_POSTHOG_HOST;
         });
       </script>
     )}
+    <!-- Sentry: error-only monitoring, no-op without PUBLIC_SENTRY_DSN -->
+    <script>
+      import { initSentry } from '../lib/sentry';
+      initSentry();
+    </script>
   </head>
   <body>
     <a

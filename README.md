@@ -30,6 +30,14 @@ Build for production with `npm run build`. To deploy Convex functions and build 
 - `RESEND_API_KEY` — magic link emails
 - `OPENROUTER_KEY_ENCRYPTION_SECRET` — encrypts user-supplied OpenRouter keys
 
+## Client/build env vars (Vercel)
+
+These are read at build time by Vite (root app) / Astro (`landing/`):
+
+- `VITE_CONVEX_URL` — Convex deployment URL (root app)
+- `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST` / `PUBLIC_POSTHOG_KEY`, `PUBLIC_POSTHOG_HOST` — PostHog analytics
+- `VITE_SENTRY_DSN` (root app) / `PUBLIC_SENTRY_DSN` (`landing/`) — Sentry error monitoring. Optional; when unset, Sentry is a no-op. Error capture only — tracing and Replay are disabled, and request headers/cookies/body plus user data are stripped before send.
+
 ## Project docs
 
 The real specs live in `project-docs/`:
