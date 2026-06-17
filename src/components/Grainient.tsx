@@ -159,12 +159,28 @@ const Grainient: React.FC<GrainientProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const renderer = new Renderer({
-      webgl: 2,
-      alpha: true,
-      antialias: false,
-      dpr: Math.min(window.devicePixelRatio || 1, 2),
-    });
+    // The Grainient is purely decorative. If WebGL2 is unavailable (hardware
+    // acceleration off, GPU blocklist, too many live contexts, older/locked-down
+    // browsers), bail gracefully instead of letting OGL's Renderer throw on a
+    // null context. See Sentry BLIND-BENCH-LANDING-1.
+    try {
+      if (!document.createElement('canvas').getContext('webgl2')) return;
+    } catch {
+      return;
+    }
+
+    let renderer: Renderer;
+    try {
+      renderer = new Renderer({
+        webgl: 2,
+        alpha: true,
+        antialias: false,
+        dpr: Math.min(window.devicePixelRatio || 1, 2),
+      });
+    } catch {
+      // OGL couldn't acquire a context; skip the effect.
+      return;
+    }
 
     const gl = renderer.gl;
     const canvas = gl.canvas as HTMLCanvasElement;

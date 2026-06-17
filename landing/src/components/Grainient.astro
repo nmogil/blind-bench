@@ -153,6 +153,17 @@ void main(){
   function init(container: HTMLElement) {
     if (container.dataset.initialized === '1') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    // The Grainient is purely decorative. If WebGL2 is unavailable (hardware
+    // acceleration off, GPU blocklist, too many live contexts, older/locked-down
+    // browsers), bail gracefully instead of letting OGL's Renderer throw on a
+    // null context. See Sentry BLIND-BENCH-LANDING-1.
+    try {
+      if (!document.createElement('canvas').getContext('webgl2')) return;
+    } catch {
+      return;
+    }
+
     container.dataset.initialized = '1';
 
     const timeSpeed = parseFloat(container.dataset.timeSpeed || '0.25');
@@ -162,12 +173,18 @@ void main(){
     const zoom = parseFloat(container.dataset.zoom || '0.9');
     const contrast = parseFloat(container.dataset.contrast || '1.5');
 
-    const renderer = new Renderer({
-      webgl: 2,
-      alpha: true,
-      antialias: false,
-      dpr: Math.min(window.devicePixelRatio || 1, 2),
-    });
+    let renderer: Renderer;
+    try {
+      renderer = new Renderer({
+        webgl: 2,
+        alpha: true,
+        antialias: false,
+        dpr: Math.min(window.devicePixelRatio || 1, 2),
+      });
+    } catch {
+      // OGL couldn't acquire a context; skip the effect.
+      return;
+    }
 
     const gl = renderer.gl;
     const canvas = gl.canvas as HTMLCanvasElement;
