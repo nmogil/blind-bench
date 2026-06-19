@@ -1,0 +1,1 @@
+Browser console checked separately via Hermes browser: no console messages or JS errors observed.
