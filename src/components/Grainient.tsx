@@ -164,7 +164,12 @@ const Grainient: React.FC<GrainientProps> = ({
     // browsers), bail gracefully instead of letting OGL's Renderer throw on a
     // null context. See Sentry BLIND-BENCH-LANDING-1.
     try {
-      if (!document.createElement('canvas').getContext('webgl2')) return;
+      const probe = document.createElement('canvas').getContext('webgl2');
+      if (!probe) return;
+      // Release the probe's context immediately. A leaked probe counts against
+      // the browser's live-WebGL-context budget and can itself starve OGL's
+      // Renderer ("too many live contexts") — the very failure we guard against.
+      probe.getExtension('WEBGL_lose_context')?.loseContext();
     } catch {
       return;
     }
@@ -181,6 +186,10 @@ const Grainient: React.FC<GrainientProps> = ({
       // OGL couldn't acquire a context; skip the effect.
       return;
     }
+
+    // Defensive: never proceed without a usable context. OGL throws on a null
+    // context (caught above), but guard the null path explicitly regardless.
+    if (!renderer.gl) return;
 
     const gl = renderer.gl;
     const canvas = gl.canvas as HTMLCanvasElement;
