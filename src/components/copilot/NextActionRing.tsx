@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
+import { track } from "@/lib/analytics";
 
 // Step keys mirror CopilotPanel's STEPS — kept as a string union so callers
 // get autocomplete and so accidental typos break at the type level.
@@ -77,6 +78,7 @@ export function NextActionRing({
 
   const handleClickCapture = () => {
     if (!shouldShow) return;
+    track("next_action_clicked", { target });
     void dismissRing({ target });
   };
 

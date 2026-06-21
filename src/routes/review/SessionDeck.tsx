@@ -9,7 +9,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { posthog } from "@/lib/posthog";
+import { track } from "@/lib/analytics";
 import { friendlyError } from "@/lib/errors";
 
 import { BattlePhase } from "./BattlePhase";
@@ -91,13 +91,12 @@ export function SessionDeck() {
     const sid = data.session.id;
     if (startedFiredRef.current === sid) return;
     startedFiredRef.current = sid;
-    posthog.capture("review_session_started", {
-      sessionId: sid,
+    track("review_session_started", {
       scope,
       role: data.session.role,
-      output_count: data.outputs.length,
-      require_phase1: data.session.requirePhase1,
-      require_phase2: data.session.requirePhase2,
+      outputCount: data.outputs.length,
+      requirePhase1: data.session.requirePhase1,
+      requirePhase2: data.session.requirePhase2,
     });
   }, [data, scope]);
 
@@ -260,12 +259,11 @@ export function SessionDeck() {
         reasonTags: tags,
       })
         .then(() => {
-          posthog.capture("review_phase2_matchup_recorded", {
-            sessionId: data.session.id,
+          track("review_phase2_matchup_recorded", {
             scope,
             role: data.session.role,
-            winner,
-            reason_tag_count: tags.length,
+            selectedWinner: winner,
+            reasonTagCount: tags.length,
           });
         })
         .catch((err) =>
@@ -279,13 +277,12 @@ export function SessionDeck() {
     if (!data) return;
     void submitPhase1({ sessionId: data.session.id })
       .then((res) => {
-        posthog.capture("review_phase1_submitted", {
-          sessionId: data.session.id,
+        track("review_phase1_submitted", {
           scope,
           role: data.session.role,
-          output_count: data.outputs.length,
-          matchups_generated: res.phase === "phase2" ? res.matchups : 0,
-          advanced_to: res.phase,
+          outputCount: data.outputs.length,
+          matchupCount: res.phase === "phase2" ? res.matchups : 0,
+          advancedTo: res.phase,
         });
         if (res.phase === "complete") {
           toast.success("Review complete");
@@ -302,11 +299,10 @@ export function SessionDeck() {
     if (!data) return;
     void complete({ sessionId: data.session.id })
       .then(() => {
-        posthog.capture("review_session_completed", {
-          sessionId: data.session.id,
+        track("review_session_completed", {
           scope,
           role: data.session.role,
-          output_count: data.outputs.length,
+          outputCount: data.outputs.length,
         });
         toast.success("Review complete");
       })

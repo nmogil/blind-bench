@@ -8,3 +8,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  /** PostHog snippet loaded inline in Base.astro; absent without a key/host. */
+  posthog?: {
+    capture: (event: string, props?: Record<string, unknown>) => void;
+  };
+}
