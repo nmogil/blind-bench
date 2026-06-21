@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { track } from "@/lib/analytics";
 import {
   Check,
   ChevronRight,
@@ -183,7 +184,10 @@ export function CopilotPanel() {
             render={
               <button
                 type="button"
-                onClick={() => void setCollapsed({ collapsed: false })}
+                onClick={() => {
+                  track("copilot_panel_opened", { source: "expand" });
+                  void setCollapsed({ collapsed: false });
+                }}
                 className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted"
                 aria-label="Expand setup co-pilot"
               />

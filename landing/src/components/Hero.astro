@@ -175,10 +175,13 @@ const APP_URL = 'https://app.blindbench.dev';
 </style>
 
 <script>
-  type PostHogGlobal = {
-    capture: (event: string, props?: Record<string, unknown>) => void;
-  };
-  const w = window as Window & { posthog?: PostHogGlobal };
+  import { trackLandingEvent } from '../lib/analytics';
+
+  const ROTATOR_PERSONAS = ['PMs', 'legal', 'marketing', 'customers', 'experts'] as const;
+
+  function normalizePersona(value: string | undefined) {
+    return ROTATOR_PERSONAS.find((persona) => persona === value) ?? 'unknown';
+  }
 
   const rotator = document.querySelector<HTMLElement>('[data-hero-rotator]');
   const rotatorActive = rotator?.querySelector<HTMLElement>(
@@ -186,7 +189,7 @@ const APP_URL = 'https://app.blindbench.dev';
   );
 
   if (rotator && rotatorActive) {
-    const ROLES = ['PMs', 'legal', 'marketing', 'customers', 'experts'];
+    const ROLES = ROTATOR_PERSONAS;
     const DWELL_MS = 2000;
     const STAGGER_MS = 25; // matches React Bits staggerDuration 0.025
     const ENTER_MS = 420;
@@ -292,11 +295,11 @@ const APP_URL = 'https://app.blindbench.dev';
     .querySelectorAll<HTMLElement>('[data-hero-cta]')
     .forEach((el) => {
       el.addEventListener('click', () => {
-        const persona = rotator?.dataset.current ?? 'unknown';
-        const label = el.getAttribute('data-hero-cta') ?? 'unknown';
-        w.posthog?.capture('hero_cta_click', {
-          rotator_persona: persona,
-          cta_label: label,
+        const persona = normalizePersona(rotator?.dataset.current);
+        const label = el.getAttribute('data-hero-cta');
+        trackLandingEvent('hero_cta_click', {
+          ctaLabel: label === 'see_how' ? 'see_how' : 'get_started',
+          rotatorPersona: persona,
         });
       });
     });

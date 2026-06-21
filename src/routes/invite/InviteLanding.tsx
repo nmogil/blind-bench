@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { friendlyError } from "@/lib/errors";
+import { track } from "@/lib/analytics";
 
 // M30: reviewer-role invites can be accepted without an account — the guest
 // becomes an anonymous user that is registered as a blind evaluator.
@@ -62,6 +63,20 @@ function InviteContent({ token }: { token: string }) {
     | InviteMeta
     | null
     | undefined;
+
+  // Fire once per resolved invite — GTM activation funnel entry point.
+  const viewFiredRef = useRef(false);
+  useEffect(() => {
+    if (!meta || viewFiredRef.current) return;
+    viewFiredRef.current = true;
+    track("invite_landing_viewed", {
+      scope: meta.scope,
+      role: meta.role,
+      guestAllowed: roleAllowsGuest(meta.role),
+      status: meta.status,
+      blindMode: meta.blindMode ?? null,
+    });
+  }, [meta]);
 
   if (meta === undefined) {
     return (
