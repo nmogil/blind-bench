@@ -1,5 +1,5 @@
 /**
- * SYNTHETIC eval cases — fake data ONLY. No real Pennie/customer/PII content.
+ * SYNTHETIC eval cases — fake data ONLY. No real customer/PII content.
  *
  * Two worked examples (one Eavesly, one Migo) demonstrating the EvalCase schema
  * across scenario sources, expected tool calls, escalation, data policy, and

@@ -1,24 +1,24 @@
-# Pennie AI Quality Scorecard handoff
+# Customer AI Quality Scorecard handoff
 
-This is the customer-facing pilot scorecard template and payment handoff checklist for the first paid Pennie AI Quality Bench delivery.
+This is the customer-facing pilot scorecard template and payment handoff checklist for the first paid customer AI quality bench delivery.
 
 ## Repeatable scorecard command
 
-Once the Pennie synthetic smoke pack and runner are available, generate artifacts with:
+Once the customer synthetic smoke pack and runner are available, generate artifacts with:
 
 ```bash
 npx tsx src/lib/evals/cli.ts \
-  --pack pennie/smoke \
+  --pack customer-pilot/smoke \
   --source fixtures \
-  --output artifacts/pennie-ai-quality-scorecard.json \
-  --markdown artifacts/pennie-ai-quality-scorecard.md \
+  --output artifacts/customer-ai-quality-scorecard.json \
+  --markdown artifacts/customer-ai-quality-scorecard.md \
   --allow-failures
 ```
 
 For an all-pass CI smoke run:
 
 ```bash
-npx tsx src/lib/evals/cli.ts --pack pennie/smoke-pass --source fixtures
+npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke-pass --source fixtures
 ```
 
 ## Customer-facing scorecard sections
@@ -79,7 +79,7 @@ npx tsx src/lib/evals/cli.ts --pack pennie/smoke-pass --source fixtures
 
 ## Pilot payment handoff
 
-The first Pennie pilot can be paid manually; Polar self-serve billing is not required for first value delivery.
+The first customer pilot can be paid manually; Polar self-serve billing is not required for first value delivery.
 
 Checklist:
 

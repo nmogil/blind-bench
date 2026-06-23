@@ -1,6 +1,6 @@
 # Customer tenancy, consent, and data isolation
 
-Blind Bench must keep customer data isolated while still allowing reusable product infrastructure to improve. This note defines the minimum model for Pennie and future Cloudflare AI Gateway users.
+Blind Bench must keep customer data isolated while still allowing reusable product infrastructure to improve. This note defines the minimum model for customers and future Cloudflare AI Gateway users.
 
 ## Tenancy architecture
 
@@ -94,10 +94,10 @@ Customer-specific artifacts:
 
 - Cloudflare logs
 - trace sidecars
-- Pennie labels/reviews
-- Pennie regression datasets
-- Pennie scorecards
-- Pennie training exports
+- Customer labels/reviews
+- Customer regression datasets
+- Customer scorecards
+- Customer training exports
 - prompt/version metadata if confidential
 
 ## Deletion and retention
