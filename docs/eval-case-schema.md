@@ -5,7 +5,9 @@ future Blind Bench customers. Source of truth: `src/lib/evals/evalCase.ts` (zod)
 Types are inferred from the zod schemas; JSON Schema artifacts are exported for
 non-TypeScript consumers (`schemas/*.schema.json`).
 
-This is foundation only — no runner, CLI, or UI yet.
+This is the portable schema foundation. See also:
+
+- [Cloudflare-first eval architecture](./cloudflare-first-eval-architecture.md)
 
 ## Files
 
