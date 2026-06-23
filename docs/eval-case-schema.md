@@ -27,7 +27,8 @@ This is the portable schema foundation. See also:
 
 ```
 EvalCase {
-  id, product, title, description?, source, tags[], input, expected, metadata?
+  id, product, title, description?, source, tags[], input, expected,
+  scorer_assignments[], metadata?
 }
 ```
 
@@ -64,7 +65,13 @@ expected {
   expectation (e.g. `ephemeral`, `do_not_store_call_audio`); labels are open strings so
   each product names its own sources.
 
-## Scorer contract
+## Scorer assignments
+
+Cases can declare `scorer_assignments[]`, a portable list of scorer ids plus
+optional config/weight/required flags. Local and CI runners consume this field;
+metadata is reserved for customer/package context and is not required for scoring.
+
+## Scorer result
 
 A scorer grades one `(case, output)` pair. Same interface for deterministic checks and
 LLM judges — judges are just async.

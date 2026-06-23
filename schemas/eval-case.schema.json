@@ -196,6 +196,48 @@
         "privacy_class"
       ]
     },
+    "scorer_assignments": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "deterministic",
+              "llm_judge"
+            ]
+          },
+          "required": {
+            "default": true,
+            "type": "boolean"
+          },
+          "weight": {
+            "default": 1,
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "hard_fail_on_failure": {
+            "default": false,
+            "type": "boolean"
+          },
+          "config": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
     "metadata": {
       "type": "object",
       "propertyNames": {
