@@ -3,8 +3,8 @@
  * interface (stub only — no provider wiring here).
  *
  * Each scorer grades one (EvalCase, AgentOutput) pair and returns a ScorerResult.
- * Scorers are built per-case from `case.metadata.scorers` (a list of {id, config}
- * specs) so the local runner stays data-driven.
+ * Scorers are built per-case from `case.scorer_assignments` so the local runner
+ * stays data-driven and schema-visible.
  *
  * Hard-fail separation: privacy + tool-safety scorers set `hard_fail` on violation
  * (these dominate the case verdict). Quality scorers (tone, groundedness,
@@ -357,10 +357,9 @@ export const SCORER_REGISTRY: Record<string, Factory> = {
   cost_latency_threshold: costLatencyThreshold,
 };
 
-/** Read `case.metadata.scorers` and instantiate the assigned scorers. */
+/** Read `case.scorer_assignments` and instantiate the assigned scorers. */
 export function buildScorers(evalCase: EvalCase): Scorer[] {
-  const specs = (evalCase.metadata?.scorers ?? []) as ScorerSpec[];
-  return specs.map((spec) => {
+  return evalCase.scorer_assignments.map((spec) => {
     const factory = SCORER_REGISTRY[spec.id];
     if (!factory) throw new Error(`Unknown scorer id: ${spec.id}`);
     return factory(spec.config ?? {});

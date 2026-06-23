@@ -110,6 +110,20 @@ export type ExpectedBehavior = z.infer<typeof ExpectedBehavior>;
 
 // --- Eval case ---------------------------------------------------------------
 
+export const ScorerKind = z.enum(["deterministic", "llm_judge"]);
+export type ScorerKind = z.infer<typeof ScorerKind>;
+
+/** Serializable per-case assignment consumed by local/CI runners. */
+export const ScorerAssignment = z.object({
+  id: z.string(),
+  kind: ScorerKind.optional(),
+  required: z.boolean().default(true),
+  weight: z.number().positive().default(1),
+  hard_fail_on_failure: z.boolean().default(false),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+export type ScorerAssignment = z.infer<typeof ScorerAssignment>;
+
 export const EvalCase = z.object({
   id: z.string(),
   /** Owning product/agent, open string for portability: "eavesly", "migo", ... */
@@ -120,6 +134,8 @@ export const EvalCase = z.object({
   tags: z.array(z.string()).default([]),
   input: CaseInput,
   expected: ExpectedBehavior,
+  /** Data-driven scorer assignments used by local/CI runners. */
+  scorer_assignments: z.array(ScorerAssignment).default([]),
   /** Platform-specific extras; never required for scoring. */
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
@@ -145,9 +161,6 @@ export const AgentOutput = z.object({
 export type AgentOutput = z.infer<typeof AgentOutput>;
 
 // --- Scorer contract ---------------------------------------------------------
-
-export const ScorerKind = z.enum(["deterministic", "llm_judge"]);
-export type ScorerKind = z.infer<typeof ScorerKind>;
 
 /**
  * Points at the text supporting a verdict. `source` names where the span lives

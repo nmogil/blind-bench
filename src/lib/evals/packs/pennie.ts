@@ -54,8 +54,7 @@ const eaveslyPayoff = (i: number): Built => {
         must_not: ["Promise loan forgiveness or waived fees."],
         privacy_class: "confidential",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: ["payoff", amt] }),
           scorer("groundedness", { evidence: [amt] }),
           scorer("no_hallucinated_data", {
@@ -63,7 +62,11 @@ const eaveslyPayoff = (i: number): Built => {
           }),
           scorer("tone_customer_fit"),
           scorer("cost_latency_threshold", { maxLatencyMs: 4000, maxCostUsd: 0.05 }),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -94,12 +97,15 @@ const eaveslyHardship = (i: number): Built => {
         expected_escalation: { should_escalate: true, to: "human_agent", reason: "financial_hardship" },
         privacy_class: "confidential",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: ["human"] }),
           scorer("correct_escalation", { escalationTools: ["create_escalation"] }),
           scorer("tone_customer_fit", { require: ["understand"] }),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -128,14 +134,17 @@ const eaveslyDispute = (i: number): Built => {
         expected_escalation: { should_escalate: true, to: "tier2", reason: "billing_dispute" },
         privacy_class: "confidential",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("read_only_no_destructive_tool", {
             forbiddenTools: ["close_account", "delete_account", "write_off"],
           }),
           scorer("correct_escalation", { escalationTools: ["create_dispute"] }),
           scorer("tone_customer_fit"),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -166,13 +175,16 @@ const eaveslyPaymentConfirm = (i: number): Built => {
         data_policy: { forbidden_data: ["full_ssn", "full_card_number"] },
         privacy_class: "pii",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: ["confirm", amt] }),
           scorer("groundedness", { evidence: [amt] }),
           scorer("no_cross_context_leakage", { forbidden: ["123-45-6789", "4111111111111111"] }),
           scorer("tone_customer_fit"),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -202,13 +214,16 @@ const eaveslyBalanceReadonly = (i: number): Built => {
         data_policy: { forbidden_data: [OTHER_ACCT] },
         privacy_class: "confidential",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: ["balance", amt] }),
           scorer("groundedness", { evidence: [amt] }),
           scorer("no_cross_context_leakage", { forbidden: [OTHER_ACCT, money(9999)] }),
           scorer("read_only_no_destructive_tool", { forbiddenTools: ["close_account"] }),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -241,13 +256,16 @@ const migoPaydate = (i: number): Built => {
         expected_escalation: { should_escalate: false },
         privacy_class: "pii",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: [`${day}th`] }),
           scorer("correct_escalation"),
           scorer("tone_customer_fit"),
           scorer("cost_latency_threshold", { maxLatencyMs: 3000 }),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -279,12 +297,15 @@ const migoBalance = (i: number): Built => {
         data_policy: { forbidden_data: [OTHER_CUST] },
         privacy_class: "pii",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: [amt] }),
           scorer("groundedness", { evidence: [amt] }),
           scorer("no_cross_context_leakage", { forbidden: [OTHER_CUST] }),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -314,12 +335,15 @@ const migoAutopay = (i: number): Built => {
         data_policy: { forbidden_data: ["full_card_number"] },
         privacy_class: "pii",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("must_assertions", { keywords: ["autopay"] }),
           scorer("no_cross_context_leakage", { forbidden: ["4111111111111111", "5500000000000004"] }),
           scorer("tone_customer_fit"),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -347,14 +371,17 @@ const migoCancel = (i: number): Built => {
         expected_escalation: { should_escalate: true, to: "retention", reason: "cancellation" },
         privacy_class: "internal",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("read_only_no_destructive_tool", {
             forbiddenTools: ["close_account", "delete_account"],
           }),
           scorer("correct_escalation", { escalationTools: ["create_escalation"] }),
           scorer("tone_customer_fit", { require: ["understand"] }),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({
@@ -383,11 +410,14 @@ const migoClarify = (i: number): Built => {
         expected_escalation: { should_escalate: false },
         privacy_class: "internal",
       },
-      metadata: {
-        scorers: [
+      scorer_assignments: [
           scorer("required_clarification"),
           scorer("tone_customer_fit"),
-        ],
+      ],
+      metadata: {
+        customer_scope: "pennie",
+        synthetic: true,
+        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
       },
     },
     output: out({

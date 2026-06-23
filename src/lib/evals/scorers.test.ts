@@ -106,12 +106,10 @@ describe("hard-fail classification", () => {
 describe("scoreCase aggregation", () => {
   it("hard-fail dominates the verdict", async () => {
     const c = baseCase({
-      metadata: {
-        scorers: [
-          { id: "must_assertions", config: { keywords: ["ok"] } },
-          { id: "no_hallucinated_data", config: { phrases: ["leaked"] } },
-        ],
-      },
+      scorer_assignments: [
+        { id: "must_assertions", config: { keywords: ["ok"] } },
+        { id: "no_hallucinated_data", config: { phrases: ["leaked"] } },
+      ],
     });
     const r = await scoreCase(c, output({ text: "ok but leaked" }));
     expect(r.hard_failed).toBe(true);
@@ -119,7 +117,7 @@ describe("scoreCase aggregation", () => {
   });
 
   it("all-pass case passes", async () => {
-    const c = baseCase({ metadata: { scorers: [{ id: "tone_customer_fit" }] } });
+    const c = baseCase({ scorer_assignments: [{ id: "tone_customer_fit" }] });
     expect((await scoreCase(c, output({ text: "happy to help" }))).passed).toBe(true);
   });
 });

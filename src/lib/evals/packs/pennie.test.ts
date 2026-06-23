@@ -25,10 +25,12 @@ describe("pennie smoke pack", () => {
   });
 
   it("every case is synthetic and assigns scorers", () => {
-    for (const c of pennieSmokeCases) {
+    for (const raw of pennieSmokeCases) {
+      const c = EvalCase.parse(raw);
       expect(c.source).toBe("synthetic");
-      const scorers = (c.metadata?.scorers ?? []) as unknown[];
-      expect(scorers.length).toBeGreaterThan(0);
+      expect(c.metadata?.customer_scope).toBe("pennie");
+      expect(c.metadata?.synthetic).toBe(true);
+      expect(c.scorer_assignments.length).toBeGreaterThan(0);
     }
   });
 
