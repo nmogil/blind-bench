@@ -54,7 +54,7 @@ describe("agent trace normalization", () => {
     expect(JSON.stringify(visible)).not.toContain("TEST-TOKEN-DO-NOT-SHOW");
   });
 
-  it("keeps internal view available for controlled Pennie-only debugging", () => {
+  it("keeps internal view available for controlled customer-scoped debugging", () => {
     const trace = normalizeJeevesClogRun(failingRun);
     const visible = toScorerVisibleAgentRun(trace, "internal_view");
     expect(JSON.stringify(visible)).toContain("123-45-6789");

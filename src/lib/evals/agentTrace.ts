@@ -1,5 +1,5 @@
 /**
- * Normalized multi-step agent run traces for Jeeves/Pennie Systems style harnesses.
+ * Normalized multi-step agent run traces for agent-harness style harnesses.
  *
  * This is capture/normalization only: no sandboxed agent execution and no provider
  * SDK dependency. The concrete first ingest path is a permissive "Jeeves/Clog run"
@@ -272,7 +272,7 @@ export function agentTraceToEvalCase(trace: AgentRunTrace): EvalCaseInput {
         policy_events: visible.policy_events,
       },
     },
-    expected: { privacy_class: trace.privacy.class, data_policy: { retention: "pennie_scoped_review_only" } },
+    expected: { privacy_class: trace.privacy.class, data_policy: { retention: "customer_scoped_review_only" } },
     metadata: { trace_id: trace.trace_id, run_id: trace.run_id, final_answer: visible.final_answer, scorers: [] },
   };
 }

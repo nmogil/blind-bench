@@ -1,6 +1,6 @@
 # Agent harness trace capture
 
-Blind Bench needs to evaluate agentic Pennie workflows such as Jeeves / Pennie Systems AI, not only single chat-completion calls. This document defines the first normalized agent-run trace shape and the first concrete ingest path.
+Blind Bench needs to evaluate agentic customer workflows such as support and operations agents, not only single chat-completion calls. This document defines the first normalized agent-run trace shape and the first concrete ingest path.
 
 ## First source path: Jeeves / Clog run export
 
@@ -76,7 +76,7 @@ Internal view is explicit:
 toScorerVisibleAgentRun(trace, "internal_view")
 ```
 
-Only use internal view in controlled Pennie-scoped debugging. Blind/evaluator views should not expose raw tool payloads by default.
+Only use internal view in controlled customer-scoped debugging. Blind/evaluator views should not expose raw tool payloads by default.
 
 ## Scorer-visible projection
 
@@ -120,4 +120,4 @@ The eval case stores messages and scorer-visible tool/policy context while keepi
 - No LangGraph/LangSmith/Phoenix replacement.
 - No sandboxed agent execution yet.
 - No automatic capture from production Jeeves agents yet.
-- No Pennie production data committed to the repo.
+- No customer production data committed to the repo.
