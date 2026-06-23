@@ -6,7 +6,7 @@ Blind Bench should sit above Cloudflare AI Gateway rather than replace it. Cloud
 
 ```mermaid
 flowchart LR
-  A[Pennie AI apps\nMigo / Eavesly / Jeeves] --> B[Cloudflare AI Gateway]
+  A[Customer AI apps\nVoice / chat / agent workflows] --> B[Cloudflare AI Gateway]
   B --> C[AI Gateway logs / Logpush / API export]
   C --> D[Blind Bench CF adapter\nnormalize JSONL]
   D --> E[Normalized trace rows]
@@ -25,9 +25,9 @@ flowchart LR
 | Raw request/response logs | Cloudflare AI Gateway | Source of raw model-call facts, provider/model, token/cost/latency, DLP, feedback, log IDs. |
 | Trace normalization | Blind Bench | Convert heterogeneous AI Gateway exports into stable portable trace rows. |
 | Eval semantics | Blind Bench | Expected behavior, scorer assignments, regression packs, review state, scorecards. |
-| Pennie domain labels | Pennie-scoped Blind Bench workspace | Pennie data stays scoped to Pennie and is not generalized into reusable Blind Bench assets. |
+| Customer domain labels | Customer-scoped Blind Bench workspace | customer data stays scoped to customer and is not generalized into reusable Blind Bench assets. |
 | Scorer execution | Blind Bench local/CI runner | Deterministic by default; LLM judges behind explicit provider adapters. |
-| Fine-tuning data | Pennie-scoped exports | Export only reviewed/approved examples or preference data. |
+| Fine-tuning data | Customer-scoped exports | Export only reviewed/approved examples or preference data. |
 
 ## Raw Cloudflare fields vs normalized fields
 
@@ -58,9 +58,9 @@ flowchart LR
 | `metadata.release` | `release` |
 | `metadata.environment` | `environment` |
 
-## Pennie metadata conventions
+## Customer metadata conventions
 
-Pennie AI calls should attach metadata where possible:
+Customer AI calls should attach metadata where possible:
 
 ```json
 {
@@ -77,11 +77,11 @@ Recommended app-specific conventions:
 
 - **Eavesly**: `module` should name the QA or alerting module, e.g. `disposition_review`, `qa_summary`, `manager_insights`.
 - **Migo**: `module` should name the summary/chat workflow, e.g. `summary`, `tradelines`, `customer_sms`.
-- **Jeeves / Pennie Systems AI**: include `module: "systems_agent"` plus sidecar metadata for harness name/version and tool policy when Cloudflare metadata is too small.
+- **Agent harnesses**: include `module: "systems_agent"` plus sidecar metadata for harness name/version and tool policy when Cloudflare metadata is too small.
 
 ## Metadata sidecar
 
-Cloudflare custom metadata may be too small for rich eval context. Store large or sensitive context in a Pennie-controlled sidecar keyed by one or more stable source IDs:
+Cloudflare custom metadata may be too small for rich eval context. Store large or sensitive context in a customer-controlled sidecar keyed by one or more stable source IDs:
 
 ```text
 trace_sidecar[log_id | event_id | trace_id] = {
@@ -96,15 +96,15 @@ trace_sidecar[log_id | event_id | trace_id] = {
 }
 ```
 
-The adapter supports a `metadataSidecar` map so normalized trace rows can merge Cloudflare metadata with Pennie-owned context without forcing everything into Cloudflare.
+The adapter supports a `metadataSidecar` map so normalized trace rows can merge Cloudflare metadata with customer-owned context without forcing everything into Cloudflare.
 
 ## Data boundaries
 
-- Do not commit real Pennie traces, call transcripts, account data, phone numbers, emails, or secrets to the Blind Bench repo.
-- Pennie-specific eval packs and reviewed examples remain Pennie-scoped.
+- Do not commit real customer traces, call transcripts, account data, phone numbers, emails, or secrets to the Blind Bench repo.
+- Customer-specific eval packs and reviewed examples remain customer-scoped.
 - Reusable Blind Bench assets should be generic scorer code, schemas, docs, and synthetic examples only.
 - Production traces become eval cases only after redaction/scope review.
-- Fine-tuning exports should contain only reviewed/approved Pennie-scoped examples.
+- Fine-tuning exports should contain only reviewed/approved customer-scoped examples.
 
 ## Build-vs-buy
 
@@ -127,7 +127,7 @@ Use Blind Bench for:
 - CI gates
 - fine-tuning-ready exports
 
-Add **Braintrust** or **Langfuse** only if Blind Bench needs a borrowed observability/annotation layer that Cloudflare + the Blind Bench review workflow cannot cover. They should not become the canonical source of Pennie eval semantics by default.
+Add **Braintrust** or **Langfuse** only if Blind Bench needs a borrowed observability/annotation layer that Cloudflare + the Blind Bench review workflow cannot cover. They should not become the canonical source of customer eval semantics by default.
 
 ## Current MVP source path
 

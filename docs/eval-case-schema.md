@@ -1,6 +1,6 @@
 # Eval case schema & scorer contract
 
-Portable foundation for grading agent behavior across Pennie / Eavesly / Migo and
+Portable foundation for grading agent behavior across support, voice, chat, and agentic workflows and
 future Blind Bench customers. Source of truth: `src/lib/evals/evalCase.ts` (zod).
 Types are inferred from the zod schemas; JSON Schema artifacts are exported for
 non-TypeScript consumers (`schemas/*.schema.json`).
@@ -59,7 +59,7 @@ expected {
 - **`privacy_class`** — `public` | `internal` | `confidential` | `pii` | `phi`.
   Real data must be classed honestly so a runner can gate where outputs are stored.
 - **Synthetic cases must use fake data.** The example cases tag fake identifiers with
-  `TEST`; a test enforces `source === "synthetic"`. Do not commit real Pennie/customer PII.
+  `TEST`; a test enforces `source === "synthetic"`. Do not commit real customer PII.
 - **`data_policy`** declares which data the agent may read/emit and a retention
   expectation (e.g. `ephemeral`, `do_not_store_call_audio`); labels are open strings so
   each product names its own sources.

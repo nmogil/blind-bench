@@ -228,7 +228,7 @@ export function convertTraceToEvalCase(
     expected: {
       privacy_class: trace.redaction.request_missing ? "internal" : "confidential",
       must: trace.output_text ? ["Review candidate output against the original production output."] : [],
-      data_policy: { retention: "pennie_scoped_review_only" },
+      data_policy: { retention: "customer_scoped_review_only" },
     },
     metadata: {
       suite_id: options.suiteId ?? "cloudflare-ai-gateway-import",

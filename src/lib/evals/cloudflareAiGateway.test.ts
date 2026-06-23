@@ -11,7 +11,7 @@ import {
 
 const chatRecord: CloudflareAiGatewayLog = {
   account_id: "acct_TEST_cloudflare",
-  gateway_id: "gw_TEST_pennie",
+  gateway_id: "gw_TEST_customer",
   log_id: "log_TEST_001",
   event_id: "evt_TEST_001",
   timestamp: "2026-06-23T12:00:00Z",
@@ -40,7 +40,7 @@ const chatRecord: CloudflareAiGatewayLog = {
 
 const redactedRecord: CloudflareAiGatewayLog = {
   account_id: "acct_TEST_cloudflare",
-  gateway_id: "gw_TEST_pennie",
+  gateway_id: "gw_TEST_customer",
   log_id: "log_TEST_002",
   timestamp: "2026-06-23T12:01:00Z",
   provider: "openai",
@@ -53,7 +53,7 @@ const redactedRecord: CloudflareAiGatewayLog = {
 
 const feedbackDlpRecord: CloudflareAiGatewayLog = {
   account_id: "acct_TEST_cloudflare",
-  gateway_id: "gw_TEST_pennie",
+  gateway_id: "gw_TEST_customer",
   log_id: "log_TEST_003",
   event_id: "evt_TEST_003",
   timestamp: "2026-06-23T12:02:00Z",
