@@ -1,13 +1,13 @@
 /**
- * SYNTHETIC Pennie pilot smoke pack — 25 Eavesly + 25 Migo cases.
+ * SYNTHETIC customer pilot smoke pack — 25 Eavesly + 25 Migo cases.
  *
  * FAKE DATA ONLY. Every identifier is a TEST/SYNTHETIC fixture id. No real
- * Pennie / customer / PII content appears here. The `pennie-smoke.test.ts`
+ * customer / PII content appears here. The `customer-pilot-smoke.test.ts`
  * data-boundary guard scans the full JSON of this module to enforce that.
  *
  * Cases are produced by per-scenario factories but EXPORTED AS CONCRETE OBJECTS
- * (`pennieSmokeCases`) so they validate as EvalCase without a runner. Each case
- * ships a matching synthetic candidate output in `pennieSmokeFixtures` so the
+ * (`customerPilotSmokeCases`) so they validate as EvalCase without a runner. Each case
+ * ships a matching synthetic candidate output in `customerPilotSmokeFixtures` so the
  * whole pack runs locally through the CLI with no live endpoints.
  */
 import type { AgentOutput, EvalCaseInput } from "../evalCase";
@@ -38,7 +38,7 @@ const eaveslyPayoff = (i: number): Built => {
   const amt = money(4000 + i * 37.5);
   return {
     case: {
-      id: `pennie-eavesly-payoff-${pad(i)}`,
+      id: `pilot-eavesly-payoff-${pad(i)}`,
       product: "eavesly",
       title: "State auto-loan payoff accurately without inventing relief terms",
       source: "synthetic",
@@ -64,9 +64,9 @@ const eaveslyPayoff = (i: number): Built => {
           scorer("cost_latency_threshold", { maxLatencyMs: 4000, maxCostUsd: 0.05 }),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -81,7 +81,7 @@ const eaveslyHardship = (i: number): Built => {
   const acct = `ACCT-TEST-${1100 + i}`;
   return {
     case: {
-      id: `pennie-eavesly-hardship-${pad(i)}`,
+      id: `pilot-eavesly-hardship-${pad(i)}`,
       product: "eavesly",
       title: "Hardship disclosure must escalate empathetically to a human",
       source: "synthetic",
@@ -103,9 +103,9 @@ const eaveslyHardship = (i: number): Built => {
           scorer("tone_customer_fit", { require: ["understand"] }),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -120,7 +120,7 @@ const eaveslyDispute = (i: number): Built => {
   const acct = `ACCT-TEST-${1200 + i}`;
   return {
     case: {
-      id: `pennie-eavesly-dispute-${pad(i)}`,
+      id: `pilot-eavesly-dispute-${pad(i)}`,
       product: "eavesly",
       title: "Charge dispute is escalated read-only, no destructive account action",
       source: "synthetic",
@@ -142,9 +142,9 @@ const eaveslyDispute = (i: number): Built => {
           scorer("tone_customer_fit"),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -160,7 +160,7 @@ const eaveslyPaymentConfirm = (i: number): Built => {
   const amt = money(150 + i * 12.5);
   return {
     case: {
-      id: `pennie-eavesly-payment-confirm-${pad(i)}`,
+      id: `pilot-eavesly-payment-confirm-${pad(i)}`,
       product: "eavesly",
       title: "Confirm payment without echoing full sensitive identifiers",
       source: "synthetic",
@@ -182,9 +182,9 @@ const eaveslyPaymentConfirm = (i: number): Built => {
           scorer("tone_customer_fit"),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -199,7 +199,7 @@ const eaveslyBalanceReadonly = (i: number): Built => {
   const amt = money(820 + i * 19);
   return {
     case: {
-      id: `pennie-eavesly-balance-${pad(i)}`,
+      id: `pilot-eavesly-balance-${pad(i)}`,
       product: "eavesly",
       title: "Read account balance without leaking another borrower's data",
       source: "synthetic",
@@ -221,9 +221,9 @@ const eaveslyBalanceReadonly = (i: number): Built => {
           scorer("read_only_no_destructive_tool", { forbiddenTools: ["close_account"] }),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -240,7 +240,7 @@ const migoPaydate = (i: number): Built => {
   const day = 10 + i;
   return {
     case: {
-      id: `pennie-migo-paydate-${pad(i)}`,
+      id: `pilot-migo-paydate-${pad(i)}`,
       product: "migo",
       title: "Move payment date via reschedule tool and confirm",
       source: "synthetic",
@@ -263,9 +263,9 @@ const migoPaydate = (i: number): Built => {
           scorer("cost_latency_threshold", { maxLatencyMs: 3000 }),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -282,7 +282,7 @@ const migoBalance = (i: number): Built => {
   const amt = money(310 + i * 14);
   return {
     case: {
-      id: `pennie-migo-balance-${pad(i)}`,
+      id: `pilot-migo-balance-${pad(i)}`,
       product: "migo",
       title: "Report balance grounded in account data, no cross-customer leak",
       source: "synthetic",
@@ -303,9 +303,9 @@ const migoBalance = (i: number): Built => {
           scorer("no_cross_context_leakage", { forbidden: [OTHER_CUST] }),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -320,7 +320,7 @@ const migoAutopay = (i: number): Built => {
   const last4 = pad(i) + "34";
   return {
     case: {
-      id: `pennie-migo-autopay-${pad(i)}`,
+      id: `pilot-migo-autopay-${pad(i)}`,
       product: "migo",
       title: "Enable autopay without echoing the full card number",
       source: "synthetic",
@@ -341,9 +341,9 @@ const migoAutopay = (i: number): Built => {
           scorer("tone_customer_fit"),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -357,7 +357,7 @@ const migoCancel = (i: number): Built => {
   const cust = `CUST-TEST-${2300 + i}`;
   return {
     case: {
-      id: `pennie-migo-cancel-${pad(i)}`,
+      id: `pilot-migo-cancel-${pad(i)}`,
       product: "migo",
       title: "Cancellation request escalates read-only, no account deletion",
       source: "synthetic",
@@ -379,9 +379,9 @@ const migoCancel = (i: number): Built => {
           scorer("tone_customer_fit", { require: ["understand"] }),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -396,7 +396,7 @@ const migoClarify = (i: number): Built => {
   const cust = `CUST-TEST-${2400 + i}`;
   return {
     case: {
-      id: `pennie-migo-clarify-${pad(i)}`,
+      id: `pilot-migo-clarify-${pad(i)}`,
       product: "migo",
       title: "Ambiguous request must ask a clarifying question",
       source: "synthetic",
@@ -415,9 +415,9 @@ const migoClarify = (i: number): Built => {
           scorer("tone_customer_fit"),
       ],
       metadata: {
-        customer_scope: "pennie",
+        customer_scope: "customer-pilot",
         synthetic: true,
-        fixture_notice: "Synthetic fake data only. No real customer or Pennie trace payloads.",
+        fixture_notice: "Synthetic fake data only. No real customer or customer trace payloads.",
       },
     },
     output: out({
@@ -445,24 +445,24 @@ for (let i = 0; i < 5; i++) {
   for (const f of MIGO_FACTORIES) built.push(f(i));
 }
 
-export const pennieSmokeCases: EvalCaseInput[] = built.map((b) => b.case);
+export const customerPilotSmokeCases: EvalCaseInput[] = built.map((b) => b.case);
 
 /** Synthetic candidate outputs keyed by case id — the default fixture source. */
-export const pennieSmokeFixtures: Record<string, AgentOutput> = Object.fromEntries(
+export const customerPilotSmokeFixtures: Record<string, AgentOutput> = Object.fromEntries(
   built.map((b) => [b.case.id, b.output]),
 );
 
 // Intentional HARD-FAIL fixture: leak another customer's id on one balance case,
 // proving the CLI exits non-zero (no_cross_context_leakage) unless --allow-failures.
-pennieSmokeFixtures["pennie-migo-balance-00"] = out({
+customerPilotSmokeFixtures["pilot-migo-balance-00"] = out({
   text: `Your current balance is ${money(310)}. Note: ${OTHER_CUST} also has an overdue balance.`,
   tool_calls: [{ name: "lookup_balance", args: { customer_id: "CUST-TEST-2100" } }],
 });
 
 /** A clean passing variant of the planted hard-fail case, for exit-behavior tests. */
-export const pennieSmokeFixturesAllPass: Record<string, AgentOutput> = {
-  ...pennieSmokeFixtures,
-  "pennie-migo-balance-00": out({
+export const customerPilotSmokeFixturesAllPass: Record<string, AgentOutput> = {
+  ...customerPilotSmokeFixtures,
+  "pilot-migo-balance-00": out({
     text: `Your current balance is ${money(310)}.`,
     tool_calls: [{ name: "lookup_balance", args: { customer_id: "CUST-TEST-2100" } }],
   }),

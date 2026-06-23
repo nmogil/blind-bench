@@ -14,7 +14,7 @@
  *
  * Deliberately platform-agnostic: `product`, tool names, data-policy labels, and
  * input shape are open strings/records, not closed enums, so the same schema
- * serves Pennie / Eavesly / Migo and future Blind Bench customers.
+ * serves support, voice, chat, and agentic workflows and future Blind Bench customers.
  */
 // zod 3.25 exposes the v4 API on this subpath; use it for JSON Schema export.
 import { z } from "zod/v4";

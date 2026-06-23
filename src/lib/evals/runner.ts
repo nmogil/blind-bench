@@ -6,20 +6,20 @@
 import { AgentOutput, EvalCase, type EvalResult } from "./evalCase";
 import { scoreCase } from "./scorers";
 import {
-  pennieSmokeCases,
-  pennieSmokeFixtures,
-  pennieSmokeFixturesAllPass,
-} from "./packs/pennie";
+  customerPilotSmokeCases,
+  customerPilotSmokeFixtures,
+  customerPilotSmokeFixturesAllPass,
+} from "./packs/customerPilot";
 
 export interface Pack {
-  cases: typeof pennieSmokeCases;
+  cases: typeof customerPilotSmokeCases;
   fixtures: Record<string, AgentOutput>;
 }
 
 export const PACKS: Record<string, Pack> = {
-  "pennie/smoke": { cases: pennieSmokeCases, fixtures: pennieSmokeFixtures },
+  "customer-pilot/smoke": { cases: customerPilotSmokeCases, fixtures: customerPilotSmokeFixtures },
   // All-pass variant, handy for CI smoke / exit-behavior demos.
-  "pennie/smoke-pass": { cases: pennieSmokeCases, fixtures: pennieSmokeFixturesAllPass },
+  "customer-pilot/smoke-pass": { cases: customerPilotSmokeCases, fixtures: customerPilotSmokeFixturesAllPass },
 };
 
 export interface CaseRow {

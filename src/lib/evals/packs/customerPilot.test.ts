@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { EvalCase } from "../evalCase";
-import { pennieSmokeCases, pennieSmokeFixtures } from "./pennie";
+import { customerPilotSmokeCases, customerPilotSmokeFixtures } from "./customerPilot";
 
-describe("pennie smoke pack", () => {
+describe("customer-pilot smoke pack", () => {
   it("has 50 cases: 25 eavesly + 25 migo", () => {
-    expect(pennieSmokeCases).toHaveLength(50);
-    const byProduct = pennieSmokeCases.reduce<Record<string, number>>((m, c) => {
+    expect(customerPilotSmokeCases).toHaveLength(50);
+    const byProduct = customerPilotSmokeCases.reduce<Record<string, number>>((m, c) => {
       m[c.product] = (m[c.product] ?? 0) + 1;
       return m;
     }, {});
@@ -13,22 +13,22 @@ describe("pennie smoke pack", () => {
   });
 
   it("every case validates as EvalCase", () => {
-    for (const c of pennieSmokeCases) {
+    for (const c of customerPilotSmokeCases) {
       expect(() => EvalCase.parse(c)).not.toThrow();
     }
   });
 
   it("case ids are unique and every case has a fixture", () => {
-    const ids = pennieSmokeCases.map((c) => c.id);
+    const ids = customerPilotSmokeCases.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ids) expect(pennieSmokeFixtures[id]).toBeDefined();
+    for (const id of ids) expect(customerPilotSmokeFixtures[id]).toBeDefined();
   });
 
   it("every case is synthetic and assigns scorers", () => {
-    for (const raw of pennieSmokeCases) {
+    for (const raw of customerPilotSmokeCases) {
       const c = EvalCase.parse(raw);
       expect(c.source).toBe("synthetic");
-      expect(c.metadata?.customer_scope).toBe("pennie");
+      expect(c.metadata?.customer_scope).toBe("customer-pilot");
       expect(c.metadata?.synthetic).toBe(true);
       expect(c.scorer_assignments.length).toBeGreaterThan(0);
     }
@@ -37,7 +37,7 @@ describe("pennie smoke pack", () => {
   // Data-boundary guard: scan the FULL serialized pack (cases + fixtures) so no
   // real-looking identifier slips in. Synthetic ids must be tagged TEST/SYNTHETIC.
   it("contains only synthetic TEST identifiers — no real-looking PII", () => {
-    const blob = JSON.stringify({ pennieSmokeCases, pennieSmokeFixtures });
+    const blob = JSON.stringify({ customerPilotSmokeCases, customerPilotSmokeFixtures });
 
     // Every account/customer id must carry the TEST sentinel.
     for (const id of blob.match(/\b(?:ACCT|CUST)-[A-Z0-9-]+/g) ?? []) {
@@ -46,7 +46,7 @@ describe("pennie smoke pack", () => {
 
     // No real SSNs (forbidden-data sentinels for scanners are the only digit runs
     // that look like one, and they live in scorer config, never in agent output).
-    const ssnInOutputs = JSON.stringify(pennieSmokeFixtures).match(/\b\d{3}-\d{2}-\d{4}\b/g);
+    const ssnInOutputs = JSON.stringify(customerPilotSmokeFixtures).match(/\b\d{3}-\d{2}-\d{4}\b/g);
     expect(ssnInOutputs).toBeNull();
   });
 });

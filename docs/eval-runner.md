@@ -1,6 +1,6 @@
 # Local eval runner
 
-This document covers the local, infrastructure-free eval runner for the Pennie AI Quality Bench MVP.
+This document covers the local, infrastructure-free eval runner for the customer AI quality bench MVP.
 
 ## Scope
 
@@ -10,7 +10,7 @@ The runner is intentionally local-only:
 - no Convex persistence dependency
 - no Cloudflare API dependency
 - no external LLM judge calls
-- synthetic fixtures only for the committed Pennie smoke pack
+- synthetic fixtures only for the committed customer pilot smoke pack
 
 It is designed to prove the trace-to-eval loop before wiring real Cloudflare AI Gateway imports or the human review console.
 
@@ -19,7 +19,7 @@ It is designed to prove the trace-to-eval loop before wiring real Cloudflare AI 
 The first pack is:
 
 ```text
-pennie/smoke
+customer-pilot/smoke
 ```
 
 It contains 50 synthetic cases:
@@ -30,10 +30,10 @@ It contains 50 synthetic cases:
 The pack lives in:
 
 ```text
-src/lib/evals/packs/pennie.ts
+src/lib/evals/packs/customer-pilot.ts
 ```
 
-Every committed case is `source: "synthetic"` and uses obvious `TEST` fixture identifiers. Do not commit real Pennie/customer traces, call transcripts, account numbers, emails, phone numbers, or secrets.
+Every committed case is `source: "synthetic"` and uses obvious `TEST` fixture identifiers. Do not commit real customer traces, call transcripts, account numbers, emails, phone numbers, or secrets.
 
 ## Scorers
 
@@ -63,7 +63,7 @@ Default smoke run, allowing the intentionally planted hard-fail fixture:
 
 ```bash
 npx tsx src/lib/evals/cli.ts \
-  --pack pennie/smoke \
+  --pack customer-pilot/smoke \
   --source fixtures \
   --output /tmp/blindbench-report.json \
   --markdown /tmp/blindbench-report.md \
@@ -73,18 +73,18 @@ npx tsx src/lib/evals/cli.ts \
 Without `--allow-failures`, the default pack exits non-zero because it includes one intentional hard-fail fixture to prove CI gating works:
 
 ```bash
-npx tsx src/lib/evals/cli.ts --pack pennie/smoke --source fixtures
+npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke --source fixtures
 ```
 
 Expected behavior:
 
-- `pennie/smoke`: 49/50 pass, 1 intentional hard-fail
-- `pennie/smoke-pass`: 50/50 pass, 0 hard-fails
+- `customer-pilot/smoke`: 49/50 pass, 1 intentional hard-fail
+- `customer-pilot/smoke-pass`: 50/50 pass, 0 hard-fails
 
 All-pass smoke run:
 
 ```bash
-npx tsx src/lib/evals/cli.ts --pack pennie/smoke-pass --source fixtures
+npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke-pass --source fixtures
 ```
 
 ## Baseline vs candidate
@@ -105,7 +105,7 @@ Run with:
 
 ```bash
 npx tsx src/lib/evals/cli.ts \
-  --pack pennie/smoke \
+  --pack customer-pilot/smoke \
   --baseline-fixtures /path/to/baseline.json \
   --candidate-fixtures /path/to/candidate.json \
   --output /tmp/blindbench-compare.json \

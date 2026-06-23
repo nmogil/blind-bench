@@ -8,27 +8,27 @@ import {
   formatMarkdown,
   runPack,
 } from "./runner";
-import { pennieSmokeFixturesAllPass } from "./packs/pennie";
+import { customerPilotSmokeFixturesAllPass } from "./packs/customerPilot";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "bb-eval-"));
 
 describe("runPack", () => {
-  it("default pennie/smoke pack hard-fails on the planted leakage fixture", async () => {
-    const s = await runPack("pennie/smoke");
+  it("default customer-pilot/smoke pack hard-fails on the planted leakage fixture", async () => {
+    const s = await runPack("customer-pilot/smoke");
     expect(s.total).toBe(50);
     expect(s.hard_failed).toBe(1);
     expect(s.passed).toBe(49);
-    expect(s.results.find((r) => r.case_id === "pennie-migo-balance-00")?.hard_failed).toBe(true);
+    expect(s.results.find((r) => r.case_id === "pilot-migo-balance-00")?.hard_failed).toBe(true);
   });
 
   it("all-pass fixture set clears every case with no hard-fails", async () => {
-    const s = await runPack("pennie/smoke", pennieSmokeFixturesAllPass);
+    const s = await runPack("customer-pilot/smoke", customerPilotSmokeFixturesAllPass);
     expect(s.passed).toBe(50);
     expect(s.hard_failed).toBe(0);
   });
 
   it("reports cases with no fixture instead of crashing", async () => {
-    const s = await runPack("pennie/smoke", { "pennie-eavesly-payoff-00": pennieSmokeFixturesAllPass["pennie-eavesly-payoff-00"]! });
+    const s = await runPack("customer-pilot/smoke", { "pilot-eavesly-payoff-00": customerPilotSmokeFixturesAllPass["pilot-eavesly-payoff-00"]! });
     expect(s.total).toBe(1);
     expect(s.missing_fixtures.length).toBe(49);
   });
@@ -37,7 +37,7 @@ describe("runPack", () => {
 describe("JSON + Markdown output", () => {
   it("writes both summaries to temp files", async () => {
     const dir = tmp();
-    const s = await runPack("pennie/smoke");
+    const s = await runPack("customer-pilot/smoke");
     const jsonPath = join(dir, "report.json");
     const mdPath = join(dir, "report.md");
     writeFileSync(jsonPath, formatJson(s));
@@ -55,10 +55,10 @@ describe("JSON + Markdown output", () => {
 
 describe("baseline vs candidate comparison", () => {
   it("flags the planted hard-fail as a regression vs the all-pass baseline", async () => {
-    const baseline = await runPack("pennie/smoke", pennieSmokeFixturesAllPass);
-    const candidate = await runPack("pennie/smoke");
+    const baseline = await runPack("customer-pilot/smoke", customerPilotSmokeFixturesAllPass);
+    const candidate = await runPack("customer-pilot/smoke");
     const cmp = compareSummaries(baseline, candidate);
-    expect(cmp.regressions).toContain("pennie-migo-balance-00");
+    expect(cmp.regressions).toContain("pilot-migo-balance-00");
     expect(cmp.fixes).toEqual([]);
   });
 });
