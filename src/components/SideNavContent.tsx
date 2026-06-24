@@ -5,6 +5,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
 import {
   ClipboardCheck,
+  CloudDownload,
   CreditCard,
   FolderOpen,
   Key,
@@ -99,6 +100,14 @@ export function SideNavContent({
       >
         <Plug aria-hidden="true" className="h-4 w-4 shrink-0" />
         Gateway onboarding
+      </NavLink>
+      <NavLink
+        to={`/orgs/${org.slug}/gateway-import`}
+        className={linkClass}
+        onClick={onNavigate}
+      >
+        <CloudDownload aria-hidden="true" className="h-4 w-4 shrink-0" />
+        Import Gateway logs
       </NavLink>
       <NavLink
         to={`/orgs/${org.slug}/pilot-scorecard`}

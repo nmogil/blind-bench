@@ -64,7 +64,8 @@ export type TraceSource =
   | "langfuse"
   | "posthog"
   | "promptlayer"
-  | "manual_paste";
+  | "manual_paste"
+  | "cloudflare_ai_gateway";
 
 export interface ParsedTrace {
   source: TraceSource;

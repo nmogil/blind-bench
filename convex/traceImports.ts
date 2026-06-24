@@ -7,6 +7,7 @@ const SOURCE_VALIDATOR = v.union(
   v.literal("posthog"),
   v.literal("promptlayer"),
   v.literal("manual_paste"),
+  v.literal("cloudflare_ai_gateway"),
 );
 
 /**
