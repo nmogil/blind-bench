@@ -21,6 +21,7 @@ const PilotScorecard = lazy(() => import("./routes/orgs/PilotScorecard").then(m 
 const OrgSettings = lazy(() => import("./routes/orgs/settings/OrgSettings").then(m => ({ default: m.OrgSettings })));
 const OrgMembers = lazy(() => import("./routes/orgs/settings/OrgMembers").then(m => ({ default: m.OrgMembers })));
 const OpenRouterKey = lazy(() => import("./routes/orgs/settings/OpenRouterKey").then(m => ({ default: m.OpenRouterKey })));
+const Billing = lazy(() => import("./routes/orgs/settings/Billing").then(m => ({ default: m.Billing })));
 const ProjectSettings = lazy(() => import("./routes/orgs/projects/settings/ProjectSettings").then(m => ({ default: m.ProjectSettings })));
 const ProjectCollaborators = lazy(() => import("./routes/orgs/projects/settings/ProjectCollaborators").then(m => ({ default: m.ProjectCollaborators })));
 const Variables = lazy(() => import("./routes/orgs/projects/Variables").then(m => ({ default: m.Variables })));
@@ -79,6 +80,7 @@ export function App() {
             <Route path="settings" element={<OrgSettings />} />
             <Route path="settings/members" element={<OrgMembers />} />
             <Route path="settings/openrouter-key" element={<OpenRouterKey />} />
+            <Route path="settings/billing" element={<Billing />} />
             <Route path="projects/:projectId" element={<ProjectLayout />}>
               <Route index element={<Navigate to="versions" replace />} />
               <Route path="variables" element={<Variables />} />

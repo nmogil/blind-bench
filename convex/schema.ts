@@ -988,6 +988,72 @@ const schema = defineSchema({
     .index("by_scope", ["scope", "scopeId"])
     .index("by_email_scope", ["email", "scope", "scopeId"])
     .index("by_org_status", ["orgId", "status"]),
+
+  // =========================================================================
+  // Polar self-serve billing. Payment state lives ONLY in these four tables
+  // and is never joined to trace/eval/test-case data. Nothing here stores
+  // customer trace content — only money/entitlement bookkeeping and Polar IDs.
+  // =========================================================================
+
+  // One row per org once it touches billing. `externalCustomerId` is the
+  // stable handle we send to Polar (derived from the org id) so checkout can
+  // create-or-resume the same Polar customer; `polarCustomerId` is filled in
+  // once Polar assigns one.
+  billingCustomers: defineTable({
+    organizationId: v.id("organizations"),
+    externalCustomerId: v.string(),
+    polarCustomerId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["organizationId"])
+    .index("by_polar_customer", ["polarCustomerId"])
+    .index("by_external_customer", ["externalCustomerId"]),
+
+  // Current package grant for an org. One active row per org at a time; older
+  // grants are flipped to "revoked" rather than deleted for audit.
+  billingEntitlements: defineTable({
+    organizationId: v.id("organizations"),
+    packageKey: v.string(),
+    status: v.union(
+      v.literal("trialing"),
+      v.literal("active"),
+      v.literal("revoked"),
+    ),
+    polarSubscriptionId: v.optional(v.string()),
+    grantedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["organizationId"])
+    .index("by_org_and_status", ["organizationId", "status"])
+    .index("by_subscription", ["polarSubscriptionId"]),
+
+  // Append-only credit ledger. Remaining credits = sum of `creditDelta` for an
+  // org. Purchases add positive deltas; refunds/revocations add negative ones.
+  // Carries Polar IDs for idempotency and audit — never trace/test-case data.
+  billingLedger: defineTable({
+    organizationId: v.id("organizations"),
+    creditDelta: v.number(),
+    reason: v.string(),
+    packageKey: v.optional(v.string()),
+    polarOrderId: v.optional(v.string()),
+    polarSubscriptionId: v.optional(v.string()),
+    polarEventId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["organizationId"])
+    .index("by_order", ["polarOrderId"])
+    .index("by_subscription", ["polarSubscriptionId"])
+    .index("by_event", ["polarEventId"]),
+
+  // Idempotency + audit log of every webhook delivery we accepted. Keyed by the
+  // Standard Webhooks `webhook-id`; a repeat delivery is a no-op.
+  polarWebhookEvents: defineTable({
+    eventId: v.string(),
+    eventType: v.string(),
+    processedAt: v.number(),
+    result: v.string(),
+  }).index("by_event_id", ["eventId"]),
 });
 
 export default schema;
