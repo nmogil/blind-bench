@@ -67,6 +67,8 @@ Raw trace
   → export only if class == training_approved
 ```
 
+A local, pure-function implementation of the label → regression/training gates lives in [`review-promotion-workflow.md`](./review-promotion-workflow.md) (`src/lib/evals/reviewWorkflow.ts`).
+
 Training export metadata should include:
 
 - source trace ID / hash
