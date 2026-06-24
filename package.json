@@ -12,7 +12,8 @@
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "scorecard:customer-pilot": "npx tsx src/lib/evals/scorecard.ts",
     "dataset:customer-pilot": "npx tsx src/lib/evals/trainingDataset.ts",
-    "compare:customer-pilot": "npx tsx src/lib/evals/modelComparison.ts"
+    "compare:customer-pilot": "npx tsx src/lib/evals/modelComparison.ts",
+    "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",
