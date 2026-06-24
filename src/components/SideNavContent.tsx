@@ -3,7 +3,15 @@ import { NavLink } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
-import { FolderOpen, Key, Settings, Users, Plus, Plug } from "lucide-react";
+import {
+  ClipboardCheck,
+  FolderOpen,
+  Key,
+  Plug,
+  Plus,
+  Settings,
+  Users,
+} from "lucide-react";
 import { NextActionRing } from "@/components/copilot/NextActionRing";
 
 interface SideNavContentProps {
@@ -88,8 +96,16 @@ export function SideNavContent({
         className={linkClass}
         onClick={onNavigate}
       >
-        <Plug className="h-4 w-4 shrink-0" />
+        <Plug aria-hidden="true" className="h-4 w-4 shrink-0" />
         Gateway onboarding
+      </NavLink>
+      <NavLink
+        to={`/orgs/${org.slug}/pilot-scorecard`}
+        className={linkClass}
+        onClick={onNavigate}
+      >
+        <ClipboardCheck aria-hidden="true" className="h-4 w-4 shrink-0" />
+        Pilot scorecard
       </NavLink>
 
       {role === "owner" && (
