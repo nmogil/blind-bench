@@ -5,6 +5,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
 import {
   ClipboardCheck,
+  CreditCard,
   FolderOpen,
   Key,
   Plug,
@@ -139,6 +140,14 @@ export function SideNavContent({
           >
             <Key className="h-4 w-4 shrink-0" />
             OpenRouter Key
+          </NavLink>
+          <NavLink
+            to={`/orgs/${org.slug}/settings/billing`}
+            className={linkClass}
+            onClick={onNavigate}
+          >
+            <CreditCard aria-hidden="true" className="h-4 w-4 shrink-0" />
+            Billing
           </NavLink>
         </>
       )}
