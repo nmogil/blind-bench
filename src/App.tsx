@@ -16,6 +16,7 @@ const SignIn = lazy(() => import("./routes/auth/SignIn").then(m => ({ default: m
 const Onboarding = lazy(() => import("./routes/Onboarding").then(m => ({ default: m.Onboarding })));
 const WelcomeFirstRun = lazy(() => import("./routes/welcome/WelcomeFirstRun").then(m => ({ default: m.WelcomeFirstRun })));
 const OrgHome = lazy(() => import("./routes/orgs/OrgHome").then(m => ({ default: m.OrgHome })));
+const GatewayOnboarding = lazy(() => import("./routes/orgs/GatewayOnboarding").then(m => ({ default: m.GatewayOnboarding })));
 const OrgSettings = lazy(() => import("./routes/orgs/settings/OrgSettings").then(m => ({ default: m.OrgSettings })));
 const OrgMembers = lazy(() => import("./routes/orgs/settings/OrgMembers").then(m => ({ default: m.OrgMembers })));
 const OpenRouterKey = lazy(() => import("./routes/orgs/settings/OpenRouterKey").then(m => ({ default: m.OpenRouterKey })));
@@ -72,6 +73,7 @@ export function App() {
           <Route path="/review/:projectId" element={<ProjectReview />} />
           <Route path="/orgs/:orgSlug" element={<OrgLayout />}>
             <Route index element={<OrgHome />} />
+            <Route path="gateway-onboarding" element={<GatewayOnboarding />} />
             <Route path="settings" element={<OrgSettings />} />
             <Route path="settings/members" element={<OrgMembers />} />
             <Route path="settings/openrouter-key" element={<OpenRouterKey />} />

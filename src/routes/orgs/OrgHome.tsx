@@ -5,7 +5,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useOrgLayout } from "@/components/layouts/OrgLayout";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardCheck, FolderOpen, ChevronRight } from "lucide-react";
+import { ClipboardCheck, FolderOpen, ChevronRight, Plug } from "lucide-react";
 
 export function OrgHome() {
   const { org, orgId } = useOrg();
@@ -46,6 +46,22 @@ export function OrgHome() {
           ))}
         </div>
       )}
+
+      <Link
+        to={`/orgs/${org.slug}/gateway-onboarding`}
+        className="mt-4 flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Plug className="h-4 w-4 text-primary shrink-0" />
+          <div>
+            <div className="text-sm font-medium">Gateway onboarding</div>
+            <div className="text-xs text-muted-foreground">
+              Feed Cloudflare AI Gateway logs into Blind Bench.
+            </div>
+          </div>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
 
       <div className="mt-6">
         {projects === undefined ? (
