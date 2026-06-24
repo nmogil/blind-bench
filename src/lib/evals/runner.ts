@@ -29,6 +29,10 @@ export interface CaseRow {
   score: number;
   passed: boolean;
   hard_failed: boolean;
+  metrics?: {
+    cost_usd?: number;
+    latency_ms?: number;
+  };
   scores: Pick<EvalResult["scores"][number], "scorer" | "passed" | "hard_fail" | "reason">[];
 }
 
@@ -64,6 +68,11 @@ export async function runPack(
       continue;
     }
     const output = AgentOutput.parse(fixture);
+    const outputRaw = (output.raw ?? {}) as Record<string, unknown>;
+    const metrics = {
+      ...(typeof outputRaw.cost_usd === "number" ? { cost_usd: outputRaw.cost_usd } : {}),
+      ...(typeof outputRaw.latency_ms === "number" ? { latency_ms: outputRaw.latency_ms } : {}),
+    };
     const { scores, score, passed, hard_failed } = await scoreCase(evalCase, output);
     results.push({
       case_id: evalCase.id,
@@ -72,6 +81,7 @@ export async function runPack(
       score,
       passed,
       hard_failed,
+      ...(Object.keys(metrics).length ? { metrics } : {}),
       scores: scores.map((s) => ({
         scorer: s.scorer,
         passed: s.passed,

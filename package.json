@@ -9,7 +9,8 @@
     "build:deploy": "npx convex deploy && tsc -b && vite build",
     "preview": "vite preview",
     "test:evals": "vitest run src/lib/evals/",
-    "test:convex": "vitest run --config convex/vitest.config.ts"
+    "test:convex": "vitest run --config convex/vitest.config.ts",
+    "scorecard:customer-pilot": "npx tsx src/lib/evals/scorecard.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",
@@ -67,6 +68,7 @@
     "convex-test": "^0.0.47",
     "shadcn": "^4.2.0",
     "tailwindcss": "^4.2.2",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.2",
     "vite": "^8.0.8",
     "vitest": "^4.1.4"
