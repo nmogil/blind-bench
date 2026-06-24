@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
-import { FolderOpen, Key, Settings, Users, Plus } from "lucide-react";
+import { FolderOpen, Key, Settings, Users, Plus, Plug } from "lucide-react";
 import { NextActionRing } from "@/components/copilot/NextActionRing";
 
 interface SideNavContentProps {
@@ -77,6 +77,20 @@ export function SideNavContent({
           </NavLink>
         ))
       )}
+
+      <div className="mt-4 px-2 pb-1">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Workspace
+        </span>
+      </div>
+      <NavLink
+        to={`/orgs/${org.slug}/gateway-onboarding`}
+        className={linkClass}
+        onClick={onNavigate}
+      >
+        <Plug className="h-4 w-4 shrink-0" />
+        Gateway onboarding
+      </NavLink>
 
       {role === "owner" && (
         <>
