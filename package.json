@@ -11,7 +11,8 @@
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "scorecard:customer-pilot": "npx tsx src/lib/evals/scorecard.ts",
-    "dataset:customer-pilot": "npx tsx src/lib/evals/trainingDataset.ts"
+    "dataset:customer-pilot": "npx tsx src/lib/evals/trainingDataset.ts",
+    "compare:customer-pilot": "npx tsx src/lib/evals/modelComparison.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",
