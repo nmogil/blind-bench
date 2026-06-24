@@ -32,6 +32,7 @@ export interface CaseRow {
   metrics?: {
     cost_usd?: number;
     latency_ms?: number;
+    tokens?: number;
   };
   scores: Pick<EvalResult["scores"][number], "scorer" | "passed" | "hard_fail" | "reason">[];
 }
@@ -72,6 +73,7 @@ export async function runPack(
     const metrics = {
       ...(typeof outputRaw.cost_usd === "number" ? { cost_usd: outputRaw.cost_usd } : {}),
       ...(typeof outputRaw.latency_ms === "number" ? { latency_ms: outputRaw.latency_ms } : {}),
+      ...(typeof outputRaw.tokens === "number" ? { tokens: outputRaw.tokens } : {}),
     };
     const { scores, score, passed, hard_failed } = await scoreCase(evalCase, output);
     results.push({
