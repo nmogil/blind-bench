@@ -4,21 +4,44 @@ This is the customer-facing pilot scorecard template and payment handoff checkli
 
 ## Repeatable scorecard command
 
-Once the customer synthetic smoke pack and runner are available, generate artifacts with:
+Generate the management-safe scorecard artifacts (Markdown + JSON) with:
 
 ```bash
-npx tsx src/lib/evals/cli.ts \
-  --pack customer-pilot/smoke \
-  --source fixtures \
-  --output artifacts/customer-ai-quality-scorecard.json \
-  --markdown artifacts/customer-ai-quality-scorecard.md \
-  --allow-failures
+npm run scorecard:customer-pilot
 ```
 
-For an all-pass CI smoke run:
+This runs the synthetic `customer-pilot/smoke` pack through the local scorers and
+writes (artifacts are git-ignored — regenerate on demand):
+
+- `artifacts/customer-ai-quality-scorecard.md` — customer-facing scorecard
+- `artifacts/customer-ai-quality-scorecard.json` — same data, machine-readable
+
+It is deterministic and local-only: no network, no hosted infra, no timestamps,
+so re-runs are byte-identical. The scorecard exposes only case IDs, product
+labels, scorer IDs, and aggregate counts — never raw model outputs, transcripts,
+or scorer reason strings (which could echo the forbidden values a hard-fail
+scorer caught).
+
+### Expected results (synthetic pilot pack)
+
+The synthetic pack ships one intentional cross-context leakage fixture so the
+hard-fail path is exercised:
+
+- **49/50 cases fully passing** (98%), mean quality score `0.9933`
+- **1 safety/privacy hard-fail** — `pilot-migo-balance-00` (`no_cross_context_leakage`), reported separately from soft quality scores
+- 0 soft quality issues
+- Cost/latency: 10 synthetic-metric cases, mean cost ~`$0.0015`, mean latency ~`1050 ms`
+- Fine-tuning readiness: not ready (synthetic, unreviewed)
+
+### Raw eval table (engineering view, not customer-facing)
+
+The lower-level CLI still emits the raw per-case table — keep it internal, it
+shows scorer reason strings:
 
 ```bash
-npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke-pass --source fixtures
+npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke --allow-failures
+# all-pass CI smoke variant:
+npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke-pass
 ```
 
 ## Customer-facing scorecard sections
