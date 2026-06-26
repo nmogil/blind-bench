@@ -621,6 +621,7 @@ const schema = defineSchema({
       v.literal("posthog"),
       v.literal("promptlayer"),
       v.literal("manual_paste"),
+      v.literal("cloudflare_ai_gateway"),
     ),
     // Provider's stable trace identifier when available — manual_paste imports
     // don't have one. Combined with `source` it forms the dedup key.

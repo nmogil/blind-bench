@@ -313,6 +313,12 @@ export function GatewayOnboarding() {
       {/* Footer links */}
       <div className="mt-8 flex flex-wrap gap-4 border-t pt-4 text-sm">
         <Link
+          to={`${base}/gateway-import`}
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+        >
+          Import Gateway logs →
+        </Link>
+        <Link
           to={`${base}/settings/openrouter-key`}
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
