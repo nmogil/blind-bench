@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { requireAuth, requireProjectRole } from "./lib/auth";
 import { legacyTargetFieldForMessage, readMessages } from "./lib/messages";
 
@@ -73,7 +74,12 @@ export const addOutputFeedback = mutation({
 
 export const listOutputFeedback = query({
   args: { outputId: v.id("runOutputs") },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    Array<Doc<"outputFeedback"> & { authorName: string | null; isOwn: boolean }>
+  > => {
     const output = await ctx.db.get(args.outputId);
     if (!output) return [];
 

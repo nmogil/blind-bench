@@ -161,9 +161,10 @@ export const executeRunAction = internalAction({
       version,
       testCase,
       variables,
-      promptAttachments,
       organizationId,
     } = context;
+    const promptAttachments: Doc<"promptAttachments">[] =
+      context.promptAttachments;
 
     // 2. Decrypt org's OpenRouter key
     let apiKey: string;

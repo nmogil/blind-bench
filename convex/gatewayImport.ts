@@ -9,8 +9,24 @@ import {
   parseGatewayJsonl,
   summarizeTraces,
 } from "./traceAdapters/cloudflareAiGateway";
+import type { TraceAggregate } from "./traceAdapters/cloudflareAiGateway";
 
 const SOURCE = "cloudflare_ai_gateway" as const;
+
+interface InsertImportRowsResult {
+  imported: number;
+  deduped: number;
+  newRows: { importId: Id<"traceImports">; index: number }[];
+}
+
+type ImportGatewayLogsResult = {
+  imported: number;
+  deduped: number;
+  parsed: number;
+  invalid: number;
+  invalidLines: number[];
+  truncated: boolean;
+} & TraceAggregate;
 
 /**
  * Auth + dedup + identity insert for a batch of parsed traces. Runs as one
@@ -23,7 +39,7 @@ export const insertImportRows = internalMutation({
     projectId: v.id("projects"),
     sourceTraceIds: v.array(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<InsertImportRowsResult> => {
     const { userId } = await requireProjectRole(ctx, args.projectId, [
       "owner",
       "editor",
@@ -97,7 +113,7 @@ export const importGatewayLogs = action({
     projectId: v.id("projects"),
     jsonl: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ImportGatewayLogsResult> => {
     // UTF-16 char length, not exact bytes — a cheap upper-bound guard before
     // we do any work.
     if (args.jsonl.length > DEFAULT_LIMITS.maxBytes) {
@@ -111,9 +127,8 @@ export const importGatewayLogs = action({
       DEFAULT_LIMITS,
     );
 
-    const { imported, deduped, newRows } = await ctx.runMutation(
-      internal.gatewayImport.insertImportRows,
-      {
+    const { imported, deduped, newRows }: InsertImportRowsResult =
+      await ctx.runMutation(internal.gatewayImport.insertImportRows, {
         projectId: args.projectId,
         sourceTraceIds: traces.map((t) => t.sourceTraceId),
       },
@@ -125,7 +140,7 @@ export const importGatewayLogs = action({
       [];
     for (const { importId, index } of newRows) {
       const storageId = await ctx.storage.store(
-        new Blob([traces[index].rawPayloadJson], { type: "application/json" }),
+        new Blob([traces[index]!.rawPayloadJson], { type: "application/json" }),
       );
       updates.push({ importId, storageId });
     }

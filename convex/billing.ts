@@ -58,7 +58,23 @@ async function activeEntitlement(ctx: QueryCtx, orgId: Id<"organizations">) {
  */
 export const getBillingOverview = query({
   args: { orgId: v.id("organizations") },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    packages: ReturnType<typeof publicPackageCatalog>;
+    trial: typeof TRIAL;
+    entitlement: { packageKey: string; status: string } | null;
+    remainingCredits: number;
+    ledger: Array<{
+      creditDelta: number;
+      reason: string;
+      packageKey: string | null;
+      createdAt: number;
+    }>;
+    portalAvailable: boolean;
+    checkoutConfigured: boolean;
+  }> => {
     await requireOrgRole(ctx, args.orgId, ["owner"]);
 
     const entitlement = await activeEntitlement(ctx, args.orgId);

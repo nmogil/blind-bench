@@ -23,19 +23,19 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function fromBase64(b64: string): Uint8Array {
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
 
-function secretToKeyBytes(secret: string): Uint8Array {
+function secretToKeyBytes(secret: string): Uint8Array<ArrayBuffer> {
   if (secret.startsWith("whsec_")) return fromBase64(secret.slice("whsec_".length));
   return new TextEncoder().encode(secret);
 }
 
-async function hmacBase64(keyBytes: Uint8Array, message: string): Promise<string> {
+async function hmacBase64(keyBytes: Uint8Array<ArrayBuffer>, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     keyBytes,

@@ -265,7 +265,7 @@ export const cancelOptimization = mutation({
 
 export const acceptOptimization = mutation({
   args: { requestId: v.id("optimizationRequests") },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"promptVersions">> => {
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Optimization request not found");
 
