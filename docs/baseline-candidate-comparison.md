@@ -5,6 +5,9 @@ sets** â€” a *baseline* and a *candidate*, standing in for two model endpoints â
 emits a management-safe Markdown + JSON comparison report with an explicit
 promote / hold / reject recommendation.
 
+For running the same comparison against two **live** endpoints (baseline model +
+Fireworks candidate via Cloudflare AI Gateway), see `live-endpoint-comparison.md`.
+
 Issue #229. Source: `src/lib/evals/modelComparison.ts`. Tests:
 `src/lib/evals/modelComparison.test.ts`.
 

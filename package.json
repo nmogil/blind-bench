@@ -13,6 +13,7 @@
     "scorecard:customer-pilot": "npx tsx src/lib/evals/scorecard.ts",
     "dataset:customer-pilot": "npx tsx src/lib/evals/trainingDataset.ts",
     "compare:customer-pilot": "npx tsx src/lib/evals/modelComparison.ts",
+    "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts"
   },
   "dependencies": {
