@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { isBlindReviewer, requireProjectRole } from "./lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -76,7 +77,18 @@ export const getMyComment = query({
 
 export const listForRun = query({
   args: { runId: v.id("promptRuns") },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<
+    Array<{
+      _id: Id<"runComments">;
+      comment: string;
+      createdAt: number;
+      authorName: string | null;
+      isOwn: boolean;
+    }>
+  > => {
     const run = await ctx.db.get(args.runId);
     if (!run) return [];
 

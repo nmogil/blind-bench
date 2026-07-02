@@ -81,7 +81,6 @@ const get = (obj: unknown, paths: string[]): unknown => {
   }
   return undefined;
 };
-const getRecord = (obj: unknown, paths: string[]) => asRecord(get(obj, paths));
 const getStr = (obj: unknown, paths: string[]) => str(get(obj, paths));
 const getNum = (obj: unknown, paths: string[]) => num(get(obj, paths));
 
@@ -225,7 +224,7 @@ export function parseGatewayJsonl(
   let truncated = false;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const line = lines[i]!.trim();
     if (!line) continue;
     if (processed >= limits.maxLines) {
       truncated = true;

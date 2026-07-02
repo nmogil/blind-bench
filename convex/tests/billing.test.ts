@@ -63,15 +63,15 @@ describe("applyPolarEvent", () => {
         .withIndex("by_org", (q) => q.eq("organizationId", ids.orgId))
         .collect();
       expect(ledger).toHaveLength(1);
-      expect(ledger[0].creditDelta).toBe(2500);
+      expect(ledger[0]!.creditDelta).toBe(2500);
 
       const ent = await ctx.db
         .query("billingEntitlements")
         .withIndex("by_org", (q) => q.eq("organizationId", ids.orgId))
         .collect();
       expect(ent).toHaveLength(1);
-      expect(ent[0].status).toBe("active");
-      expect(ent[0].packageKey).toBe("team");
+      expect(ent[0]!.status).toBe("active");
+      expect(ent[0]!.packageKey).toBe("team");
 
       const cust = await ctx.db
         .query("billingCustomers")
@@ -142,7 +142,7 @@ describe("applyPolarEvent", () => {
         .query("billingEntitlements")
         .withIndex("by_org", (q) => q.eq("organizationId", ids.orgId))
         .collect();
-      expect(ent[0].status).toBe("revoked");
+      expect(ent[0]!.status).toBe("revoked");
       return ledger.reduce((a, r) => a + r.creditDelta, 0);
     });
     expect(credits).toBe(0);
