@@ -166,6 +166,8 @@ export interface CompareOptions {
   baseline_label?: string;
   candidate_label?: string;
   tolerances?: ComparisonTolerances;
+  /** Overrides the cost/latency/tokens provenance note (e.g. for live captures). */
+  metrics_note?: string;
 }
 
 /**
@@ -278,7 +280,9 @@ export function compareModels(
         mean_latency_ms: subOrNull(candMetrics.mean_latency_ms, baseMetrics.mean_latency_ms),
         mean_tokens: subOrNull(candMetrics.mean_tokens, baseMetrics.mean_tokens),
       },
-      note: "Synthetic metadata; indicative only. Real cost/latency/token figures require production trace ingestion (#220).",
+      note:
+        opts.metrics_note ??
+        "Synthetic metadata; indicative only. Real cost/latency/token figures require production trace ingestion (#220).",
     },
     tolerances,
     recommendation,
