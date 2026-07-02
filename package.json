@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:deploy": "npx convex deploy && tsc -b && vite build",
+    "build:deploy": "node scripts/vercel-build.mjs",
     "preview": "vite preview",
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
