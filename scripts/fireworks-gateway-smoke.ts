@@ -23,6 +23,7 @@ import {
 import { loadConfig } from "../src/lib/evals/fireworksGatewayPrototype";
 import {
   buildSmokeRequest,
+  redactSecrets,
   redactSmokeRequest,
   verifyGatewayLog,
   type SmokeRequest,
@@ -74,20 +75,51 @@ interface CfLogsResponse {
   errors?: unknown[];
 }
 
-/** Poll the Gateway logs API until a log carrying `traceId` in its metadata appears, or timeout. */
+/** Consecutive non-OK Logs API responses tolerated before the poll gives up as fatal. */
+const MAX_CONSECUTIVE_NON_OK = 3;
+
+/**
+ * Poll the Gateway logs API until a log carrying `traceId` in its metadata appears, or timeout.
+ * Throws (fatal) on 401/403 immediately, or after `MAX_CONSECUTIVE_NON_OK` non-OK responses —
+ * error messages carry only the HTTP status plus a `redact`-sanitized body snippet.
+ */
 export async function pollForTraceLog(
   deps: PollDeps,
-  opts: { accountId: string; gateway: string; apiToken: string; traceId: string; timeoutMs?: number },
+  opts: {
+    accountId: string;
+    gateway: string;
+    apiToken: string;
+    traceId: string;
+    timeoutMs?: number;
+    /** Sanitizer applied to response-body snippets before they enter error messages. */
+    redact?: (text: string) => string;
+  },
 ): Promise<CloudflareAiGatewayLog | undefined> {
   const url = `${CF_API_BASE}/accounts/${opts.accountId}/ai-gateway/gateways/${opts.gateway}/logs?per_page=50`;
   const deadline = deps.now() + (opts.timeoutMs ?? POLL_TIMEOUT_MS);
+  const redact = opts.redact ?? ((text: string) => text);
+  let consecutiveNonOk = 0;
   do {
     const res = await deps.fetch(url, { headers: { Authorization: `Bearer ${opts.apiToken}` } });
     if (res.ok) {
+      consecutiveNonOk = 0;
       const payload = (await res.json()) as CfLogsResponse;
       for (const entry of payload.result ?? []) {
         const record = entry as CloudflareAiGatewayLog;
         if (normalizeCloudflareAiGatewayLog(record).metadata.trace_id === opts.traceId) return record;
+      }
+    } else {
+      const snippet = redact((await res.text()).slice(0, 300));
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(
+          `Gateway logs API auth failed (HTTP ${res.status}) — check CF_API_TOKEN scope/validity. Body: ${snippet}`,
+        );
+      }
+      consecutiveNonOk += 1;
+      if (consecutiveNonOk >= MAX_CONSECUTIVE_NON_OK) {
+        throw new Error(
+          `Gateway logs API returned ${consecutiveNonOk} consecutive non-OK responses (last HTTP ${res.status}). Body: ${snippet}`,
+        );
       }
     }
     if (deps.now() >= deadline) break;
@@ -159,12 +191,16 @@ export async function main(
   deps: PollDeps = { fetch, now: Date.now, sleep: (ms) => new Promise((r) => setTimeout(r, ms)) },
 ): Promise<number> {
   const { dryRun } = parseArgs(argv);
+  // Every stderr line is sanitized — no secret env value may reach the terminal.
+  const errOut = (msg: string): void => {
+    process.stderr.write(redactSecrets(msg, env) + "\n");
+  };
 
   const missing = missingEnv(env, REQUIRED_ENV);
   if (missing.length) {
-    process.stderr.write(
+    errOut(
       `fireworks-gateway-smoke: missing required env: ${missing.join(", ")}. ` +
-        `Set all of ${REQUIRED_ENV.join(", ")} (secrets stay env-only, never committed).\n`,
+        `Set all of ${REQUIRED_ENV.join(", ")} (secrets stay env-only, never committed).`,
     );
     return 1;
   }
@@ -194,15 +230,19 @@ export async function main(
 
   const liveMissing = missingEnv(env, LIVE_ENV);
   if (liveMissing.length) {
-    process.stderr.write(
+    errOut(
       `fireworks-gateway-smoke: live run needs ${liveMissing.join(", ")} to read the Gateway logs API. ` +
-        `Use --dry-run to skip sending.\n`,
+        `Use --dry-run to skip sending.`,
     );
     return 1;
   }
 
   process.stdout.write(`Sending synthetic smoke request (trace_id=${traceId})…\n`);
   const send = await sendSmokeRequest(deps.fetch, request);
+  if (!send.ok) {
+    errOut(`Gateway send failed: HTTP ${send.status}. Not polling logs.`);
+    return 1;
+  }
   process.stdout.write(`Gateway responded HTTP ${send.status}.\n`);
 
   process.stdout.write(`Polling Gateway logs for trace_id (timeout ${POLL_TIMEOUT_MS / 1000}s)…\n`);
@@ -211,9 +251,10 @@ export async function main(
     gateway: config.cf_gateway,
     apiToken: env.CF_API_TOKEN!,
     traceId,
+    redact: (text) => redactSecrets(text, env),
   });
   if (!record) {
-    process.stderr.write(`No Gateway log found for trace_id=${traceId} within the timeout.\n`);
+    errOut(`No Gateway log found for trace_id=${traceId} within the timeout.`);
     return 1;
   }
 
@@ -227,7 +268,7 @@ export async function main(
 
   process.stdout.write(`Verification: ${result.ok ? "PASS" : "FAIL"}\n`);
   for (const n of result.notes) process.stdout.write(`  note: ${n}\n`);
-  for (const f of result.failures) process.stderr.write(`  fail: ${f}\n`);
+  for (const f of result.failures) errOut(`  fail: ${f}`);
   process.stdout.write(`Wrote ${OUT_DIR}/fireworks-gateway-smoke.{json,md}.\n`);
   return result.ok ? 0 : 1;
 }
@@ -238,7 +279,9 @@ if (invokedDirectly) {
   main(process.argv.slice(2))
     .then((code) => process.exit(code))
     .catch((e: unknown) => {
-      process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+      // Thrown messages may echo request/API details — sanitize before they hit stderr.
+      const message = e instanceof Error ? e.message : String(e);
+      process.stderr.write(redactSecrets(message, process.env) + "\n");
       process.exit(1);
     });
 }

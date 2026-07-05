@@ -98,6 +98,23 @@ export function buildSmokeRequest(config: PrototypeConfig, params: SmokeRequestP
   };
 }
 
+/** Env vars whose values must never appear in any output; replaced by `$NAME` placeholders. */
+export const SECRET_ENV_VARS = ["FIREWORKS_API_KEY", "CF_AIG_TOKEN", "CF_API_TOKEN"] as const;
+
+/**
+ * Replace every occurrence of each secret env value in `text` with its `$NAME` placeholder.
+ * Run this over ANY string that could carry a secret (error messages, API response bodies)
+ * before it reaches stderr/stdout or an artifact. Unset/empty secrets are skipped.
+ */
+export function redactSecrets(text: string, env: Record<string, string | undefined>): string {
+  let out = text;
+  for (const name of SECRET_ENV_VARS) {
+    const value = env[name];
+    if (value !== undefined && value !== "") out = out.split(value).join(`$${name}`);
+  }
+  return out;
+}
+
 /** Copy of a smoke request with both secret header values replaced by env-var placeholders. */
 export function redactSmokeRequest(req: SmokeRequest): SmokeRequest {
   return {

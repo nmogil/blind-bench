@@ -6,6 +6,7 @@ import {
 import { loadConfig, modelField, gatewayUrlForMode } from "./fireworksGatewayPrototype";
 import {
   buildSmokeRequest,
+  redactSecrets,
   redactSmokeRequest,
   verifyGatewayLog,
   SMOKE_PROMPT,
@@ -91,6 +92,36 @@ describe("redactSmokeRequest", () => {
     expect(text).not.toContain("cf_SUPER_SECRET_TOKEN");
     // metadata + prompt still round-trip so the operator can eyeball the request
     expect(text).toContain(IDS.traceId);
+  });
+});
+
+describe("redactSecrets", () => {
+  const SECRET_ENV = {
+    FIREWORKS_API_KEY: "fw_LIVE_SECRET_1234567890",
+    CF_AIG_TOKEN: "cf_aig_LIVE_SECRET_0987654321",
+    CF_API_TOKEN: "cf_api_LIVE_SECRET_1122334455",
+  };
+
+  it("replaces every occurrence of each secret env value with its placeholder", () => {
+    const text =
+      `Error: 401 from https://x?key=${SECRET_ENV.FIREWORKS_API_KEY} ` +
+      `Authorization: Bearer ${SECRET_ENV.CF_API_TOKEN} ` +
+      `retry with ${SECRET_ENV.FIREWORKS_API_KEY} and ${SECRET_ENV.CF_AIG_TOKEN}`;
+    const out = redactSecrets(text, SECRET_ENV);
+    expect(out).not.toContain(SECRET_ENV.FIREWORKS_API_KEY);
+    expect(out).not.toContain(SECRET_ENV.CF_AIG_TOKEN);
+    expect(out).not.toContain(SECRET_ENV.CF_API_TOKEN);
+    expect(out).toContain("$FIREWORKS_API_KEY");
+    expect(out).toContain("$CF_AIG_TOKEN");
+    expect(out).toContain("$CF_API_TOKEN");
+    // both FIREWORKS_API_KEY occurrences replaced
+    expect(out.match(/\$FIREWORKS_API_KEY/g)).toHaveLength(2);
+  });
+
+  it("leaves text untouched when the secrets are unset or empty", () => {
+    const text = "plain error message with no secrets";
+    expect(redactSecrets(text, {})).toBe(text);
+    expect(redactSecrets(text, { FIREWORKS_API_KEY: "", CF_AIG_TOKEN: undefined })).toBe(text);
   });
 });
 
