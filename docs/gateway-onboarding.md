@@ -201,7 +201,8 @@ artifacts, or Gateway logs (routing runbook §"Auth & key handling"):
 | `CF_AIG_TOKEN` | Authenticates the caller to the Cloudflare AI Gateway edge. |
 | `CF_API_TOKEN` | Reads back the Gateway logs API (the AI Gateway — Read token). |
 
-Per-tenant isolation: **one Fireworks key + one gateway (+ `metadata.tenant`) per
-tenant.** Do not share keys, gateways, or models across tenants — isolation is
-enforced at the credential and gateway boundary (routing runbook §"Per-tenant
-separation requirements").
+Per-tenant isolation: prefer a **separate gateway per tenant**, or at minimum a
+distinct `metadata.tenant` label **plus BYOK / model-deployment namespacing** so
+one tenant's key can never route another tenant's traffic. Isolation is enforced
+at the credential and gateway boundary (routing runbook §"Per-tenant separation
+requirements").
