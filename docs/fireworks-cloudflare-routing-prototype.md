@@ -3,6 +3,9 @@
 Exact, customer-generic steps to deploy a Fireworks fine-tuned/custom model and route it
 through Cloudflare AI Gateway, then feed the captured logs into the existing eval pipeline.
 
+For the user-facing onboarding checklist that precedes this runbook (connect logs → metadata
+→ baseline eval → candidate rows), see [`gateway-onboarding.md`](./gateway-onboarding.md).
+
 **No production or customer data.** Use synthetic prompts (Migo/Eavesly-style) for the smoke
 test. Secrets stay in your secret store / env — they never go into the repo, the generated
 artifacts, or Gateway logs.
