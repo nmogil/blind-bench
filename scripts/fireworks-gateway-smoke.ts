@@ -109,7 +109,9 @@ export async function pollForTraceLog(
         if (normalizeCloudflareAiGatewayLog(record).metadata.trace_id === opts.traceId) return record;
       }
     } else {
-      const snippet = redact((await res.text()).slice(0, 300));
+      // Redact the FULL body before slicing — a secret straddling the slice
+      // boundary would otherwise partially leak into the error message.
+      const snippet = redact(await res.text()).slice(0, 300);
       if (res.status === 401 || res.status === 403) {
         throw new Error(
           `Gateway logs API auth failed (HTTP ${res.status}) — check CF_API_TOKEN scope/validity. Body: ${snippet}`,
