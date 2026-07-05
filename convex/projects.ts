@@ -6,7 +6,7 @@ import {
   requireOrgRole,
   requireProjectRole,
 } from "./lib/auth";
-import { safeDeleteStorage } from "./lib/storageCleanup";
+import { safeDeleteTestCaseBlob } from "./lib/storageCleanup";
 import { genMessageId } from "./lib/messages";
 import {
   createPersonalOrg,
@@ -474,13 +474,16 @@ export const deleteProject = mutation({
     // project is removed. Only image attachments are cleaned up here — other
     // entity rows (testCases, runs, versions, etc.) are intentionally left
     // for the broader cleanup story.
+    // #188: because promptRuns rows survive this cascade, their inputSnapshot
+    // history can still reference these blobs — route through the retention
+    // check so a lingering run's "what we sent" stays intact.
     const testCases = await ctx.db
       .query("testCases")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .take(500);
     for (const tc of testCases) {
       for (const storageId of Object.values(tc.variableAttachments ?? {})) {
-        await safeDeleteStorage(ctx, storageId);
+        await safeDeleteTestCaseBlob(ctx, args.projectId, storageId);
       }
     }
 

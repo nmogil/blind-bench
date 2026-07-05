@@ -40,6 +40,37 @@ export function buildInputSnapshot(args: {
 }
 
 /**
+ * Resolve the variable inputs to dispatch for a run. When a snapshot exists it
+ * is authoritative for BOTH text and images — a snapshot without `images`
+ * means "no image variables were bound at dispatch", so we must not fall back
+ * to the live test case's attachments (that would dispatch images added after
+ * run creation). Live fallback applies only to pre-#188 runs with no snapshot.
+ */
+export function resolveDispatchInputs(args: {
+  snapshot?: InputSnapshot | null;
+  testCase?: {
+    variableValues: Record<string, string>;
+    variableAttachments?: Record<string, Id<"_storage">>;
+  } | null;
+  inlineVariables?: Record<string, string>;
+}): {
+  variableValues: Record<string, string>;
+  variableAttachments: Record<string, Id<"_storage">>;
+} {
+  if (args.snapshot) {
+    return {
+      variableValues: args.snapshot.text,
+      variableAttachments: args.snapshot.images ?? {},
+    };
+  }
+  return {
+    variableValues:
+      args.testCase?.variableValues ?? args.inlineVariables ?? {},
+    variableAttachments: args.testCase?.variableAttachments ?? {},
+  };
+}
+
+/**
  * Pure blob-retention predicate: is `storageId` referenced by the
  * `inputSnapshot.images` of any of the given runs? Used to decide whether a
  * test-case blob is safe to delete when the test case is edited or removed —

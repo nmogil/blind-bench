@@ -4,6 +4,7 @@ import type { Id } from "../_generated/dataModel";
 import {
   buildInputSnapshot,
   isStorageIdReferencedBySnapshots,
+  resolveDispatchInputs,
   type InputSnapshot,
 } from "../lib/inputSnapshot";
 
@@ -111,5 +112,67 @@ describe("isStorageIdReferencedBySnapshots", () => {
       withImages({ b: "shared" }),
     ];
     expect(isStorageIdReferencedBySnapshots(runs, sid("shared"))).toBe(true);
+  });
+});
+
+describe("resolveDispatchInputs", () => {
+  test("snapshot is authoritative for text and images", () => {
+    const out = resolveDispatchInputs({
+      snapshot: { text: { a: "frozen" }, images: { img: sid("b1") } },
+      testCase: {
+        variableValues: { a: "live" },
+        variableAttachments: { img: sid("b2") },
+      },
+    });
+    expect(out).toEqual({
+      variableValues: { a: "frozen" },
+      variableAttachments: { img: sid("b1") },
+    });
+  });
+
+  test("snapshot without images never falls back to live attachments", () => {
+    // Regression: images added to the test case AFTER run creation must not
+    // be dispatched for a snapshotted run whose snapshot has no images.
+    const out = resolveDispatchInputs({
+      snapshot: { text: { a: "frozen" } },
+      testCase: {
+        variableValues: { a: "live" },
+        variableAttachments: { addedLater: sid("b9") },
+      },
+    });
+    expect(out.variableAttachments).toEqual({});
+    expect(out.variableValues).toEqual({ a: "frozen" });
+  });
+
+  test("no snapshot falls back to live test case (pre-#188 runs)", () => {
+    const out = resolveDispatchInputs({
+      snapshot: null,
+      testCase: {
+        variableValues: { a: "live" },
+        variableAttachments: { img: sid("b1") },
+      },
+    });
+    expect(out).toEqual({
+      variableValues: { a: "live" },
+      variableAttachments: { img: sid("b1") },
+    });
+  });
+
+  test("no snapshot, no test case falls back to inline variables", () => {
+    const out = resolveDispatchInputs({
+      testCase: null,
+      inlineVariables: { q: "inline" },
+    });
+    expect(out).toEqual({
+      variableValues: { q: "inline" },
+      variableAttachments: {},
+    });
+  });
+
+  test("nothing at all yields empty inputs", () => {
+    expect(resolveDispatchInputs({})).toEqual({
+      variableValues: {},
+      variableAttachments: {},
+    });
   });
 });

@@ -283,6 +283,11 @@ export async function materializeSampleProject(
     projectId,
     promptVersionId: versionId,
     testCaseId,
+    // #188: seeded runs carry an input snapshot like real dispatches, so the
+    // sample run's "what we sent" view doesn't show the legacy fallback note.
+    inputSnapshot: {
+      text: { [SAMPLE_VARIABLE_NAME]: SAMPLE_TEST_CASE_DRAFT },
+    },
     model: SAMPLE_OUTPUTS[0]!.model,
     temperature: 0.7,
     mode: "mix",
