@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
+import { safeDeleteTestCaseBlob } from "./lib/storageCleanup";
 
 // Mime allowlist matching OpenRouter's OpenAI-compatible image input format.
 // Anything outside this set is rejected at finalize() — never trust the client.
@@ -101,6 +102,8 @@ export const deleteAttachment = mutation({
   },
   handler: async (ctx, args) => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
-    await ctx.storage.delete(args.storageId);
+    // #188: don't delete a blob still referenced by a past run's inputSnapshot;
+    // its "what we sent" history depends on the blob staying alive.
+    await safeDeleteTestCaseBlob(ctx, args.projectId, args.storageId);
   },
 });
