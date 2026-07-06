@@ -113,18 +113,24 @@ in-app onboarding page):
 | `trace_id` | Request trace id, to correlate with app logs. Use a **real unique** value per request. |
 | `session_id` | Conversation / session id where available. |
 
-**Cloudflare custom-metadata limits.** AI Gateway custom metadata is limited in
-**key count and value size**. Keep values short. Anything larger — full prompt
-text, long ids, structured context — goes in a **sidecar record keyed by
-`trace_id`**, not inline in Gateway metadata. Note that the Convex importer does
-**not yet accept a sidecar** (the local exported-JSONL adapter does — see
-`cloudflare-gateway-live-import.md` "Follow-up"), so for now keep everything you
-need for grouping inside the short metadata keys above.
+**Cloudflare custom-metadata limits.** AI Gateway stores **at most 5 custom
+metadata entries per request and silently drops the rest** (verified live
+2026-07-06: a 9-key `cf-aig-metadata` header came back in the log with only its
+first 5 keys). Choose your ≤5 keys deliberately — `trace_id` must always be one
+of them, or you lose log↔app correlation entirely. Blind Bench's default
+priority is `trace_id, tenant, product, prompt_version, variant`
+(`SMOKE_METADATA_KEYS` in `src/lib/evals/fireworksGatewaySmoke.ts`). Values must
+also stay short. Anything larger — full prompt text, long ids, structured
+context, and any keys that didn't make the cut — goes in a **sidecar record
+keyed by `trace_id`**, not inline in Gateway metadata. Note that the Convex
+importer does **not yet accept a sidecar** (the local exported-JSONL adapter
+does — see `cloudflare-gateway-live-import.md` "Follow-up"), so for now keep
+everything you need for grouping inside your 5 metadata keys.
 
 Metadata travels two ways on a request: in the request body's `metadata` field
 and in a `cf-aig-metadata` header
-(`fireworks-cloudflare-routing-prototype.md` §3). All keys round-trip into the
-Gateway log, where `src/lib/evals/cloudflareAiGateway.ts` /
+(`fireworks-cloudflare-routing-prototype.md` §3). The Gateway log records the
+first 5 header keys, where `src/lib/evals/cloudflareAiGateway.ts` /
 `convex/traceAdapters/cloudflareAiGateway.ts` read them back.
 
 ---

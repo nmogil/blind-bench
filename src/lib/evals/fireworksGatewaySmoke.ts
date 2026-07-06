@@ -21,18 +21,35 @@ import {
 /** Synthetic prompt — never production or customer data. */
 export const SMOKE_PROMPT = "Synthetic smoke prompt — no production or customer data. Reply with: ok.";
 
-/** Metadata keys the smoke request sets and expects to round-trip through the Gateway log. */
+/**
+ * Cloudflare AI Gateway stores at most this many custom-metadata entries per request and
+ * silently drops the rest (observed live 2026-07-06: a 9-key `cf-aig-metadata` header came
+ * back in the log with only its first 5 keys). Every key we need back — above all
+ * `trace_id` — must be inside this cap.
+ */
+export const CF_METADATA_MAX_KEYS = 5;
+
+/**
+ * Metadata keys the smoke request sends and expects to round-trip through the Gateway log,
+ * in priority order (correlation → tenancy → eval grouping), capped at `CF_METADATA_MAX_KEYS`.
+ */
 export const SMOKE_METADATA_KEYS = [
+  "trace_id",
+  "tenant",
   "product",
-  "module",
   "prompt_version",
   "variant",
-  "release",
-  "environment",
-  "tenant",
-  "trace_id",
-  "session_id",
 ] as const;
+
+/**
+ * Reduce full routing metadata to the Gateway's key cap: priority keys first, then any
+ * remaining keys in insertion order, truncated to `CF_METADATA_MAX_KEYS`.
+ */
+export function capMetadataForGateway(metadata: Record<string, string>): Record<string, string> {
+  const priority = SMOKE_METADATA_KEYS.filter((k) => k in metadata);
+  const rest = Object.keys(metadata).filter((k) => !(SMOKE_METADATA_KEYS as readonly string[]).includes(k));
+  return Object.fromEntries([...priority, ...rest].slice(0, CF_METADATA_MAX_KEYS).map((k) => [k, metadata[k]]));
+}
 
 export interface SmokeRequestBody {
   model: string;
@@ -76,10 +93,11 @@ export function buildSmokeMetadata(
  * use `redactSmokeRequest` before printing or persisting.
  * - `Authorization` — upstream Fireworks key.
  * - `cf-aig-authorization` — Gateway edge token.
- * - `cf-aig-metadata` — routing metadata (also mirrored in the body).
+ * - `cf-aig-metadata` — routing metadata (also mirrored in the body), capped to the
+ *   Gateway's `CF_METADATA_MAX_KEYS` limit with `trace_id` guaranteed to survive.
  */
 export function buildSmokeRequest(config: PrototypeConfig, params: SmokeRequestParams): SmokeRequest {
-  const metadata = buildSmokeMetadata(config, params);
+  const metadata = capMetadataForGateway(buildSmokeMetadata(config, params));
   return {
     url: gatewayUrlForMode(config),
     headers: {
