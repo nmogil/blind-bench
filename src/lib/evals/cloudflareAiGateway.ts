@@ -78,6 +78,17 @@ const getStr = (obj: unknown, paths: string[]) => str(get(obj, paths));
 const getNum = (obj: unknown, paths: string[]) => num(get(obj, paths));
 const getBool = (obj: unknown, paths: string[]) => bool(get(obj, paths));
 
+/** Derive a status string from `success`/`status_code` when the log has no string status. */
+const deriveStatus = (record: unknown): string | undefined => {
+  const success = getBool(record, ["success"]);
+  if (success === false) return "error";
+  // 2xx only, and status_code outranks success:true — a 3xx/5xx log is not a
+  // completed generation even if the record claims success.
+  const code = getNum(record, ["status_code", "response.status_code"]);
+  if (code !== undefined) return code >= 200 && code < 300 ? "success" : "error";
+  return success === true ? "success" : undefined;
+};
+
 const stableHash = (value: unknown): string =>
   createHash("sha256").update(stableStringify(value)).digest("hex").slice(0, 16);
 
@@ -156,7 +167,9 @@ export function normalizeCloudflareAiGatewayLog(
     timestamp: getStr(record, ["timestamp", "created_at", "datetime"]),
     provider: getStr(record, ["provider", "request.provider", "response.provider"]),
     model: getStr(record, ["model", "request.model", "response.model"]),
-    status: getStr(record, ["status", "response.status", "error.type"]),
+    // Live Gateway logs (verified 2026-07-06) carry no string status — only
+    // `success: boolean` and `status_code: number`; derive one when absent.
+    status: getStr(record, ["status", "response.status", "error.type"]) ?? deriveStatus(record),
     request_type: getStr(record, ["request_type", "type"]),
     messages,
     output_text: outputText,

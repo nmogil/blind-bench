@@ -97,6 +97,37 @@ describe("Cloudflare AI Gateway adapter", () => {
     expect(row.redaction.notes).toContain("response_missing_or_redacted");
   });
 
+  it("derives status from success/status_code when no string status exists (live log shape, 2026-07-06)", () => {
+    // Field shape captured from a real /ai-gateway/gateways/{gw}/logs response.
+    const liveShape = {
+      id: "01KWVJZHEK0YQ4S0J37D840R5E",
+      created_at: "2026-07-06T11:28:26.144Z",
+      event_id: "de3a17ba-422b-4149-964b-14127f42f2ac",
+      provider: "custom-fireworks",
+      model: "accounts/fireworks/models/gpt-oss-120b",
+      path: "chat/completions",
+      duration: 381,
+      status_code: 200,
+      success: true,
+      tokens_in: 87,
+      tokens_out: 43,
+      metadata: { product: "migo", trace_id: "smoke-test-trace" },
+      cost: 0,
+      request: "",
+      response: "",
+    };
+    expect(normalizeCloudflareAiGatewayLog(liveShape).status).toBe("success");
+    expect(normalizeCloudflareAiGatewayLog({ ...liveShape, success: false }).status).toBe("error");
+    const { success: _drop, ...noSuccess } = liveShape;
+    expect(normalizeCloudflareAiGatewayLog({ ...noSuccess, status_code: 502 }).status).toBe("error");
+    // 3xx is not a completed generation — must not verify as success.
+    expect(normalizeCloudflareAiGatewayLog({ ...noSuccess, status_code: 302 }).status).toBe("error");
+    // status_code outranks a contradictory success:true.
+    expect(normalizeCloudflareAiGatewayLog({ ...liveShape, status_code: 500 }).status).toBe("error");
+    // success:false outranks a 200.
+    expect(normalizeCloudflareAiGatewayLog({ ...liveShape, success: false }).status).toBe("error");
+  });
+
   it("maps DLP and human feedback fields", () => {
     const row = normalizeCloudflareAiGatewayLog(feedbackDlpRecord);
     expect(row.dlp).toEqual({ action: "allow", flagged: false });

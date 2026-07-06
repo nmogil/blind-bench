@@ -101,9 +101,12 @@ firectl create deployment accounts/<account>/models/migo-eval-ft-0001
    export CF_AIG_TOKEN=…        # gateway token
    ```
 2. Run the redacted cURL from the runbook artifact. The body carries `metadata` (and the
-   request also sends a `cf-aig-metadata` header) with: `product`, `module`, `prompt_version`,
-   `variant`, `release`, `environment`, `tenant`, `trace_id`, `session_id`.
-3. Use a **real unique** `trace_id`/`session_id` per request; the generated synthetic ids are
+   request also sends a `cf-aig-metadata` header). **The Gateway keeps at most 5 metadata
+   entries per request and silently drops the rest** (verified live 2026-07-06), so the smoke
+   sends exactly the priority set `trace_id`, `tenant`, `product`, `prompt_version`, `variant`
+   (`SMOKE_METADATA_KEYS` / `capMetadataForGateway` in `fireworksGatewaySmoke.ts`). `trace_id`
+   must always survive the cap — it is the only way to correlate the log back to the request.
+3. Use a **real unique** `trace_id` per request; the generated synthetic ids are
    deterministic placeholders for review only.
 
 ### Automated: live smoke + log verification
@@ -157,7 +160,7 @@ what `cloudflareAiGateway.ts` reads:
 | `cost_usd` | Per-request cost where reported (may be null). |
 | `duration_ms` | End-to-end latency. |
 | `usage` | input / output / total tokens. |
-| `metadata` | all metadata keys round-trip. |
+| `metadata` | the ≤5 sent keys round-trip (Gateway cap — see §3). |
 | `status` | success/error. |
 | `redaction` | if bodies are stripped by log settings, the normalizer flags them — expected/safe. |
 

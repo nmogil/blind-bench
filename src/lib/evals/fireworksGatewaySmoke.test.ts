@@ -6,9 +6,12 @@ import {
 import { loadConfig, modelField, gatewayUrlForMode } from "./fireworksGatewayPrototype";
 import {
   buildSmokeRequest,
+  capMetadataForGateway,
   redactSecrets,
   redactSmokeRequest,
   verifyGatewayLog,
+  CF_METADATA_MAX_KEYS,
+  SMOKE_METADATA_KEYS,
   SMOKE_PROMPT,
   type VerifyExpectations,
 } from "./fireworksGatewaySmoke";
@@ -76,8 +79,51 @@ describe("buildSmokeRequest", () => {
     expect(req.headers["cf-aig-authorization"]).toBe("Bearer cf_SUPER_SECRET_TOKEN");
     const meta = JSON.parse(req.headers["cf-aig-metadata"] ?? "{}") as Record<string, string>;
     expect(meta.trace_id).toBe(IDS.traceId);
-    expect(meta.session_id).toBe(IDS.sessionId);
     expect(req.body.metadata.trace_id).toBe(IDS.traceId);
+  });
+
+  it("caps header metadata at the Gateway limit with trace_id first", () => {
+    const req = buildSmokeRequest(loadConfig(ENV), { ...IDS, ...SECRETS });
+    const meta = JSON.parse(req.headers["cf-aig-metadata"] ?? "{}") as Record<string, string>;
+    expect(Object.keys(meta).length).toBeLessThanOrEqual(CF_METADATA_MAX_KEYS);
+    // The keys we verify against must all survive the cap — trace_id above all.
+    expect(Object.keys(meta)[0]).toBe("trace_id");
+    for (const key of SMOKE_METADATA_KEYS) expect(meta[key]).toBeDefined();
+    expect(req.body.metadata).toEqual(meta);
+  });
+});
+
+describe("capMetadataForGateway", () => {
+  it("keeps priority keys, fills with remaining insertion order, truncates to the cap", () => {
+    const capped = capMetadataForGateway({
+      a: "1",
+      b: "2",
+      product: "p",
+      c: "3",
+      trace_id: "t",
+      tenant: "ten",
+      prompt_version: "pv",
+      variant: "v",
+    });
+    expect(Object.keys(capped)).toEqual(["trace_id", "tenant", "product", "prompt_version", "variant"]);
+  });
+
+  it("backfills below-cap metadata without inventing keys", () => {
+    const capped = capMetadataForGateway({ x: "1", trace_id: "t" });
+    expect(Object.keys(capped)).toEqual(["trace_id", "x"]);
+  });
+
+  it("backfills with extras then truncates when most priority keys are missing", () => {
+    const capped = capMetadataForGateway({
+      e1: "1",
+      e2: "2",
+      trace_id: "t",
+      e3: "3",
+      e4: "4",
+      product: "p",
+      e5: "5",
+    });
+    expect(Object.keys(capped)).toEqual(["trace_id", "product", "e1", "e2", "e3"]);
   });
 });
 

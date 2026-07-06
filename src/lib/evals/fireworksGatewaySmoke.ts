@@ -13,26 +13,24 @@
 import type { NormalizedBlindBenchTrace } from "./cloudflareAiGateway";
 import {
   buildMetadata,
+  capMetadataForGateway,
   gatewayUrlForMode,
   modelField,
+  CF_METADATA_MAX_KEYS,
+  GATEWAY_METADATA_PRIORITY,
   type PrototypeConfig,
 } from "./fireworksGatewayPrototype";
 
 /** Synthetic prompt — never production or customer data. */
 export const SMOKE_PROMPT = "Synthetic smoke prompt — no production or customer data. Reply with: ok.";
 
-/** Metadata keys the smoke request sets and expects to round-trip through the Gateway log. */
-export const SMOKE_METADATA_KEYS = [
-  "product",
-  "module",
-  "prompt_version",
-  "variant",
-  "release",
-  "environment",
-  "tenant",
-  "trace_id",
-  "session_id",
-] as const;
+/**
+ * Metadata keys the smoke request sends and expects to round-trip through the Gateway log —
+ * the shared Gateway priority set (see `GATEWAY_METADATA_PRIORITY` / `capMetadataForGateway`
+ * in `fireworksGatewayPrototype.ts` for the 5-key Cloudflare cap they exist to survive).
+ */
+export const SMOKE_METADATA_KEYS = GATEWAY_METADATA_PRIORITY;
+export { capMetadataForGateway, CF_METADATA_MAX_KEYS };
 
 export interface SmokeRequestBody {
   model: string;
@@ -76,10 +74,11 @@ export function buildSmokeMetadata(
  * use `redactSmokeRequest` before printing or persisting.
  * - `Authorization` — upstream Fireworks key.
  * - `cf-aig-authorization` — Gateway edge token.
- * - `cf-aig-metadata` — routing metadata (also mirrored in the body).
+ * - `cf-aig-metadata` — routing metadata (also mirrored in the body), capped to the
+ *   Gateway's `CF_METADATA_MAX_KEYS` limit with `trace_id` guaranteed to survive.
  */
 export function buildSmokeRequest(config: PrototypeConfig, params: SmokeRequestParams): SmokeRequest {
-  const metadata = buildSmokeMetadata(config, params);
+  const metadata = capMetadataForGateway(buildSmokeMetadata(config, params));
   return {
     url: gatewayUrlForMode(config),
     headers: {

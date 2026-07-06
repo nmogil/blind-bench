@@ -156,6 +156,43 @@ export function buildMetadata(c: PrototypeConfig): Record<string, string> {
   };
 }
 
+/**
+ * Cloudflare AI Gateway stores at most this many custom-metadata entries per request and
+ * silently drops the rest (observed live 2026-07-06: a 9-key `cf-aig-metadata` header came
+ * back in the log with only its first 5 keys).
+ */
+export const CF_METADATA_MAX_KEYS = 5;
+
+/**
+ * Keys that must survive the Gateway cap, in priority order: correlation → tenancy →
+ * eval grouping. `trace_id` first — it is the only way to match a log to its request.
+ */
+export const GATEWAY_METADATA_PRIORITY = [
+  "trace_id",
+  "tenant",
+  "product",
+  "prompt_version",
+  "variant",
+] as const;
+
+/**
+ * Reduce full routing metadata to the Gateway's key cap: priority keys first, then any
+ * remaining keys in insertion order, truncated to `CF_METADATA_MAX_KEYS`. Every builder
+ * that emits `cf-aig-metadata` must send capped metadata or risk losing `trace_id`.
+ */
+export function capMetadataForGateway(metadata: Record<string, string>): Record<string, string> {
+  const priority = GATEWAY_METADATA_PRIORITY.filter((k) => k in metadata);
+  const rest = Object.keys(metadata).filter(
+    (k) => !(GATEWAY_METADATA_PRIORITY as readonly string[]).includes(k),
+  );
+  const capped: Record<string, string> = {};
+  for (const k of [...priority, ...rest].slice(0, CF_METADATA_MAX_KEYS)) {
+    const v = metadata[k];
+    if (v !== undefined) capped[k] = v;
+  }
+  return capped;
+}
+
 /** Model string the request body should carry (compat mode prefixes the provider slug). */
 export function modelField(c: PrototypeConfig): string {
   return c.gateway_mode === "compat" ? `${c.provider_slug}/${c.fireworks_model}` : c.fireworks_model;
@@ -169,16 +206,17 @@ const SYNTHETIC_BODY_MESSAGE = "Synthetic smoke prompt — no production or cust
  * carries the Gateway token (separate from the upstream provider key).
  */
 export function buildExampleCurl(c: PrototypeConfig): string {
+  const metadata = capMetadataForGateway(buildMetadata(c));
   const body = {
     model: modelField(c),
     messages: [{ role: "user", content: SYNTHETIC_BODY_MESSAGE }],
     max_tokens: 64,
-    metadata: buildMetadata(c),
+    metadata,
   };
   const headers = [
     `-H 'Authorization: Bearer $FIREWORKS_API_KEY'`,
     `-H 'cf-aig-authorization: Bearer $CF_AIG_TOKEN'`,
-    `-H 'cf-aig-metadata: ${JSON.stringify(buildMetadata(c))}'`,
+    `-H 'cf-aig-metadata: ${JSON.stringify(metadata)}'`,
     `-H 'Content-Type: application/json'`,
   ];
   return [
@@ -198,7 +236,7 @@ export function buildVerificationChecklist(): { field: string; expect: string }[
     { field: "cost_usd", expect: "Per-request cost present where the provider reports it (may be null)." },
     { field: "duration_ms", expect: "End-to-end latency captured." },
     { field: "usage", expect: "input/output/total tokens present." },
-    { field: "metadata", expect: "product, module, prompt_version, variant, release, environment, tenant, trace_id, session_id all round-trip." },
+    { field: "metadata", expect: "the ≤5 sent keys (trace_id, tenant, product, prompt_version, variant) round-trip — the Gateway drops entries beyond 5." },
     { field: "status", expect: "Success/error status recorded." },
     { field: "redaction", expect: "If request/response bodies are stripped by log settings, normalizer flags request_missing/response_missing — expected and safe." },
   ];
