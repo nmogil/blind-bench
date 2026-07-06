@@ -81,11 +81,12 @@ const getBool = (obj: unknown, paths: string[]) => bool(get(obj, paths));
 /** Derive a status string from `success`/`status_code` when the log has no string status. */
 const deriveStatus = (record: unknown): string | undefined => {
   const success = getBool(record, ["success"]);
-  if (success !== undefined) return success ? "success" : "error";
+  if (success === false) return "error";
+  // 2xx only, and status_code outranks success:true — a 3xx/5xx log is not a
+  // completed generation even if the record claims success.
   const code = getNum(record, ["status_code", "response.status_code"]);
-  // 2xx only: a 3xx log is not a completed generation and must not verify as success.
   if (code !== undefined) return code >= 200 && code < 300 ? "success" : "error";
-  return undefined;
+  return success === true ? "success" : undefined;
 };
 
 const stableHash = (value: unknown): string =>
