@@ -97,9 +97,12 @@ Notes:
 
 ## Metadata conventions
 
-Attach these keys to every Gateway request so logs stay groupable after import.
-The convention (from `fireworks-cloudflare-routing-prototype.md` §3 and the
-in-app onboarding page):
+**Send at most 5 of these keys per request** — Cloudflare's cap, see the limits
+note below. The default set is `trace_id, tenant, product, prompt_version,
+variant` (trace_id always included); the full table is a catalog to choose
+from, with everything that doesn't make your 5 going to a sidecar. The
+convention (from `fireworks-cloudflare-routing-prototype.md` §3 and the in-app
+onboarding page):
 
 | Key | Meaning |
 | --- | --- |

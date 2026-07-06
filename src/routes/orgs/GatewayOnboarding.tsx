@@ -86,19 +86,20 @@ const PRODUCTS = [
   },
 ] as const;
 
+// Cloudflare keeps at most 5 metadata entries per request and silently drops the
+// rest, so the default set is exactly these five, trace_id first. Everything else
+// (module, release, environment, session_id, …) belongs in a sidecar keyed by trace_id.
 const METADATA_FIELDS = [
+  { key: "trace_id", desc: "Request trace id — always first; it is the only log↔app correlation key." },
+  { key: "tenant", desc: "Tenant label for attribution and per-tenant isolation." },
   { key: "product", desc: "Top-level product, e.g. migo / eavesly." },
-  { key: "module", desc: "Sub-surface within the product, e.g. assistant / summarizer." },
   { key: "prompt_version", desc: "Version tag of the prompt that produced the output." },
   { key: "variant", desc: "control / candidate (which arm of an A/B)." },
-  { key: "release", desc: "App release or deploy identifier." },
-  { key: "environment", desc: "prod / staging / dev — keep prod data customer-scoped." },
-  { key: "trace_id", desc: "Request trace id, where available, to correlate with app logs." },
-  { key: "session_id", desc: "Conversation / session id, where available." },
 ] as const;
 
 const CLI_SNIPPET = `# Request path: attach compact metadata before the AI Gateway call
-METADATA='{"product":"migo","module":"assistant","prompt_version":"2026-06-01","variant":"control","environment":"prod","trace_id":"<trace>"}'
+# (max 5 keys — Cloudflare drops the rest; trace_id must be one of them)
+METADATA='{"trace_id":"<trace>","tenant":"<tenant>","product":"migo","prompt_version":"2026-06-01","variant":"control"}'
 curl https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/openai/chat/completions
   -H "cf-aig-metadata: $METADATA"
   -d '{ "model": "gpt-4o-mini", "messages": [ ... ] }'

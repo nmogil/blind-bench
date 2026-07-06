@@ -83,7 +83,8 @@ const deriveStatus = (record: unknown): string | undefined => {
   const success = getBool(record, ["success"]);
   if (success !== undefined) return success ? "success" : "error";
   const code = getNum(record, ["status_code", "response.status_code"]);
-  if (code !== undefined) return code >= 200 && code < 400 ? "success" : "error";
+  // 2xx only: a 3xx log is not a completed generation and must not verify as success.
+  if (code !== undefined) return code >= 200 && code < 300 ? "success" : "error";
   return undefined;
 };
 

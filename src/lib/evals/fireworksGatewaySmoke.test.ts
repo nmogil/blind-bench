@@ -112,6 +112,19 @@ describe("capMetadataForGateway", () => {
     const capped = capMetadataForGateway({ x: "1", trace_id: "t" });
     expect(Object.keys(capped)).toEqual(["trace_id", "x"]);
   });
+
+  it("backfills with extras then truncates when most priority keys are missing", () => {
+    const capped = capMetadataForGateway({
+      e1: "1",
+      e2: "2",
+      trace_id: "t",
+      e3: "3",
+      e4: "4",
+      product: "p",
+      e5: "5",
+    });
+    expect(Object.keys(capped)).toEqual(["trace_id", "product", "e1", "e2", "e3"]);
+  });
 });
 
 describe("redactSmokeRequest", () => {

@@ -13,8 +13,11 @@
 import type { NormalizedBlindBenchTrace } from "./cloudflareAiGateway";
 import {
   buildMetadata,
+  capMetadataForGateway,
   gatewayUrlForMode,
   modelField,
+  CF_METADATA_MAX_KEYS,
+  GATEWAY_METADATA_PRIORITY,
   type PrototypeConfig,
 } from "./fireworksGatewayPrototype";
 
@@ -22,34 +25,12 @@ import {
 export const SMOKE_PROMPT = "Synthetic smoke prompt — no production or customer data. Reply with: ok.";
 
 /**
- * Cloudflare AI Gateway stores at most this many custom-metadata entries per request and
- * silently drops the rest (observed live 2026-07-06: a 9-key `cf-aig-metadata` header came
- * back in the log with only its first 5 keys). Every key we need back — above all
- * `trace_id` — must be inside this cap.
+ * Metadata keys the smoke request sends and expects to round-trip through the Gateway log —
+ * the shared Gateway priority set (see `GATEWAY_METADATA_PRIORITY` / `capMetadataForGateway`
+ * in `fireworksGatewayPrototype.ts` for the 5-key Cloudflare cap they exist to survive).
  */
-export const CF_METADATA_MAX_KEYS = 5;
-
-/**
- * Metadata keys the smoke request sends and expects to round-trip through the Gateway log,
- * in priority order (correlation → tenancy → eval grouping), capped at `CF_METADATA_MAX_KEYS`.
- */
-export const SMOKE_METADATA_KEYS = [
-  "trace_id",
-  "tenant",
-  "product",
-  "prompt_version",
-  "variant",
-] as const;
-
-/**
- * Reduce full routing metadata to the Gateway's key cap: priority keys first, then any
- * remaining keys in insertion order, truncated to `CF_METADATA_MAX_KEYS`.
- */
-export function capMetadataForGateway(metadata: Record<string, string>): Record<string, string> {
-  const priority = SMOKE_METADATA_KEYS.filter((k) => k in metadata);
-  const rest = Object.keys(metadata).filter((k) => !(SMOKE_METADATA_KEYS as readonly string[]).includes(k));
-  return Object.fromEntries([...priority, ...rest].slice(0, CF_METADATA_MAX_KEYS).map((k) => [k, metadata[k]]));
-}
+export const SMOKE_METADATA_KEYS = GATEWAY_METADATA_PRIORITY;
+export { capMetadataForGateway, CF_METADATA_MAX_KEYS };
 
 export interface SmokeRequestBody {
   model: string;

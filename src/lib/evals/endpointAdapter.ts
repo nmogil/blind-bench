@@ -16,6 +16,7 @@ import { z } from "zod/v4";
 import { AgentOutput, EvalCase, type EvalCaseInput } from "./evalCase";
 import {
   buildMetadata,
+  capMetadataForGateway,
   gatewayUrlForMode,
   loadConfig,
   modelField,
@@ -71,7 +72,8 @@ export function fireworksCandidateEndpoint(
     headers: {
       Authorization: "Bearer $FIREWORKS_API_KEY",
       "cf-aig-authorization": "Bearer $CF_AIG_TOKEN",
-      "cf-aig-metadata": JSON.stringify(buildMetadata(c)),
+      // Capped: the Gateway keeps only 5 metadata entries; trace_id must survive.
+      "cf-aig-metadata": JSON.stringify(capMetadataForGateway(buildMetadata(c))),
     },
   });
 }

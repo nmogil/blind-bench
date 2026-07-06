@@ -120,6 +120,8 @@ describe("Cloudflare AI Gateway adapter", () => {
     expect(normalizeCloudflareAiGatewayLog({ ...liveShape, success: false }).status).toBe("error");
     const { success: _drop, ...noSuccess } = liveShape;
     expect(normalizeCloudflareAiGatewayLog({ ...noSuccess, status_code: 502 }).status).toBe("error");
+    // 3xx is not a completed generation — must not verify as success.
+    expect(normalizeCloudflareAiGatewayLog({ ...noSuccess, status_code: 302 }).status).toBe("error");
   });
 
   it("maps DLP and human feedback fields", () => {
