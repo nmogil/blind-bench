@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
-import { safeDeleteStorage } from "./lib/storageCleanup";
+import { safeDeleteTestCaseBlob } from "./lib/storageCleanup";
 
 export const list = query({
   args: { projectId: v.id("projects") },
@@ -152,7 +152,8 @@ export const deleteVariable = mutation({
         const attachments = tc.variableAttachments;
         if (!attachments || !(variable.name in attachments)) continue;
         const storageId = attachments[variable.name]!;
-        await safeDeleteStorage(ctx, storageId);
+        // #188: keep blobs still referenced by a past run's inputSnapshot.
+        await safeDeleteTestCaseBlob(ctx, variable.projectId, storageId);
         const { [variable.name]: _removed, ...rest } = attachments;
         await ctx.db.patch(tc._id, { variableAttachments: rest });
       }

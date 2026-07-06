@@ -192,6 +192,20 @@ const schema = defineSchema({
     testCaseId: v.optional(v.id("testCases")),
     // M12: Quick run — inline variables when no test case
     inlineVariables: v.optional(v.record(v.string(), v.string())),
+    // #188: Frozen copy of the inputs actually dispatched for this run. Test
+    // cases are mutable, so without this the run's "what we sent" view would
+    // silently re-render with the test case's *current* values whenever it is
+    // edited after the run. Written at dispatch; absent on pre-#188 runs (no
+    // backfill — readers fall back to the live test case with a visible note).
+    // `images` maps image-variable name → the _storage blob that was sent; the
+    // blob-retention check in convex/lib/inputSnapshot.ts keeps those blobs
+    // alive even after the test case is edited or deleted.
+    inputSnapshot: v.optional(
+      v.object({
+        text: v.record(v.string(), v.string()),
+        images: v.optional(v.record(v.string(), v.id("_storage"))),
+      }),
+    ),
     model: v.string(),
     temperature: v.number(),
     maxTokens: v.optional(v.number()),

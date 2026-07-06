@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireProjectRole } from "./lib/auth";
-import { safeDeleteStorage } from "./lib/storageCleanup";
+import { safeDeleteTestCaseBlob } from "./lib/storageCleanup";
 
 export const list = query({
   args: { projectId: v.id("projects") },
@@ -92,7 +92,8 @@ export const update = mutation({
       // pass through untouched.
       for (const [varName, prevId] of Object.entries(previous)) {
         if (next[varName] !== prevId) {
-          await safeDeleteStorage(ctx, prevId);
+          // #188: keep blobs still referenced by a past run's inputSnapshot.
+          await safeDeleteTestCaseBlob(ctx, testCase.projectId, prevId);
         }
       }
       updates.variableAttachments = next;
@@ -112,8 +113,10 @@ export const deleteTestCase = mutation({
 
     // M21.10: cascade-delete image variable blobs so test-case removal
     // doesn't leave orphans in storage.
+    // #188: but keep any blob still referenced by a past run's inputSnapshot,
+    // so deleting the test case doesn't corrupt that run's "what we sent".
     for (const storageId of Object.values(testCase.variableAttachments ?? {})) {
-      await safeDeleteStorage(ctx, storageId);
+      await safeDeleteTestCaseBlob(ctx, testCase.projectId, storageId);
     }
 
     await ctx.db.delete(args.testCaseId);

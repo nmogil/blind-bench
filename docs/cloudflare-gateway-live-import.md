@@ -8,6 +8,9 @@ eval set.
 their own gateway and pastes/uploads them. This keeps the data boundary
 one-directional and avoids holding any Cloudflare credentials.
 
+For the full end-to-end onboarding checklist (permissions, metadata, baseline
+eval, candidate rows), see [`gateway-onboarding.md`](./gateway-onboarding.md).
+
 ## 1. Export from Cloudflare
 
 Pull request logs from the customer's gateway — either path produces JSONL

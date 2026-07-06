@@ -23,6 +23,64 @@ function formatTime(ts: number | undefined): string {
   return new Date(ts).toLocaleTimeString();
 }
 
+/**
+ * #188: Renders the inputs that were sent with a run ("what we sent"). Values
+ * come from the run's frozen inputSnapshot, so editing the test case later
+ * never rewrites this history. When a pre-#188 run has no snapshot, we fall
+ * back to the live test case values behind a visible warning — never a silent
+ * live render.
+ */
+function RunInputs({
+  inputVariables,
+  snapshotMissing,
+  isQuickRun,
+}: {
+  inputVariables: Record<string, string> | null;
+  snapshotMissing: boolean;
+  isQuickRun: boolean;
+}) {
+  const entries = Object.entries(inputVariables ?? {}).filter(
+    ([, value]) => value !== undefined && value !== "",
+  );
+
+  if (entries.length === 0 && !snapshotMissing) return null;
+
+  return (
+    <div className="rounded-lg border bg-muted/20 p-3">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <span className="text-xs font-medium text-foreground">
+          {isQuickRun ? "Inputs sent (quick run)" : "Inputs sent"}
+        </span>
+      </div>
+      {snapshotMissing && (
+        <p className="mb-2.5 text-xs text-amber-700 dark:text-amber-400">
+          Input not snapshotted — showing current test case values. This run
+          predates input snapshots, so these may differ from what was actually
+          sent.
+        </p>
+      )}
+      {entries.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No input variables were sent with this run.
+        </p>
+      ) : (
+        <dl className="space-y-2">
+          {entries.map(([name, value]) => (
+            <div key={name} className="flex flex-col gap-0.5">
+              <dt className="text-xs font-medium text-muted-foreground">
+                {`{{${name}}}`}
+              </dt>
+              <dd className="whitespace-pre-wrap break-words text-xs text-foreground">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 export function RunView() {
   const { projectId } = useProject();
   const { orgSlug, runId } = useParams<{
@@ -175,6 +233,15 @@ export function RunView() {
 
       {/* Dynamic output grid */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* #188: "What we sent" — inputs frozen at dispatch. Reads the run's
+            inputSnapshot (via inputVariables); for pre-#188 test-case runs
+            with no snapshot it shows the current test case values behind an
+            explicit warning rather than passing live state off as history. */}
+        <RunInputs
+          inputVariables={run.inputVariables}
+          snapshotMissing={run.inputSnapshotMissing}
+          isQuickRun={run.isQuickRun}
+        />
         {run.outputs.length === 0 && run.status !== "failed" && (
           // M28.5: pre-activation eval-grid empty state — outputs haven't
           // materialized yet (pending or running). Forward-looking copy that

@@ -12,6 +12,10 @@ import { getBlindLabels, validateSlotConfigs } from "./lib/slotConfig";
 import { collectReferencedVariables } from "./lib/templateValidation";
 import { readMessages } from "./lib/messages";
 import { modelSupportsImages } from "./lib/modelCapabilities";
+import {
+  buildInputSnapshot,
+  resolveDispatchInputs,
+} from "./lib/inputSnapshot";
 
 const CONCURRENT_CAP = 10;
 
@@ -49,9 +53,15 @@ export const execute = mutation({
     if (!args.testCaseId && !args.inlineVariables) {
       throw new Error("Provide a test case or inline variable values.");
     }
+    if (args.testCaseId && args.inlineVariables) {
+      throw new Error(
+        "Provide either a test case or inline variable values, not both.",
+      );
+    }
 
     // Verify test case belongs to same project (when using test case)
     let testCaseVarValues: Record<string, string> | undefined;
+    let testCaseAttachments: Record<string, Id<"_storage">> | undefined;
     let testCaseHasImages = false;
     if (args.testCaseId) {
       const testCase = await ctx.db.get(args.testCaseId);
@@ -59,6 +69,7 @@ export const execute = mutation({
         throw new Error("Test case not found");
       }
       testCaseVarValues = testCase.variableValues;
+      testCaseAttachments = testCase.variableAttachments;
       testCaseHasImages =
         Object.keys(testCase.variableAttachments ?? {}).length > 0;
     }
@@ -141,12 +152,25 @@ export const execute = mutation({
       }
     }
 
+    // #188: Freeze the inputs we're about to dispatch onto the run row so the
+    // run's "what we sent" history survives later edits to the test case.
+    const inputSnapshot = buildInputSnapshot({
+      inlineVariables: args.inlineVariables,
+      testCase: args.testCaseId
+        ? {
+            variableValues: testCaseVarValues ?? {},
+            variableAttachments: testCaseAttachments,
+          }
+        : null,
+    });
+
     // Create run
     const runId = await ctx.db.insert("promptRuns", {
       projectId: version.projectId,
       promptVersionId: args.versionId,
       testCaseId: args.testCaseId,
       inlineVariables: args.inlineVariables,
+      inputSnapshot,
       model: args.model,
       temperature: args.temperature,
       maxTokens: args.maxTokens,
@@ -307,6 +331,19 @@ export const get = query({
       : null;
     const trigger = await ctx.db.get(run.triggeredById);
 
+    // #188: The inputs shown in the run's "what we sent" view. Prefer the
+    // frozen snapshot; then inline variables (immutable, so accurate for both
+    // old and new quick runs); finally, for pre-#188 test-case runs with no
+    // snapshot, fall back to the *live* test case values and flag it so the UI
+    // can warn the reader instead of silently presenting current state as
+    // history.
+    const inputVariables =
+      run.inputSnapshot?.text ??
+      run.inlineVariables ??
+      testCase?.variableValues ??
+      null;
+    const inputSnapshotMissing = run.testCaseId != null && !run.inputSnapshot;
+
     return {
       ...run,
       outputs: outputs.sort((a, b) => a.blindLabel.localeCompare(b.blindLabel)),
@@ -315,6 +352,8 @@ export const get = query({
       testCaseName: testCase?.name ?? null,
       isQuickRun: !run.testCaseId,
       inlineVariables: run.inlineVariables ?? null,
+      inputVariables,
+      inputSnapshotMissing,
       triggeredByName: trigger?.name ?? null,
     };
   },
@@ -462,14 +501,24 @@ export const getRunContext = internalQuery({
       : null;
     if (run.testCaseId && !testCase) throw new Error("Test case not found");
 
-    // Construct a synthetic test case shape for quick runs
-    const effectiveTestCase = testCase ?? {
-      variableValues: (run.inlineVariables ?? {}) as Record<string, string>,
-      attachmentIds: [] as Array<import("./_generated/dataModel").Id<"_storage">>,
-      variableAttachments: {} as Record<
-        string,
+    // #188: Dispatch from the frozen input snapshot, not the live test case.
+    // The action runs asynchronously after the run row is created, so a test
+    // case edited in that window would otherwise change "what we sent". A
+    // snapshot is authoritative for BOTH text and images (no live fallback for
+    // either — see resolveDispatchInputs). `attachmentIds` (legacy prompt/
+    // test-case attachments, not keyed by variable) are outside the snapshot's
+    // scope, so those still ride on the live test case.
+    const dispatchInputs = resolveDispatchInputs({
+      snapshot: run.inputSnapshot,
+      testCase,
+      inlineVariables: run.inlineVariables,
+    });
+    const effectiveTestCase = {
+      variableValues: dispatchInputs.variableValues,
+      attachmentIds: (testCase?.attachmentIds ?? []) as Array<
         import("./_generated/dataModel").Id<"_storage">
       >,
+      variableAttachments: dispatchInputs.variableAttachments,
     };
 
     const project = await ctx.db.get(version.projectId);
