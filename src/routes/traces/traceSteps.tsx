@@ -3,12 +3,12 @@
  *
  * Used by both TraceViewer (single trajectory, comments enabled) and
  * TraceMatchup (two columns, read-only). Steps page in via the paginated
- * `listSteps` query; each step's heavy body lives at an opaque `bodyUrl` that we
- * fetch lazily on first expand (never up front) so a 300+ step trace stays
- * responsive. No real ids or provenance attributes ever reach the DOM.
+ * `listSteps` query; each step's heavy body is fetched lazily on first expand
+ * (never up front) via the authenticated `getStepBody` action, so a 300+ step
+ * trace stays responsive. No real ids or provenance attributes reach the DOM.
  */
 import { Fragment, useEffect, useState } from "react";
-import { usePaginatedQuery, useMutation } from "convex/react";
+import { usePaginatedQuery, useMutation, useAction } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -67,25 +67,30 @@ const BODY_FIELD: Partial<Record<TraceStep["kind"], string>> = {
 };
 
 /**
- * Lazy-loads a step body from its opaque storage URL. Mounted only once the
- * user first expands the step, so bodies are never fetched up front. Handles a
- * null url (policy events carry no body) gracefully.
+ * Lazy-loads a step body (or, with no stepIndex, the trace's final answer) via
+ * the authenticated `getStepBody` action. Mounted only once the user first
+ * expands the step, so bodies are never fetched up front. The action returns the
+ * blind-selected body server-side — no raw storage URL, no cross-origin fetch.
  */
-export function StepBody({ url, field }: { url: string | null; field?: string }) {
+export function StepBody({
+  agentTraceId,
+  stepIndex,
+  field,
+}: {
+  agentTraceId: Id<"agentTraces">;
+  stepIndex?: number;
+  field?: string;
+}) {
+  const getBody = useAction(api.agentTraces.getStepBody);
   const [state, setState] = useState<{
     status: "loading" | "done" | "error";
     data?: unknown;
   }>({ status: "loading" });
 
   useEffect(() => {
-    if (!url) {
-      setState({ status: "done", data: undefined });
-      return;
-    }
     let cancelled = false;
     setState({ status: "loading" });
-    fetch(url)
-      .then((r) => r.json())
+    getBody({ agentTraceId, stepIndex })
       .then((data) => {
         if (!cancelled) setState({ status: "done", data });
       })
@@ -95,13 +100,8 @@ export function StepBody({ url, field }: { url: string | null; field?: string })
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [agentTraceId, stepIndex, getBody]);
 
-  if (!url) {
-    return (
-      <p className="text-xs text-muted-foreground">No detail for this step.</p>
-    );
-  }
   if (state.status === "loading") {
     return <Skeleton className="h-16 w-full" />;
   }
@@ -110,6 +110,11 @@ export function StepBody({ url, field }: { url: string | null; field?: string })
       <p className="text-xs text-destructive" role="alert">
         Couldn’t load this step’s detail. Refresh the page to try again.
       </p>
+    );
+  }
+  if (state.data == null) {
+    return (
+      <p className="text-xs text-muted-foreground">No detail for this step.</p>
     );
   }
 
@@ -241,7 +246,11 @@ function StepCard({
 
       {everExpanded && (
         <div className={cn("px-3 pb-3", !expanded && "hidden")}>
-          <StepBody url={step.bodyUrl ?? null} field={BODY_FIELD[step.kind]} />
+          <StepBody
+            agentTraceId={agentTraceId}
+            stepIndex={step.stepIndex}
+            field={BODY_FIELD[step.kind]}
+          />
         </div>
       )}
 

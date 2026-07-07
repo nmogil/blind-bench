@@ -90,10 +90,7 @@ describe("#266 blind projection — no provenance leaks to evaluators", () => {
 
     // Metadata + inline scalars carry no identifiers. (Bodies are opaque URLs;
     // their redacted content is asserted separately below.)
-    const blindMeta = JSON.stringify({
-      ...blindTrace,
-      page: blindSteps.page.map((s) => ({ ...s, bodyUrl: undefined })),
-    });
+    const blindMeta = JSON.stringify({ ...blindTrace, page: blindSteps.page });
     for (const needle of FORBIDDEN) {
       expect(blindMeta).not.toContain(needle);
     }

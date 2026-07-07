@@ -140,13 +140,13 @@ export function TraceViewer() {
 
       <VerdictControl agentTraceId={traceId} />
 
-      {trace.finalAnswerUrl && (
+      {trace.hasFinalAnswer && (
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="text-base">Final answer</CardTitle>
           </CardHeader>
           <CardContent>
-            <StepBody url={trace.finalAnswerUrl} field="text" />
+            <StepBody agentTraceId={traceId} field="text" />
           </CardContent>
         </Card>
       )}

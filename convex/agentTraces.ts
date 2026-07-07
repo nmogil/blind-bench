@@ -21,7 +21,7 @@
  */
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { action, internalMutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireProjectRole, isBlindReviewer } from "./lib/auth";
@@ -321,9 +321,66 @@ export const getTrace = query({
         durationMs: trace.durationMs,
         totalTokens: trace.totalTokens,
       },
-      finalAnswerUrl: finalAnswerId ? await ctx.storage.getUrl(finalAnswerId) : null,
+      hasFinalAnswer: finalAnswerId != null,
     };
     return blind ? blindTraceView(view) : view;
+  },
+});
+
+/**
+ * Resolve the storage id for a step body (or the final answer, when
+ * `stepIndex` is omitted), blind-selected. Auth-gated so the `getStepBody`
+ * action never reads storage for an unauthorized caller — same split as the
+ * gateway importer (actions have no ctx.db).
+ */
+export const resolveBodyStorage = internalQuery({
+  args: { agentTraceId: v.id("agentTraces"), stepIndex: v.optional(v.number()) },
+  handler: async (ctx, args): Promise<{ storageId: Id<"_storage"> | null }> => {
+    const trace = await ctx.db.get(args.agentTraceId);
+    if (!trace) return { storageId: null };
+    await requireProjectRole(ctx, trace.projectId, ["owner", "editor", "evaluator"]);
+    const blind = await isBlindReviewer(ctx, trace.projectId);
+    if (args.stepIndex === undefined) {
+      const id = blind ? trace.finalAnswerBlindStorageId : trace.finalAnswerStorageId;
+      return { storageId: id ?? null };
+    }
+    const row = await ctx.db
+      .query("agentTraceSteps")
+      .withIndex("by_trace_and_index", (q) =>
+        q.eq("agentTraceId", args.agentTraceId).eq("stepIndex", args.stepIndex!),
+      )
+      .first();
+    if (!row) return { storageId: null };
+    const id = blind ? row.blindBodyStorageId : row.fullBodyStorageId;
+    return { storageId: id ?? null };
+  },
+});
+
+/**
+ * Fetch a single step body (or the final answer) on demand — the lazy-load path
+ * behind the trace viewer's expandable steps. Returns the parsed body object
+ * (`{content}` / `{args}` / `{result}` / `{snapshot}` / `{text}`) or null.
+ *
+ * Goes through the authenticated Convex channel rather than handing the client a
+ * raw storage URL: no cross-origin fetch, and a blind principal is never given
+ * the full blob's id or url — the internal query already blind-selected which
+ * blob this returns.
+ */
+export const getStepBody = action({
+  args: { agentTraceId: v.id("agentTraces"), stepIndex: v.optional(v.number()) },
+  handler: async (ctx, args): Promise<unknown> => {
+    const { storageId } = await ctx.runQuery(
+      internal.agentTraces.resolveBodyStorage,
+      args,
+    );
+    if (!storageId) return null;
+    const blob = await ctx.storage.get(storageId);
+    if (!blob) return null;
+    try {
+      return JSON.parse(await blob.text());
+    } catch {
+      return null;
+    }
   },
 });
 
@@ -355,9 +412,9 @@ export const listTraces = query({
 
 /**
  * Paginated step read — the ONLY way to read steps. Never returns a full trace.
- * Each page item carries inline scalars + a single `bodyUrl` (opaque storage
- * URL). Blind principals receive the blind blob's URL and the full storage id
- * is never in their result; reviewers receive the full blob's URL.
+ * Each page item carries inline scalars + a `hasBody` flag. Bodies are fetched
+ * lazily via `getStepBody` (authenticated, blind-selected) — never handed out
+ * as a raw storage URL, and no storage id ever appears in the result.
  */
 export const listSteps = query({
   args: {
@@ -375,31 +432,31 @@ export const listSteps = query({
       .withIndex("by_trace_and_index", (q) => q.eq("agentTraceId", args.agentTraceId))
       .paginate(args.paginationOpts);
 
-    const page = await Promise.all(
-      result.page.map(async (row) => {
-        const bodyId = blind ? row.blindBodyStorageId : row.fullBodyStorageId;
-        const item = {
-          stepIndex: row.stepIndex,
-          kind: row.kind,
-          role: row.role,
-          toolName: row.toolName,
-          toolCallId: row.toolCallId,
-          label: row.label,
-          policy: row.policy,
-          action: row.action,
-          reason: row.reason,
-          timestamp: row.timestamp,
-          privacyClass: row.privacyClass,
-          inputTokens: row.inputTokens,
-          outputTokens: row.outputTokens,
-          durationMs: row.durationMs,
-          bodyUrl: bodyId ? await ctx.storage.getUrl(bodyId) : null,
-        };
-        // #266: blind principals get the identifier-scrubbed projection
-        // (aliased tool name, opaque call id, no wall-clock timestamp).
-        return blind ? blindStepView(item) : item;
-      }),
-    );
+    const page = result.page.map((row) => {
+      const bodyId = blind ? row.blindBodyStorageId : row.fullBodyStorageId;
+      const item = {
+        stepIndex: row.stepIndex,
+        kind: row.kind,
+        role: row.role,
+        toolName: row.toolName,
+        toolCallId: row.toolCallId,
+        label: row.label,
+        policy: row.policy,
+        action: row.action,
+        reason: row.reason,
+        timestamp: row.timestamp,
+        privacyClass: row.privacyClass,
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        durationMs: row.durationMs,
+        // Whether this step has a body to lazy-load (fetched via getStepBody,
+        // never handed out as a raw storage URL).
+        hasBody: bodyId != null,
+      };
+      // #266: blind principals get the identifier-scrubbed projection
+      // (aliased tool name, opaque call id, no wall-clock timestamp).
+      return blind ? blindStepView(item) : item;
+    });
     return { ...result, page };
   },
 });

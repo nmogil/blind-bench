@@ -65,7 +65,7 @@ export interface StepView {
   inputTokens?: number;
   outputTokens?: number;
   durationMs?: number;
-  bodyUrl?: string | null;
+  hasBody?: boolean;
 }
 
 /**
@@ -97,7 +97,7 @@ export interface TraceView {
   harnessName?: string;
   harnessVersion?: string;
   usage: { costUsd?: number; durationMs?: number; totalTokens?: number };
-  finalAnswerUrl: string | null;
+  hasFinalAnswer: boolean;
 }
 
 /**
@@ -120,6 +120,6 @@ export function blindTraceView(trace: TraceView): TraceView {
     harnessName: undefined,
     harnessVersion: undefined,
     usage: trace.usage,
-    finalAnswerUrl: trace.finalAnswerUrl,
+    hasFinalAnswer: trace.hasFinalAnswer,
   };
 }

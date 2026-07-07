@@ -152,7 +152,7 @@ describe("agentTraces persistence spine", () => {
     expect(count).toBe(trace.steps.length);
   });
 
-  test("blind reviewer gets the projected body URL; full storage id never leaks", async () => {
+  test("getStepBody: owner gets full body, blind gets the redacted body; no storage ids leak", async () => {
     const t = convexTest(schema);
     const { ids, asOwner, asBlind } = await seed(t);
     const trace = normalizeJeevesClogRun(sensitiveRun);
@@ -162,31 +162,30 @@ describe("agentTraces persistence spine", () => {
     });
 
     const opts = { paginationOpts: { numItems: 50, cursor: null } };
-    const ownerPage = await asOwner.query(api.agentTraces.listSteps, { agentTraceId, ...opts });
     const blindPage = await asBlind.query(api.agentTraces.listSteps, { agentTraceId, ...opts });
-
-    // No storage id (full OR blind) is ever returned — only opaque URLs.
+    // listSteps never hands out storage ids or URLs — only a hasBody flag.
     for (const item of blindPage.page) {
       expect(item).not.toHaveProperty("fullBodyStorageId");
       expect(item).not.toHaveProperty("blindBodyStorageId");
-      expect(item.bodyUrl).toBeTruthy();
+      expect(item).not.toHaveProperty("bodyUrl");
     }
-    // Owner (full) and blind reviewer get DIFFERENT body URLs — proof the blind
-    // path serves the blind blob, not the full one.
-    expect(blindPage.page[0]?.bodyUrl).not.toBe(ownerPage.page[0]?.bodyUrl);
+    const toolStep = blindPage.page.find((s) => s.kind === "tool_call");
+    expect(toolStep?.hasBody).toBe(true);
 
-    // The stored blind blob is actually redacted; the full blob is not.
-    const bodies = await t.run(async (ctx) => {
-      const row = await ctx.db
-        .query("agentTraceSteps")
-        .withIndex("by_trace_and_index", (q) => q.eq("agentTraceId", agentTraceId))
-        .first();
-      const read = async (id: typeof row extends null ? never : NonNullable<typeof row>["fullBodyStorageId"]) =>
-        id ? await (await ctx.storage.get(id))!.text() : "";
-      return { full: await read(row!.fullBodyStorageId), blind: await read(row!.blindBodyStorageId) };
-    });
-    expect(bodies.full).toContain("123-45-6789");
-    expect(bodies.blind).toContain("[REDACTED]");
-    expect(bodies.blind).not.toContain("123-45-6789");
+    // The lazy body-fetch path (getStepBody) — the exact thing the viewer calls
+    // on expand. Owner sees the real args; blind reviewer sees the redacted body.
+    const ownerBody = JSON.stringify(
+      await asOwner.action(api.agentTraces.getStepBody, { agentTraceId, stepIndex: toolStep!.stepIndex }),
+    );
+    const blindBody = JSON.stringify(
+      await asBlind.action(api.agentTraces.getStepBody, { agentTraceId, stepIndex: toolStep!.stepIndex }),
+    );
+    expect(ownerBody).toContain("123-45-6789");
+    expect(blindBody).toContain("[REDACTED]");
+    expect(blindBody).not.toContain("123-45-6789");
+
+    // Final answer travels the same path (stepIndex omitted).
+    const finalAnswer = await asOwner.action(api.agentTraces.getStepBody, { agentTraceId });
+    expect(JSON.stringify(finalAnswer)).toContain("specialist");
   });
 });
