@@ -791,6 +791,103 @@ const schema = defineSchema({
     blindBodyStorageId: v.optional(v.id("_storage")),
   }).index("by_trace_and_index", ["agentTraceId", "stepIndex"]),
 
+  // #267 (M31.4): step-granular review annotations on an agent trace. Anchored
+  // by `stepIndex` (stable + identical for blind and owner — the opaque
+  // `call-N` tool-call id a blind reviewer sees is NOT a durable anchor), with
+  // a `kind` discriminator so a comment on a tool call reads distinctly from a
+  // comment on a whole step or the whole trajectory. Reuses the conventional-
+  // comment label + tag vocabulary from outputFeedback/cycleFeedback.
+  agentTraceComments: defineTable({
+    agentTraceId: v.id("agentTraces"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    target: v.union(
+      v.object({ kind: v.literal("trace") }),
+      v.object({ kind: v.literal("step"), stepIndex: v.number() }),
+      v.object({ kind: v.literal("tool_call"), stepIndex: v.number() }),
+    ),
+    comment: v.string(),
+    label: v.union(
+      v.literal("suggestion"),
+      v.literal("issue"),
+      v.literal("praise"),
+      v.literal("question"),
+      v.literal("nitpick"),
+      v.literal("thought"),
+    ),
+    tags: v.optional(
+      v.array(
+        v.union(
+          v.literal("accuracy"),
+          v.literal("tone"),
+          v.literal("length"),
+          v.literal("relevance"),
+          v.literal("safety"),
+          v.literal("format"),
+          v.literal("clarity"),
+          v.literal("other"),
+        ),
+      ),
+    ),
+  })
+    .index("by_trace", ["agentTraceId"])
+    .index("by_trace_and_user", ["agentTraceId", "userId"]),
+
+  // #267 (M31.4): whole-trajectory verdict, reusing the best/acceptable/weak
+  // rating vocabulary. One row per (trace, reviewer).
+  agentTraceVerdicts: defineTable({
+    agentTraceId: v.id("agentTraces"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    rating: v.union(
+      v.literal("best"),
+      v.literal("acceptable"),
+      v.literal("weak"),
+    ),
+    note: v.optional(v.string()),
+  })
+    .index("by_trace", ["agentTraceId"])
+    .index("by_trace_and_user", ["agentTraceId", "userId"]),
+
+  // #267 (M31.4): step-level pairwise preference — two blind trajectories of the
+  // same task aligned at a divergence point; the reviewer picks the better next
+  // action. This is the DPO-shaped signal (single-turn preference over the next
+  // action given an identical prefix) the training-export bridge (#53) needs.
+  // Mirrors reviewMatchups (winner left/right/tie/skip + reasonTags).
+  agentTraceMatchups: defineTable({
+    projectId: v.id("projects"),
+    leftTraceId: v.id("agentTraces"),
+    rightTraceId: v.id("agentTraces"),
+    // Length of the shared prefix; both sides diverge at this step index.
+    divergenceStepIndex: v.number(),
+    leftBlindLabel: v.string(),
+    rightBlindLabel: v.string(),
+    userId: v.optional(v.id("users")),
+    winner: v.optional(
+      v.union(
+        v.literal("left"),
+        v.literal("right"),
+        v.literal("tie"),
+        v.literal("skip"),
+      ),
+    ),
+    reasonTags: v.array(
+      v.union(
+        v.literal("tone"),
+        v.literal("accuracy"),
+        v.literal("clarity"),
+        v.literal("length"),
+        v.literal("format"),
+        v.literal("relevance"),
+        v.literal("safety"),
+        v.literal("other"),
+      ),
+    ),
+    decidedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_left", ["leftTraceId"]),
+
   // #259: per-org scorecard runs. Grades every org eval case that has a
   // captured production output against its assigned deterministic scorers.
   // `summary` and `errorMessage` are sanitized — counts + generic strings only,

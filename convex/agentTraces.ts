@@ -328,6 +328,32 @@ export const getTrace = query({
 });
 
 /**
+ * Traces in a project, newest first (capped). Blind principals get no
+ * harness/model/product — just the opaque handle, step count, and status.
+ */
+export const listTraces = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor", "evaluator"]);
+    const blind = await isBlindReviewer(ctx, args.projectId);
+    const rows = await ctx.db
+      .query("agentTraces")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .order("desc")
+      .take(200);
+    return rows.map((r) => ({
+      _id: r._id,
+      status: r.status,
+      stepCount: r.stepCount,
+      createdAt: r._creationTime,
+      product: blind ? undefined : r.product,
+      harnessName: blind ? undefined : r.harnessName,
+      model: blind ? undefined : r.model,
+    }));
+  },
+});
+
+/**
  * Paginated step read — the ONLY way to read steps. Never returns a full trace.
  * Each page item carries inline scalars + a single `bodyUrl` (opaque storage
  * URL). Blind principals receive the blind blob's URL and the full storage id
