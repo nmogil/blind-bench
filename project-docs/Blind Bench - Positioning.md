@@ -3,7 +3,40 @@
 Working doc. Captures the pivot away from developer-tool framing toward
 non-technical buyers. Expand as customer conversations sharpen the thesis.
 
-Last updated: 2026-04-18
+Last updated: 2026-07-07
+
+---
+
+## 2026-07-07 update — persona generalization (supersedes parts of this doc)
+
+Approved by Noah 2026-07-07. Source of truth:
+[[Blind Bench - Agent Trace Strategy]]. The doc below is kept intact as
+history; where it conflicts with this addendum, this addendum wins.
+
+The unit of AI work moved from *a prompt's output* to *an agent's
+trajectory*. The persona moves with it.
+
+**The persona generalizes** from "non-technical reviewer" to **domain expert
+reviewer** — the person whose judgment matters, reviewing without bias,
+without living in a dashboard. It's the GC for legal tone, the CX lead for a
+support agent, the senior engineer for a coding-agent trace. The through-line
+was never "non-technical." It was "the right reviewer, blind, with no
+friction."
+
+**"Developers are the anti-persona" is retired.** For agent traces, the
+qualified reviewer of a Claude Code trajectory is usually a senior engineer or
+domain expert. Technical reviewers are now first-class *reviewers*, not just
+buyer-influencers.
+
+**What survives unchanged:** blind-by-default; zero-friction, shareable-link
+review with no account required; plain-language reviewer surfaces; feedback
+that flows somewhere (into the prompt, into training data), never into a dead
+dashboard.
+
+**What stays true:** we are still NOT a tracing platform. BlindBench is the
+**judgment layer** that tracing platforms, harnesses, and sandboxes feed into.
+The blind-eval discipline — enforced at the Convex function boundary, opaque
+tokens, no provenance in the DOM — is the asset none of them have.
 
 ---
 
@@ -34,6 +67,10 @@ surface** that plugs into whatever tracing platform a team already runs.
 
 Primary: **non-technical reviewers and the leaders who depend on them.**
 
+> [2026-07-07: generalized to **domain expert reviewer** — see the addendum at
+> the top. The persona is the right reviewer for the artifact, not
+> specifically a non-technical one.]
+
 - VP Marketing, Head of Content — signing off on brand voice in AI output
 - General Counsel, compliance — reviewing AI responses for risk
 - Head of CX, support leads — grading agent replies against policy
@@ -45,6 +82,11 @@ feedback from the people above without scheduling a meeting.
 
 Explicit anti-persona: prompt engineers running eval suites against LLM
 judges. That's the tracing platforms' job. Don't rebuild it.
+
+> [2026-07-07: "developers are the anti-persona" is **retired** — see the
+> addendum at the top. For agent traces, senior technical reviewers are often
+> the correct reviewers. The anti-persona is anyone reviewing *biased* or
+> living *in a dashboard*, not developers as such.]
 
 ## Why this matters (the pain)
 

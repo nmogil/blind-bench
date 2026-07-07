@@ -18,6 +18,8 @@ This doc expands the architecture doc's 10-bullet Next Steps into demoable miles
 
 The numbering starts at M0 to mirror "milestone zero = setup" conventions. Milestones are strictly sequential on the critical path except where the dependency graph below says otherwise.
 
+> **Milestone coverage note (2026-07-07).** This doc formally covers M0–M7, with a handful of later milestones (M21, M26, M29) retro-inserted where they earned a full spec. Milestones **M8–M30** are tracked in GH issues (the source of truth per `CLAUDE.md`) and the strategy docs; they are not backfilled here. This file resumes at **M31 — Trajectory Spine**, which formalizes the approved [[Blind Bench - Agent Trace Strategy]] (Noah, 2026-07-07).
+
 See also:
 - [[Blind Bench - Architecture#Next Steps]] — the short form of this doc
 - [[Blind Bench - UX Spec]] — what each screen looks like (milestone deliverables reference screen IDs from this spec)
@@ -545,6 +547,70 @@ M0 → M6 is strictly sequential on the critical path. M7 (landing page on a sep
 - Marketing content beyond a tagline and a paragraph.
 - SEO work.
 - Analytics beyond the Vercel default.
+
+---
+
+## M31 — Trajectory Spine (2026-07)
+
+**Goal**: BlindBench can store an agent's trajectory (task → tool calls → reasoning → outcome), render it step by step, and let domain-expert reviewers blind-review it at the step level — with at least one step-level preference pair exportable in Fireworks DPO format. This is the one data-model shift the agent-trace direction hangs off. Formalizes the approved [[Blind Bench - Agent Trace Strategy]] (Noah, 2026-07-07).
+
+> **Sequencing.** Per the strategy doc, the spine (this milestone) and the Harbor sandbox-matrix integration run in parallel: the matrix produces trajectories, the spine renders and reviews them. The spine is the critical path; the matrix is an integration spike here (M31.5), never in-house sandbox infra. Ingestion breadth (OTLP GenAI, #263) and the full training-export bridge (#53) follow this milestone, not part of it.
+
+### Deliverables
+
+**M31.1 — Trace storage schema.**
+- New `agentTraces` parent table: one tiny row per trajectory (`projectId`, `source` ∈ `"claude_code_jsonl" | "harbor_matrix"`, model+harness combo labels, step count, status, timestamps). No inline step array — ever.
+- New `agentTraceSteps` table: one row per step, keyed by `(traceId, stepIndex)`, holding light inline fields (kind ∈ `step | tool_call | reasoning | policy_event | outcome`, ordering, small metadata) plus a `bodyStorageId` pointer to the full step body in file storage (mirrors the existing `rawPayloadStorageId` pattern). Large bodies never live in the document.
+- Wire the existing `src/lib/evals/agentTrace.ts` normalizer into Convex so ingestion writes through it rather than duplicating trajectory-shape logic. Resolve the `src/lib/evals/*` vs `convex/*` dual-path duplication for this surface (single normalizer, called server-side).
+- Queries are paginated (`paginationOpts`) over `agentTraceSteps`; there is **no reactive subscription over a full trace**.
+
+**M31.2 — Claude Code JSONL importer (first ingestion path).**
+- New importer that accepts an uploaded Claude Code session `.jsonl` file, parses it through the `agentTrace.ts` normalizer, and materializes one `agentTraces` row + N `agentTraceSteps` rows with bodies in storage.
+- Dedup on re-upload (same session → no duplicate trace), consistent with the existing Gateway-import dedup discipline.
+- This is the spine's first and only ingestion path in M31 (the cheapest real agent traces in the world; also the dogfood loop — we review our own sessions).
+
+**M31.3 — Server-side blind projections.**
+- A precomputed, server-side blind projection of each step (`toScorerVisibleAgentStep` in the spirit of the existing `toScorerVisibleAgentRun` / blind-mode boundary): strips/normalizes model names, harness metadata, tool-name fingerprints, and reasoning-style tells that identify the model+harness combo.
+- Enforced at the Convex function boundary exactly like today's blind mode — the reviewer-facing query returns only the projected fields; nothing raw is reachable from a reviewer principal.
+- Documented honestly as **bias reduction, not anonymity**: blinding a trajectory is statistical (a determined reviewer can still fingerprint Claude Code vs Codex from tool sequences/timing). The projection reduces the signal; it does not claim to erase it.
+
+**M31.4 — Step-level review UI + preference capture.**
+- A step-level trace review surface that renders steps paginated (never the whole trace reactively), with a per-step render for each step kind.
+- New annotation anchor kinds `{kind:"step"}` and `{kind:"tool_call"}` (extending today's text-range / whole-output anchors), so a reviewer can comment on a specific step or a specific tool call.
+- **Step-level pairwise preference capture**: given two candidate next-actions at step *k* over an identical prefix, the reviewer picks the better one. This is the DPO-compatible unit — Fireworks/OpenAI/Together DPO is single-turn (preference over the next assistant message), so step-level pairs map directly; whole-trajectory preferences do not.
+- One export fixture: at least one captured step-level preference pair serialized in Fireworks DPO format, checked in as a test fixture. (The full preference→Fireworks bridge / export UI, #53, is a later milestone; M31 proves the captured shape is DPO-serializable.)
+
+**M31.5 — Harbor matrix integration spike.**
+- A thin integration that runs one task across a small model+harness matrix on **Harbor** (which already orchestrates Claude Code / Codex CLI / OpenHands across Daytona/Modal/E2B) and imports the resulting trajectories through the M31.2 ingestion path (`source: "harbor_matrix"`).
+- Scoped as a spike: orchestrate + import, produce demo trajectories. **We integrate, we never build sandbox infra.**
+
+### Acceptance criteria
+
+1. Importing a real Claude Code session `.jsonl` creates exactly one `agentTraces` row and N `agentTraceSteps` rows; every step's full body is in file storage (`bodyStorageId` set) and **no** `agentTraceSteps` document exceeds the Convex ~1MiB doc cap — verified on a session of at least 100 steps at ~10KB/step (the case that breaks any inline-array design).
+2. The trace review surface loads a 100+-step trace via pagination; there is no reactive `useQuery` subscription over the full trace (verified by inspecting the query — it takes `paginationOpts` and returns a page, not the whole step set).
+3. Re-uploading the same Claude Code session produces no second trace (dedup holds).
+4. A reviewer principal calling the step query gets **only** projected fields: no raw model name, harness name, or un-normalized tool identifier appears in any response payload — verified by inspecting the raw JSON, the same bar as the M4 blind-eval field check. A reviewer calling any raw trace/step accessor directly (dashboard/devtools) is denied at the function boundary.
+5. The blind-projection module and its docs explicitly state bias-reduction-not-anonymity; there is a test asserting the projection removes the enumerated fingerprint fields, and the limitation is written down (not silently overclaimed).
+6. A reviewer can attach a comment to a specific step (`kind:"step"`) and to a specific tool call (`kind:"tool_call"`); both persist and re-render on the correct step. No `data-trace-id` / `data-step-id` / model-or-harness attribute leaks into the reviewer-view DOM.
+7. Two reviewers independently blind-review the same imported trace at the step level and submit at least one step-level pairwise preference each; the preferences persist keyed to `(traceId, stepIndex)`.
+8. At least one captured step-level preference pair is serialized to Fireworks DPO format and checked in as a fixture; a test loads the fixture and asserts it is valid single-turn DPO (prompt prefix + chosen/rejected next message), demonstrating the captured shape is training-ready.
+9. The Harbor spike runs one task across at least two model+harness combos and imports every resulting trajectory through the M31.2 path with `source: "harbor_matrix"`; the imported traces are reviewable through the same step-level surface as the Claude Code import, with no BlindBench-owned sandbox code in the path.
+10. `src/lib/evals/agentTrace.ts` is the single normalizer for both ingestion paths — there is no second trajectory-shape parser in `convex/*` for these sources.
+
+This milestone is **not done** if any acceptance criterion is "mostly passing": a trace that renders but leaks a model name fails #4; a preference captured but not DPO-serializable fails #8; an importer that works on a toy session but produces an over-cap document on a real 100-step run fails #1.
+
+### Testable demo
+
+> 1. Import a **real Claude Code session** `.jsonl` → one `agentTraces` row + its steps materialize, bodies in storage. 2. Run **one task across a small Harbor matrix** (≥2 model+harness combos) → import the resulting trajectories through the same path. 3. Two reviewers open the imported traces on the step-level review surface, blind, and each leaves at least one step comment and one step-level pairwise preference. 4. Open devtools on a reviewer view → confirm no model/harness/tool-fingerprint field and no `data-trace-id` / `data-step-id` in any payload or in the DOM. 5. Export at least one captured step-level preference pair as a **Fireworks DPO fixture** and run the test that validates it as single-turn DPO.
+
+### Out of scope
+
+- **OTLP GenAI streaming ingest (#263).** Follows the spine; the only M31 ingestion paths are Claude Code JSONL upload and the Harbor spike import.
+- **Full preference→Fireworks export bridge and export UI (#53).** M31 proves the captured shape is DPO-serializable via one fixture; the productized SFT/DPO/RFT export bridge is a later milestone.
+- **In-house sandbox / harness execution.** Harbor is integrated, never rebuilt. No Daytona/Modal/E2B orchestration code owned by BlindBench.
+- **Whole-trajectory preference → DPO.** The single-turn DPO constraint means only step-level pairs export as DPO; whole-run verdicts feed filtered SFT / RFT rubrics in a later milestone, not here.
+- **Perfect trace anonymity.** The projection is bias reduction; achieving cryptographic un-fingerprintability of a trajectory is explicitly not a goal.
+- **Live baseline-vs-candidate endpoint comparison** and the review→promotion workflow for traces — later.
 
 ---
 
