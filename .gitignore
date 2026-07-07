@@ -40,3 +40,8 @@ skills-lock.json
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Harbor spike artifacts (not committed)
+/terminal-bench/
+/harbor-jobs/
+/jobs/
