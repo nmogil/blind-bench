@@ -6,7 +6,7 @@ import {
 } from "./scorecard";
 import { runPack } from "./runner";
 
-const card = async (pack = "customer-pilot/smoke") => buildScorecard(await runPack(pack));
+const card = async (pack = "demo/smoke") => buildScorecard(await runPack(pack));
 
 describe("buildScorecard", () => {
   it("separates the planted hard-fail from soft quality scores", async () => {
@@ -16,10 +16,10 @@ describe("buildScorecard", () => {
     // The intentional leakage fixture is a SAFETY hard-fail, not a soft quality issue.
     expect(c.safety_privacy.hard_failed_cases).toBe(1);
     expect(c.safety_privacy.findings).toEqual([
-      { case_id: "pilot-migo-balance-00", product: "migo", failing_safety_scorers: ["no_cross_context_leakage"] },
+      { case_id: "demo-support-balance-00", product: "support-assistant", failing_safety_scorers: ["no_cross_context_leakage"] },
     ]);
     expect(c.quality.cases_with_soft_issues).toBe(0);
-    expect(c.regression_set_updates.cases_to_remediate).toEqual(["pilot-migo-balance-00"]);
+    expect(c.regression_set_updates.cases_to_remediate).toEqual(["demo-support-balance-00"]);
   });
 
   it("aggregates synthetic cost/latency without exposing per-case raw output", async () => {
@@ -40,7 +40,7 @@ describe("buildScorecard", () => {
   });
 
   it("clears the gate on the all-pass variant", async () => {
-    const c = await card("customer-pilot/smoke-pass");
+    const c = await card("demo/smoke-pass");
     expect(c.safety_privacy.hard_failed_cases).toBe(0);
     expect(c.safety_privacy.findings).toEqual([]);
     expect(c.quality.cases_fully_passing).toBe(50);

@@ -64,8 +64,8 @@ Customer AI calls should attach metadata where possible:
 
 ```json
 {
-  "product": "eavesly|migo|jeeves",
-  "module": "payoff_summary|qa_review|migo_summary|systems_agent",
+  "product": "doc-summarizer|support-assistant|<product-slug>",
+  "module": "renewal_summary|qa_review|chat_summary|systems_agent",
   "prompt_version": "pv_...",
   "variant": "control|candidate|experiment_name",
   "release": "rel_...",
@@ -75,8 +75,8 @@ Customer AI calls should attach metadata where possible:
 
 Recommended app-specific conventions:
 
-- **Eavesly**: `module` should name the QA or alerting module, e.g. `disposition_review`, `qa_summary`, `manager_insights`.
-- **Migo**: `module` should name the summary/chat workflow, e.g. `summary`, `tradelines`, `customer_sms`.
+- **doc-summarizer**: `module` should name the QA or alerting module, e.g. `disposition_review`, `qa_summary`, `manager_insights`.
+- **support-assistant**: `module` should name the summary/chat workflow, e.g. `summary`, `records`, `customer_sms`.
 - **Agent harnesses**: include `module: "systems_agent"` plus sidecar metadata for harness name/version and tool policy when Cloudflare metadata is too small.
 
 ## Metadata sidecar

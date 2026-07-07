@@ -32,15 +32,15 @@ structured so endpoint/provider adapters can be layered on without touching it.
 ## Run it
 
 ```bash
-npm run compare:customer-pilot
+npm run compare:demo
 # writes (gitignored):
-#   artifacts/customer-pilot-model-comparison.md
-#   artifacts/customer-pilot-model-comparison.json
+#   artifacts/model-comparison.md
+#   artifacts/model-comparison.json
 ```
 
 The default demo compares the **planted hard-fail** fixture pack
-(`customer-pilot/smoke`, baseline) against the **all-pass** fixture pack
-(`customer-pilot/smoke-pass`, candidate) over the same synthetic cases. The
+(`demo/smoke`, baseline) against the **all-pass** fixture pack
+(`demo/smoke-pass`, candidate) over the same synthetic cases. The
 candidate clears the planted privacy hard-fail, so the recommendation is
 **promote** and the CLI exits `0`.
 
@@ -78,9 +78,9 @@ suite scans the rendered artifacts to enforce this.
 ## CI usage
 
 ```bash
-env -u NODE_ENV npm run compare:customer-pilot   # exit 1 blocks the pipeline on a blocking candidate
+env -u NODE_ENV npm run compare:demo   # exit 1 blocks the pipeline on a blocking candidate
 ```
 
-Wire `compare:customer-pilot` into CI as a gate: a candidate that introduces a
+Wire `compare:demo` into CI as a gate: a candidate that introduces a
 privacy/tool-safety hard-fail regression — or misses configured minimums — fails
 the build.

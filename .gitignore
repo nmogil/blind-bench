@@ -4,7 +4,7 @@ node_modules/
 # Build output
 dist/
 
-# Generated eval/scorecard artifacts (regenerate via `npm run scorecard:customer-pilot`)
+# Generated eval/scorecard artifacts (regenerate via `npm run scorecard:demo`)
 artifacts/
 
 # Environment variables

@@ -67,10 +67,10 @@ const ENV_MAP: Record<string, string> = {
 const SYNTHETIC: Record<string, string> = {
   cf_account_id: "SYNTHETIC_cf_account_id",
   cf_gateway: "synthetic-prototype-gateway",
-  fireworks_model: "accounts/synthetic/models/migo-eval-ft-0001",
+  fireworks_model: "accounts/synthetic/models/example-eval-ft-0001",
   fireworks_deployment_id: "synthetic-deployment-0001",
   tenant_label: "synthetic-tenant-a",
-  product: "migo",
+  product: "support-assistant",
 };
 
 /**

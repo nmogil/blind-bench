@@ -22,15 +22,15 @@ const chatRecord: CloudflareAiGatewayLog = {
   request: {
     messages: [
       { role: "system", content: "You are a synthetic support assistant." },
-      { role: "user", content: "What is my synthetic payoff?" },
+      { role: "user", content: "What is my synthetic renewal?" },
     ],
   },
-  response: { choices: [{ message: { content: "Your synthetic payoff is $123.45." } }] },
+  response: { choices: [{ message: { content: "Your synthetic renewal is $123.45." } }] },
   usage: { input_tokens: 42, output_tokens: 12, total_tokens: 54, cost_usd: 0.0021 },
   duration_ms: 1180,
   metadata: {
-    product: "eavesly",
-    module: "payoff_summary",
+    product: "doc-summarizer",
+    module: "renewal_summary",
     prompt_version: "pv_TEST_001",
     variant: "control",
     release: "rel_TEST_2026_06",
@@ -48,7 +48,7 @@ const redactedRecord: CloudflareAiGatewayLog = {
   status: "success",
   request: { redacted: true },
   response: undefined,
-  metadata: { product: "migo", module: "summary", environment: "staging" },
+  metadata: { product: "support-assistant", module: "summary", environment: "staging" },
 };
 
 const feedbackDlpRecord: CloudflareAiGatewayLog = {
@@ -68,18 +68,18 @@ const feedbackDlpRecord: CloudflareAiGatewayLog = {
   duration: 640,
   dlp: { action: "allow", flagged: false },
   human_feedback: { value: "thumbs_down", rating: 0 },
-  metadata: { product: "eavesly", module: "qa_review" },
+  metadata: { product: "doc-summarizer", module: "qa_review" },
 };
 
 describe("Cloudflare AI Gateway adapter", () => {
   it("normalizes a synthetic chat-completion log", () => {
     const row = normalizeCloudflareAiGatewayLog(chatRecord);
     expect(row.trace_id).toMatch(/^cf-aigw-/);
-    expect(row.product).toBe("eavesly");
-    expect(row.module).toBe("payoff_summary");
+    expect(row.product).toBe("doc-summarizer");
+    expect(row.module).toBe("renewal_summary");
     expect(row.prompt_version).toBe("pv_TEST_001");
     expect(row.messages).toHaveLength(2);
-    expect(row.output_text).toBe("Your synthetic payoff is $123.45.");
+    expect(row.output_text).toBe("Your synthetic renewal is $123.45.");
     expect(row.cost_usd).toBe(0.0021);
     expect(row.duration_ms).toBe(1180);
     expect(row.redaction.request_missing).toBe(false);
@@ -88,7 +88,7 @@ describe("Cloudflare AI Gateway adapter", () => {
 
   it("handles redacted/missing request and response safely", () => {
     const row = normalizeCloudflareAiGatewayLog(redactedRecord);
-    expect(row.product).toBe("migo");
+    expect(row.product).toBe("support-assistant");
     expect(row.messages).toEqual([]);
     expect(row.output_text).toBeUndefined();
     expect(row.redaction.request_missing).toBe(true);
@@ -111,7 +111,7 @@ describe("Cloudflare AI Gateway adapter", () => {
       success: true,
       tokens_in: 87,
       tokens_out: 43,
-      metadata: { product: "migo", trace_id: "smoke-test-trace" },
+      metadata: { product: "support-assistant", trace_id: "smoke-test-trace" },
       cost: 0,
       request: "",
       response: "",
@@ -152,7 +152,7 @@ describe("Cloudflare AI Gateway adapter", () => {
 
   it("merges sidecar metadata when Cloudflare metadata is too small", () => {
     const row = normalizeCloudflareAiGatewayLog(
-      { ...chatRecord, metadata: { product: "eavesly" } },
+      { ...chatRecord, metadata: { product: "doc-summarizer" } },
       { metadataSidecar: { log_TEST_001: { module: "sidecar_module", prompt_version: "sidecar_prompt" } } },
     );
     expect(row.module).toBe("sidecar_module");
@@ -163,7 +163,7 @@ describe("Cloudflare AI Gateway adapter", () => {
     const row = normalizeCloudflareAiGatewayLog(chatRecord);
     const evalCase = EvalCase.parse(convertTraceToEvalCase(row, { tags: ["smoke"] }));
     expect(evalCase.source).toBe("production_log");
-    expect(evalCase.product).toBe("eavesly");
+    expect(evalCase.product).toBe("doc-summarizer");
     expect(evalCase.input.messages).toHaveLength(2);
     expect(evalCase.tags).toContain("cloudflare-ai-gateway");
   });

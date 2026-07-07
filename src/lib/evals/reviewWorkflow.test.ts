@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EvalCase, type EvalCase as EvalCaseT } from "./evalCase";
-import { customerPilotSmokeCases } from "./packs/customerPilot";
+import { demoSmokeCases } from "./packs/demoPack";
 import {
   PromotionPolicy,
   ReviewDecision,
@@ -14,14 +14,14 @@ import {
 
 // A synthetic reviewed case + reviewer — no real customer data anywhere.
 const syntheticCase = (): EvalCaseT =>
-  EvalCase.parse(customerPilotSmokeCases[0]);
+  EvalCase.parse(demoSmokeCases[0]);
 
 const review = (
   outcome: ReviewOutcome,
   over: Partial<ReturnType<typeof ReviewDecision.parse>> = {},
 ) =>
   ReviewDecision.parse({
-    case_id: "pilot-eavesly-payoff-00",
+    case_id: "demo-docs-renewal-00",
     reviewer_id: "reviewer-TEST-1",
     outcome,
     reason_tag: "looks_correct",

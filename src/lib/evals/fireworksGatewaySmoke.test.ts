@@ -19,9 +19,9 @@ import {
 const ENV = {
   CF_ACCOUNT_ID: "acct_TEST",
   CF_AIG_GATEWAY: "gw_TEST",
-  FIREWORKS_MODEL: "accounts/test/models/migo-ft-0001",
+  FIREWORKS_MODEL: "accounts/test/models/support-assistant-ft-0001",
   TENANT_LABEL: "tenant-test",
-  PRODUCT: "migo",
+  PRODUCT: "support-assistant",
 };
 
 const IDS = { traceId: "smoke-trace-abc123", sessionId: "smoke-session-abc123" };
@@ -35,14 +35,14 @@ function normalizedLog(overrides: Partial<CloudflareAiGatewayLog> = {}) {
     log_id: "log_smoke_001",
     timestamp: "2026-07-05T12:00:00Z",
     provider: "fireworks-ai",
-    model: "accounts/test/models/migo-ft-0001",
+    model: "accounts/test/models/support-assistant-ft-0001",
     status: "success",
     request: { messages: [{ role: "user", content: SMOKE_PROMPT }] },
     response: { choices: [{ message: { content: "ok" } }] },
     usage: { input_tokens: 20, output_tokens: 2, total_tokens: 22, cost_usd: 0.0001 },
     duration_ms: 540,
     metadata: {
-      product: "migo",
+      product: "support-assistant",
       module: "prototype_smoke",
       prompt_version: "pv_prototype_0001",
       variant: "control",
@@ -59,7 +59,7 @@ function normalizedLog(overrides: Partial<CloudflareAiGatewayLog> = {}) {
 
 const EXPECTED: VerifyExpectations = {
   provider: "fireworks-ai",
-  model: "accounts/test/models/migo-ft-0001",
+  model: "accounts/test/models/support-assistant-ft-0001",
   traceId: IDS.traceId,
 };
 

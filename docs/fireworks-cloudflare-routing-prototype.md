@@ -6,7 +6,7 @@ through Cloudflare AI Gateway, then feed the captured logs into the existing eva
 For the user-facing onboarding checklist that precedes this runbook (connect logs → metadata
 → baseline eval → candidate rows), see [`gateway-onboarding.md`](./gateway-onboarding.md).
 
-**No production or customer data.** Use synthetic prompts (Migo/Eavesly-style) for the smoke
+**No production or customer data.** Use synthetic prompts (support-assistant/doc-summarizer-style) for the smoke
 test. Secrets stay in your secret store / env — they never go into the repo, the generated
 artifacts, or Gateway logs.
 
@@ -43,22 +43,22 @@ Concrete, customer-generic command sequence. Ids below are placeholders; the rea
 export FIREWORKS_API_KEY=…
 
 # 1. Upload the approved, synthetic-or-reviewed dataset (JSONL of {messages:[…]} rows).
-firectl create dataset migo-eval-ft-0001 ./artifacts/training-dataset.jsonl
-#   → dataset id: accounts/<account>/datasets/migo-eval-ft-0001
+firectl create dataset example-eval-ft-0001 ./artifacts/training-dataset.jsonl
+#   → dataset id: accounts/<account>/datasets/example-eval-ft-0001
 
 # 2. Launch supervised fine-tuning against a base model.
 firectl create fine-tuning-job \
   --base-model accounts/fireworks/models/llama-v3p1-8b-instruct \
-  --dataset accounts/<account>/datasets/migo-eval-ft-0001 \
-  --output-model migo-eval-ft-0001
+  --dataset accounts/<account>/datasets/example-eval-ft-0001 \
+  --output-model example-eval-ft-0001
 #   → job id: accounts/<account>/fineTuningJobs/<job>
 #   Poll: firectl get fine-tuning-job accounts/<account>/fineTuningJobs/<job>
-#   On COMPLETED the tuned model id is: accounts/<account>/models/migo-eval-ft-0001
+#   On COMPLETED the tuned model id is: accounts/<account>/models/example-eval-ft-0001
 
 # 3a. Serverless: many tuned models serve on-demand with no explicit deployment —
 #     skip to the direct-serve check below and use the model id as-is.
 # 3b. Dedicated: create a deployment for guaranteed capacity / low latency.
-firectl create deployment accounts/<account>/models/migo-eval-ft-0001
+firectl create deployment accounts/<account>/models/example-eval-ft-0001
 #   → deployment id: accounts/<account>/deployments/<deployment>
 ```
 
@@ -71,7 +71,7 @@ firectl create deployment accounts/<account>/models/migo-eval-ft-0001
   curl -sS https://api.fireworks.ai/inference/v1/chat/completions \
     -H "Authorization: Bearer $FIREWORKS_API_KEY" \
     -H "Content-Type: application/json" \
-    -d '{"model":"accounts/<account>/models/migo-eval-ft-0001",
+    -d '{"model":"accounts/<account>/models/example-eval-ft-0001",
          "messages":[{"role":"user","content":"Synthetic smoke prompt. Reply with: ok."}],
          "max_tokens":16}'
   ```
@@ -124,7 +124,7 @@ export CF_ACCOUNT_ID=…      # gateway account
 export CF_AIG_GATEWAY=…     # gateway id/name
 export CF_AIG_TOKEN=…       # gateway edge-auth token
 export FIREWORKS_API_KEY=…  # upstream provider key
-export FIREWORKS_MODEL=accounts/<account>/models/migo-eval-ft-0001
+export FIREWORKS_MODEL=accounts/<account>/models/example-eval-ft-0001
 export CF_API_TOKEN=…       # Cloudflare API token — reads the Gateway logs API (live only)
 
 npm run smoke:fireworks-gateway -- --dry-run   # prints the redacted request, sends nothing
@@ -174,7 +174,7 @@ const traces = parseCloudflareAiGatewayJsonl(exportedJsonl, { defaultProduct, de
 ```
 
 Then `convertTraceToEvalCase()` to seed eval cases and run the scorecard
-(`npm run scorecard:customer-pilot`). Replay seeds derived from real traces stay
+(`npm run scorecard:demo`). Replay seeds derived from real traces stay
 `customer_scoped_review_only`.
 
 ## Auth & key handling / tenant isolation

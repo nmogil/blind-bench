@@ -21,9 +21,9 @@ import { pathToFileURL } from "node:url";
 import { EvalCase, type PrivacyClass, type ScenarioSource } from "./evalCase";
 import { stableStringify } from "./cloudflareAiGateway";
 import {
-  customerPilotSmokeCases,
-  customerPilotSmokeFixturesAllPass,
-} from "./packs/customerPilot";
+  demoSmokeCases,
+  demoSmokeFixturesAllPass,
+} from "./packs/demoPack";
 import {
   PromotionPolicy,
   ReviewDecision,
@@ -335,42 +335,42 @@ export function formatManifest(manifest: TrainingDatasetManifest): string {
   return JSON.stringify(manifest, null, 2) + "\n";
 }
 
-// --- Synthetic customer-pilot fixture source ---------------------------------
+// --- Synthetic demo fixture source -------------------------------------------
 
-const PILOT_REVIEWED_AT = "2026-01-01T00:00:00Z";
-const PILOT_APPROVED_AT = "2026-01-01T00:00:00Z";
+const DEMO_REVIEWED_AT = "2026-01-01T00:00:00Z";
+const DEMO_APPROVED_AT = "2026-01-01T00:00:00Z";
 
 /**
- * Build training source rows from the SYNTHETIC customer-pilot smoke pack by
+ * Build training source rows from the SYNTHETIC demo smoke pack by
  * approving each case with an explicit `training_approved` policy and pairing it
  * with the clean (all-pass) synthetic completion. Every 5th case is marked
  * held-out (eval_only, allow_in_test) to exercise contamination prevention.
  */
-export function customerPilotTrainingSourceRows(): TrainingDatasetSourceRow[] {
+export function demoTrainingSourceRows(): TrainingDatasetSourceRow[] {
   const policy = PromotionPolicy.parse({
     classification: "training_approved",
     review_allowed: true,
     training_allowed: true,
   });
-  return customerPilotSmokeCases.map((raw, i) => {
+  return demoSmokeCases.map((raw, i) => {
     const c = EvalCase.parse(raw);
     const review = ReviewDecision.parse({
       case_id: c.id,
       reviewer_id: "reviewer-TEST-1",
       outcome: "pass",
       reason_tag: "approved_for_training",
-      reviewed_at: PILOT_REVIEWED_AT,
+      reviewed_at: DEMO_REVIEWED_AT,
     });
-    const candidate = approveForTraining(c, review, policy, PILOT_APPROVED_AT);
+    const candidate = approveForTraining(c, review, policy, DEMO_APPROVED_AT);
     const eval_only = i % 5 === 0;
     return {
       candidate,
       source: c.source,
-      assistant_output: customerPilotSmokeFixturesAllPass[c.id]?.text ?? "",
+      assistant_output: demoSmokeFixturesAllPass[c.id]?.text ?? "",
       eval_only,
       allow_in_test: eval_only,
-      variant: c.product === "eavesly" ? "voice-v1" : "sms-v1",
-      customer_scope: (c.metadata?.customer_scope as string | undefined) ?? "customer-pilot",
+      variant: (c.metadata?.variant as string | undefined) ?? "control",
+      customer_scope: (c.metadata?.customer_scope as string | undefined) ?? "demo",
       metrics: { score: 1, rating: 5 },
     };
   });
@@ -379,13 +379,13 @@ export function customerPilotTrainingSourceRows(): TrainingDatasetSourceRow[] {
 // --- CLI entrypoint ----------------------------------------------------------
 
 const OUT_DIR = "artifacts";
-const BASENAME = "customer-pilot-training-dataset";
-// Fixed default so `npm run dataset:customer-pilot` is byte-stable; override via argv[0].
+const BASENAME = "training-dataset";
+// Fixed default so `npm run dataset:demo` is byte-stable; override via argv[0].
 const DEFAULT_GENERATED_AT = "2026-01-01T00:00:00Z";
 
 export async function main(argv: string[]): Promise<number> {
   const generated_at = argv[0] ?? DEFAULT_GENERATED_AT;
-  const { splits, manifest } = compileTrainingDataset(customerPilotTrainingSourceRows(), {
+  const { splits, manifest } = compileTrainingDataset(demoTrainingSourceRows(), {
     generated_at,
     dataset_name: BASENAME,
   });

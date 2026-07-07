@@ -27,9 +27,9 @@ const result = (over: Partial<ScorerResultT>): ScorerResultT =>
   });
 
 describe("eval case schema", () => {
-  it("accepts the synthetic Eavesly and Migo examples", () => {
+  it("accepts the synthetic doc-summarizer and support-assistant examples", () => {
     const products = exampleCases.map((c) => EvalCase.parse(c).product).sort();
-    expect(products).toEqual(["eavesly", "migo"]);
+    expect(products).toEqual(["doc-summarizer", "support-assistant"]);
   });
 
   it("examples are synthetic and use obviously fake TEST fixture identifiers", () => {
@@ -122,7 +122,7 @@ describe("aggregateScores (hard-fail semantics)", () => {
     const scores = [result({ score: 1 }), result({ score: 0.5 })];
     const row = EvalResult.parse({
       case_id: exampleCases[0]!.id,
-      output: { text: "Your payoff is $4,210.00.", escalated: true },
+      output: { text: "Your renewal quote is $4,210.00.", escalated: true },
       scores,
       ...aggregateScores(scores),
       timestamp: "2026-06-23T00:00:00Z",

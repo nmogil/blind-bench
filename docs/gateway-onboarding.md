@@ -37,10 +37,10 @@ only at step 7.
    metadata that was attached at request time.
 3. **Pick a product / use-case + eval pack.** Choose one or two high-traffic
    prompts to onboard first so the baseline is meaningful. Blind Bench ships
-   synthetic example surfaces (`migo`, `eavesly`) in
+   synthetic example surfaces (`support-assistant`, `doc-summarizer`) in
    `src/routes/orgs/GatewayOnboarding.tsx` to model your own against. The eval
    pack is the set of deterministic scorers you will run — the shipped pilot pack
-   is `customer-pilot/smoke` (see `docs/customer-ai-quality-scorecard-handoff.md`).
+   is `demo/smoke` (see `docs/customer-ai-quality-scorecard-handoff.md`).
 4. **Create your first dataset from filtered logs.** Filter the export by
    product / time window, then import it (step 1's path). Each new, non-duplicate
    trace is stored as a deduplicated `traceImports` row; the importer returns a
@@ -53,8 +53,8 @@ only at step 7.
    becomes an eval case.
 5. **Run a baseline eval.** Score the current production prompt against the pack
    to establish the baseline scorecard. The runner is
-   `src/lib/evals/modelComparison.ts` (`npm run compare:customer-pilot`), and the
-   customer-facing scorecard is `npm run scorecard:customer-pilot`. Both are
+   `src/lib/evals/modelComparison.ts` (`npm run compare:demo`), and the
+   customer-facing scorecard is `npm run scorecard:demo`. Both are
    local, deterministic, and management-safe — they emit only case IDs, product
    labels, scorer IDs, scores, and aggregate counts, never raw prompts or outputs
    (see [`baseline-candidate-comparison.md`](./baseline-candidate-comparison.md)).
@@ -106,7 +106,7 @@ onboarding page):
 
 | Key | Meaning |
 | --- | --- |
-| `product` | Top-level product, e.g. `migo` / `eavesly`. |
+| `product` | Top-level product, e.g. `support-assistant` / `doc-summarizer`. |
 | `module` | Sub-surface within the product, e.g. `assistant` / `summarizer`. |
 | `prompt_version` | Version tag of the prompt that produced the output. |
 | `variant` | `control` / `candidate` — which arm of an A/B. |
@@ -175,8 +175,8 @@ GET https://api.cloudflare.com/client/v4/accounts/<account>/ai-gateway/gateways/
 #   parseCloudflareAiGatewayJsonl(...) → convertTraceToEvalCase(...)
 
 # Baseline / candidate comparison + scorecard (local, deterministic)
-npm run compare:customer-pilot
-npm run scorecard:customer-pilot
+npm run compare:demo
+npm run scorecard:demo
 ```
 
 The same JSONL can also be pasted into the no-code importer above — the two paths

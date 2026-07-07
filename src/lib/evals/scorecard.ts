@@ -12,7 +12,7 @@
  * scans the rendered artifacts to enforce this.
  *
  * Run it:
- *   npm run scorecard:customer-pilot     # writes artifacts/customer-ai-quality-scorecard.{md,json}
+ *   npm run scorecard:demo     # writes artifacts/ai-quality-scorecard.{md,json}
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -119,7 +119,7 @@ export function buildScorecard(summary: Summary, fixtures?: Record<string, Agent
     scope: {
       products: [...new Set(summary.results.map((r) => r.product))].sort(),
       cases_evaluated: summary.total,
-      dataset: "Synthetic pilot smoke pack (fake data only; no production PII or transcripts).",
+      dataset: "Synthetic demo smoke pack (fake data only; no production PII or transcripts).",
       review_basis: "Deterministic local scorers. LLM-judge and human review not yet applied.",
     },
     coverage: { missing_fixtures: [...summary.missing_fixtures].sort() },
@@ -173,7 +173,7 @@ export function formatScorecardMarkdown(card: Scorecard): string {
 
   L.push("# Customer AI Quality Scorecard");
   L.push("");
-  L.push(`_Pack: \`${card.pack}\` · synthetic pilot smoke pack · deterministic local run._`);
+  L.push(`_Pack: \`${card.pack}\` · synthetic demo smoke pack · deterministic local run._`);
   L.push("");
 
   L.push("## Executive summary");
@@ -264,7 +264,7 @@ export function formatScorecardMarkdown(card: Scorecard): string {
 
 // --- CLI entrypoint ----------------------------------------------------------
 
-const DEFAULT_PACK = "customer-pilot/smoke";
+const DEFAULT_PACK = "demo/smoke";
 const OUT_DIR = "artifacts";
 
 export async function main(argv: string[]): Promise<number> {
@@ -275,12 +275,12 @@ export async function main(argv: string[]): Promise<number> {
   const json = formatScorecardJson(card);
 
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(`${OUT_DIR}/customer-ai-quality-scorecard.md`, md);
-  writeFileSync(`${OUT_DIR}/customer-ai-quality-scorecard.json`, json);
+  writeFileSync(`${OUT_DIR}/ai-quality-scorecard.md`, md);
+  writeFileSync(`${OUT_DIR}/ai-quality-scorecard.json`, json);
 
   process.stdout.write(md + "\n");
   process.stdout.write(
-    `\nWrote ${OUT_DIR}/customer-ai-quality-scorecard.md and .json (${card.safety_privacy.hard_failed_cases} hard-fail(s)).\n`,
+    `\nWrote ${OUT_DIR}/ai-quality-scorecard.md and .json (${card.safety_privacy.hard_failed_cases} hard-fail(s)).\n`,
   );
   // Reporting command only: hard-fails remain visible in the artifact but do not
   // make scorecard generation fail. Use the lower-level eval CLI for CI gates.

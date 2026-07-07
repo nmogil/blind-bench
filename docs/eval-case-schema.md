@@ -14,7 +14,7 @@ This is the portable schema foundation. See also:
 | Path | What |
 | --- | --- |
 | `src/lib/evals/evalCase.ts` | Schemas, types, `Scorer` interface, `aggregateScores`, JSON Schema exports |
-| `src/lib/evals/examples.ts` | Two **synthetic** example cases (Eavesly, Migo) — fake data only |
+| `src/lib/evals/examples.ts` | Two **synthetic** example cases (doc-summarizer, support-assistant) — fake data only |
 | `src/lib/evals/evalCase.test.ts` | Validates examples, scorer-result shape, hard-fail semantics, schema-artifact drift |
 | `schemas/eval-case.schema.json`, `schemas/eval-result.schema.json` | Generated JSON Schema (`npx tsx schemas/generate.ts` to refresh) |
 
@@ -34,7 +34,7 @@ EvalCase {
 
 - **`source`** — `synthetic` | `production_log` | `replay`. Scenario provenance for
   synthetic, production-log-derived, and replay cases. Affects sampling, not scoring.
-- **`product`** — open string (`"eavesly"`, `"migo"`, …) so the schema is portable,
+- **`product`** — open string (`"doc-summarizer"`, `"support-assistant"`, …) so the schema is portable,
   not tied to one customer.
 - **`input`** — open: `messages` / `variables` for synthetic cases, plus `transcript`
   and `context` for replay / production-log cases.

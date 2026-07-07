@@ -13,7 +13,7 @@ report logic are identical; only the source of the outputs differs.
 
 ```bash
 npm run compare:endpoints -- \
-  --pack customer-pilot/smoke \
+  --pack demo/smoke \
   --baseline ./baseline-endpoint.json \
   --candidate fireworks:env \
   --out-dir artifacts
@@ -67,6 +67,6 @@ standard metadata and can be re-ingested via `cloudflareAiGateway.ts`.
 The Markdown/JSON reports keep the management-safe contract (case IDs, scorer
 IDs, scores, aggregates only). The captured `*-outputs.json` files DO contain raw
 model output — they are written to the gitignored `artifacts/` directory for
-replay/debugging. The customer-pilot pack is fully synthetic; when running packs
+replay/debugging. The demo pack is fully synthetic; when running packs
 derived from production logs, treat the captured output files per the case's
 `privacy_class`.

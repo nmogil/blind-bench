@@ -80,11 +80,11 @@ Why it wedges:
 | 1 | Connect CF AI Gateway / Logpush; export request logs | Cloudflare emits; user exports | ✅ `docs/cloudflare-gateway-live-import.md`, `docs/gateway-onboarding.md` |
 | 2 | Normalize logs into deduplicated traces | Blind Bench | ✅ `convex/traceAdapters/cloudflareAiGateway.ts`, `src/lib/evals/cloudflareAiGateway.ts`, `convex/gatewayImport.ts` |
 | 3 | Curate datasets / eval suites from real traffic + synthetic edge cases | Blind Bench | ✅ (parse/dedup + local materialize); ⚠️ UI materialization of imported traces is **planned** — `docs/cloudflare-gateway-live-import.md` "Follow-up" |
-| 4 | Run baseline evals (management-safe scorecard) | Blind Bench | ✅ `src/lib/evals/modelComparison.ts`, `npm run scorecard:customer-pilot` — `docs/baseline-candidate-comparison.md`, `docs/customer-ai-quality-scorecard-handoff.md` |
+| 4 | Run baseline evals (management-safe scorecard) | Blind Bench | ✅ `src/lib/evals/modelComparison.ts`, `npm run scorecard:demo` — `docs/baseline-candidate-comparison.md`, `docs/customer-ai-quality-scorecard-handoff.md` |
 | 5 | Compile training / eval data for Fireworks fine-tuning / RFT | Blind Bench (curation); user approves | ✅ `src/lib/evals/trainingDataset.ts` — `docs/training-dataset-compiler.md` (default-deny on real data) |
 | 6 | Deploy candidate on Fireworks (fine-tune → serve) | Fireworks; user operates | ✅ runbook only (manual `firectl`) — `docs/fireworks-cloudflare-routing-prototype.md` §1 |
 | 7 | Route candidate through Gateway (custom provider / dynamic routing) | Cloudflare; user configures | ✅ prototype + live smoke — `docs/fireworks-cloudflare-routing-prototype.md` §§2–3, `scripts/fireworks-gateway-smoke.ts` |
-| 8 | Compare baseline vs candidate; publish scorecard | Blind Bench | ✅ `src/lib/evals/modelComparison.ts` (`compare:customer-pilot`) — promote / hold / reject recommendation, `docs/baseline-candidate-comparison.md` |
+| 8 | Compare baseline vs candidate; publish scorecard | Blind Bench | ✅ `src/lib/evals/modelComparison.ts` (`compare:demo`) — promote / hold / reject recommendation, `docs/baseline-candidate-comparison.md` |
 
 **Honest status of the loop:** the two ends (import + normalize; baseline /
 candidate comparison + scorecard) are shipped and tested. The middle —

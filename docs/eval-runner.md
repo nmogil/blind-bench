@@ -19,18 +19,18 @@ It is designed to prove the trace-to-eval loop before wiring real Cloudflare AI 
 The first pack is:
 
 ```text
-customer-pilot/smoke
+demo/smoke
 ```
 
 It contains 50 synthetic cases:
 
-- 25 Eavesly cases
-- 25 Migo cases
+- 25 doc-summarizer cases
+- 25 support-assistant cases
 
 The pack lives in:
 
 ```text
-src/lib/evals/packs/customer-pilot.ts
+src/lib/evals/packs/demoPack.ts
 ```
 
 Every committed case is `source: "synthetic"` and uses obvious `TEST` fixture identifiers. Do not commit real customer traces, call transcripts, account numbers, emails, phone numbers, or secrets.
@@ -63,7 +63,7 @@ Default smoke run, allowing the intentionally planted hard-fail fixture:
 
 ```bash
 npx tsx src/lib/evals/cli.ts \
-  --pack customer-pilot/smoke \
+  --pack demo/smoke \
   --source fixtures \
   --output /tmp/blindbench-report.json \
   --markdown /tmp/blindbench-report.md \
@@ -73,18 +73,18 @@ npx tsx src/lib/evals/cli.ts \
 Without `--allow-failures`, the default pack exits non-zero because it includes one intentional hard-fail fixture to prove CI gating works:
 
 ```bash
-npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke --source fixtures
+npx tsx src/lib/evals/cli.ts --pack demo/smoke --source fixtures
 ```
 
 Expected behavior:
 
-- `customer-pilot/smoke`: 49/50 pass, 1 intentional hard-fail
-- `customer-pilot/smoke-pass`: 50/50 pass, 0 hard-fails
+- `demo/smoke`: 49/50 pass, 1 intentional hard-fail
+- `demo/smoke-pass`: 50/50 pass, 0 hard-fails
 
 All-pass smoke run:
 
 ```bash
-npx tsx src/lib/evals/cli.ts --pack customer-pilot/smoke-pass --source fixtures
+npx tsx src/lib/evals/cli.ts --pack demo/smoke-pass --source fixtures
 ```
 
 ## Baseline vs candidate
@@ -105,7 +105,7 @@ Run with:
 
 ```bash
 npx tsx src/lib/evals/cli.ts \
-  --pack customer-pilot/smoke \
+  --pack demo/smoke \
   --baseline-fixtures /path/to/baseline.json \
   --candidate-fixtures /path/to/candidate.json \
   --output /tmp/blindbench-compare.json \
