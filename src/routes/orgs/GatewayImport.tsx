@@ -34,6 +34,7 @@ export function GatewayImport() {
 
   const [projectId, setProjectId] = useState<string>("");
   const [jsonl, setJsonl] = useState("");
+  const [sidecarJson, setSidecarJson] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -45,9 +46,11 @@ export function GatewayImport() {
     setError("");
     setSummary(null);
     try {
+      const trimmedSidecar = sidecarJson.trim();
       const result = await importLogs({
         projectId: projectId as Id<"projects">,
         jsonl,
+        ...(trimmedSidecar ? { sidecarJson: trimmedSidecar } : {}),
       });
       setSummary(result);
     } catch (err) {
@@ -143,6 +146,31 @@ export function GatewayImport() {
           </p>
         </div>
 
+        <details className="rounded-lg border bg-muted/30 px-4 py-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Metadata sidecar (optional)
+          </summary>
+          <div className="mt-3 space-y-1.5">
+            <Label htmlFor="gw-sidecar">Sidecar JSON</Label>
+            <Textarea
+              id="gw-sidecar"
+              value={sidecarJson}
+              onChange={(e) => setSidecarJson(e.target.value)}
+              placeholder={'{ "<trace_id>": { "module": "...", "release": "..." } }'}
+              rows={6}
+              spellCheck={false}
+              className="font-mono text-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              Cloudflare keeps only 5 metadata keys per request. Paste a JSON
+              object keyed by trace_id to restore the rest:{" "}
+              <code className="text-foreground">
+                {'{ "<trace_id>": { "module": "...", "release": "..." } }'}
+              </code>
+            </p>
+          </div>
+        </details>
+
         {error && (
           <p className="text-sm text-destructive" role="alert">
             {error}
@@ -186,12 +214,42 @@ function ImportSummaryCard({ summary }: { summary: ImportSummary }) {
     { label: "Missing request", value: String(summary.redactedRequest) },
     { label: "Missing response", value: String(summary.redactedResponse) },
   ];
+
+  // "Log payloads" is off when nearly every imported row lands with no response
+  // body — those outputs can never be scored. Amber, not red (color-blind rule).
+  const processed = summary.imported + summary.deduped;
+  const payloadsLikelyOff =
+    processed > 0 && summary.redactedResponse >= processed * 0.9;
+
   return (
     <Card className="mt-6">
       <CardHeader>
         <CardTitle className="text-base">Import summary</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
+        {payloadsLikelyOff && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+            <div className="flex items-start gap-2">
+              <ShieldAlert
+                aria-hidden="true"
+                className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+              />
+              <div className="space-y-1">
+                <p className="font-semibold">
+                  This gateway isn’t storing payloads
+                </p>
+                <p className="text-muted-foreground">
+                  Nearly every imported row has no response body, so these
+                  outputs can’t be scored. Enable{" "}
+                  <strong className="text-foreground">Log payloads</strong> in
+                  Cloudflare (AI Gateway → your gateway → Settings), then
+                  re-generate traffic and re-import.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {stats.map((s) => (
             <div key={s.label}>
@@ -222,6 +280,13 @@ function ImportSummaryCard({ summary }: { summary: ImportSummary }) {
         {(summary.earliest || summary.latest) && (
           <p className="text-xs text-muted-foreground">
             Window: {summary.earliest ?? "?"} → {summary.latest ?? "?"}
+          </p>
+        )}
+
+        {summary.sidecar && (
+          <p className="text-xs text-muted-foreground">
+            Sidecar: {summary.sidecar.entries} entries,{" "}
+            {summary.sidecar.matched} traces enriched
           </p>
         )}
       </CardContent>
