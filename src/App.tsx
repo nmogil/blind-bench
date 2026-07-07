@@ -17,7 +17,6 @@ const Onboarding = lazy(() => import("./routes/Onboarding").then(m => ({ default
 const WelcomeFirstRun = lazy(() => import("./routes/welcome/WelcomeFirstRun").then(m => ({ default: m.WelcomeFirstRun })));
 const OrgHome = lazy(() => import("./routes/orgs/OrgHome").then(m => ({ default: m.OrgHome })));
 const GatewayOnboarding = lazy(() => import("./routes/orgs/GatewayOnboarding").then(m => ({ default: m.GatewayOnboarding })));
-const PilotScorecard = lazy(() => import("./routes/orgs/PilotScorecard").then(m => ({ default: m.PilotScorecard })));
 const GatewayImport = lazy(() => import("./routes/orgs/GatewayImport").then(m => ({ default: m.GatewayImport })));
 const OrgSettings = lazy(() => import("./routes/orgs/settings/OrgSettings").then(m => ({ default: m.OrgSettings })));
 const OrgMembers = lazy(() => import("./routes/orgs/settings/OrgMembers").then(m => ({ default: m.OrgMembers })));
@@ -78,7 +77,6 @@ export function App() {
             <Route index element={<OrgHome />} />
             <Route path="gateway-onboarding" element={<GatewayOnboarding />} />
             <Route path="gateway-import" element={<GatewayImport />} />
-            <Route path="pilot-scorecard" element={<PilotScorecard />} />
             <Route path="settings" element={<OrgSettings />} />
             <Route path="settings/members" element={<OrgMembers />} />
             <Route path="settings/openrouter-key" element={<OpenRouterKey />} />

@@ -65,24 +65,32 @@ const STEPS = [
 
 const PRODUCTS = [
   {
-    name: "Migo",
+    name: "Support Assistant",
     blurb: "Conversational assistant surface.",
     cases: [
       "intent classification on inbound messages",
       "grounded answer drafting from a knowledge snippet",
       "tone / safety rewrite before send",
     ],
-    metadata: { product: "migo", module: "assistant", variant: "control" },
+    metadata: {
+      product: "support-assistant",
+      module: "assistant",
+      variant: "control",
+    },
   },
   {
-    name: "Eavesly",
+    name: "Doc Summarizer",
     blurb: "Summarization & extraction surface.",
     cases: [
       "call / thread summarization",
       "structured field extraction into JSON",
       "follow-up action suggestion",
     ],
-    metadata: { product: "eavesly", module: "summarizer", variant: "control" },
+    metadata: {
+      product: "doc-summarizer",
+      module: "summarizer",
+      variant: "control",
+    },
   },
 ] as const;
 
@@ -92,14 +100,14 @@ const PRODUCTS = [
 const METADATA_FIELDS = [
   { key: "trace_id", desc: "Request trace id — always first; it is the only log↔app correlation key." },
   { key: "tenant", desc: "Tenant label for attribution and per-tenant isolation." },
-  { key: "product", desc: "Top-level product, e.g. migo / eavesly." },
+  { key: "product", desc: "Top-level product, e.g. support-assistant / doc-summarizer." },
   { key: "prompt_version", desc: "Version tag of the prompt that produced the output." },
   { key: "variant", desc: "control / candidate (which arm of an A/B)." },
 ] as const;
 
 const CLI_SNIPPET = `# Request path: attach compact metadata before the AI Gateway call
 # (max 5 keys — Cloudflare drops the rest; trace_id must be one of them)
-METADATA='{"trace_id":"<trace>","tenant":"<tenant>","product":"migo","prompt_version":"2026-06-01","variant":"control"}'
+METADATA='{"trace_id":"<trace>","tenant":"<tenant>","product":"support-assistant","prompt_version":"2026-06-01","variant":"control"}'
 curl https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/openai/chat/completions
   -H "cf-aig-metadata: $METADATA"
   -d '{ "model": "gpt-4o-mini", "messages": [ ... ] }'

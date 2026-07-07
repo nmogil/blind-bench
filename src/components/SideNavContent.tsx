@@ -4,7 +4,6 @@ import { api } from "../../convex/_generated/api";
 import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
 import {
-  ClipboardCheck,
   CloudDownload,
   CreditCard,
   FolderOpen,
@@ -108,14 +107,6 @@ export function SideNavContent({
       >
         <CloudDownload aria-hidden="true" className="h-4 w-4 shrink-0" />
         Import Gateway logs
-      </NavLink>
-      <NavLink
-        to={`/orgs/${org.slug}/pilot-scorecard`}
-        className={linkClass}
-        onClick={onNavigate}
-      >
-        <ClipboardCheck aria-hidden="true" className="h-4 w-4 shrink-0" />
-        Pilot scorecard
       </NavLink>
 
       {role === "owner" && (

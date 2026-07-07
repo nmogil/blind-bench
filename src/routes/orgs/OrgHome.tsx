@@ -19,22 +19,6 @@ export function OrgHome() {
       <h1 className="text-2xl font-bold">{org.name}</h1>
       <p className="mt-1 text-sm text-muted-foreground">Your prompts</p>
 
-      <Link
-        to={`/orgs/${org.slug}/pilot-scorecard`}
-        className="mt-4 flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <ClipboardCheck aria-hidden="true" className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <div className="text-sm font-medium">Pilot scorecard</div>
-            <div className="text-xs text-muted-foreground">
-              Synthetic pilot snapshot, refreshed 2026-06-24 — 49/50 passing; 1 hard-fail blocks promotion.
-            </div>
-          </div>
-        </div>
-        <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
-      </Link>
-
       {inFlight && inFlight.length > 0 && (
         <div className="mt-4 space-y-2">
           {inFlight.map((s) => (
