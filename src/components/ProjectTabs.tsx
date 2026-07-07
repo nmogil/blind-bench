@@ -8,6 +8,7 @@ const tabs = [
   { label: "Run", path: "run" },
   { label: "Test Cases", path: "test-cases" },
   { label: "Evaluate", path: "evaluate" },
+  { label: "Export", path: "export" },
   { label: "History", path: "history" },
 ];
 
@@ -30,7 +31,8 @@ export function ProjectTabs() {
             (tab.label === "Run" ||
               tab.label === "Editor" ||
               tab.label === "Test Cases" ||
-              tab.label === "Evaluate")
+              tab.label === "Evaluate" ||
+              tab.label === "Export")
           )
             return null;
 
