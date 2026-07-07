@@ -649,7 +649,6 @@ const schema = defineSchema({
     // Original provider payload, persisted verbatim so adapter improvements
     // can re-parse without re-fetching from the source.
     rawPayloadStorageId: v.optional(v.id("_storage")),
-  })
     // #259: once a cloudflare_ai_gateway import is materialized into an eval
     // case this points at that row. Presence is the idempotency signal for
     // `gatewayImport.materializeImportedTraces` (skip already-materialized).

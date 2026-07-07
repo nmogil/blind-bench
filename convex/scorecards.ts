@@ -33,11 +33,24 @@ const summaryValidator = v.object({
 /**
  * Kick off a scorecard run for an org. Inserts a pending run and schedules the
  * grading action; returns the run id so the client can subscribe via `latest`.
+ * If a run is already pending/running for the org, returns that run's id
+ * instead of starting an overlapping one (concurrent clients / stale UI).
  */
 export const start = mutation({
   args: { orgId: v.id("organizations") },
   handler: async (ctx, args): Promise<Id<"scorecardRuns">> => {
     const { userId } = await requireOrgRole(ctx, args.orgId, ["owner", "admin"]);
+    const inFlight = await ctx.db
+      .query("scorecardRuns")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "running"),
+        ),
+      )
+      .first();
+    if (inFlight) return inFlight._id;
     const runId = await ctx.db.insert("scorecardRuns", {
       orgId: args.orgId,
       status: "pending",

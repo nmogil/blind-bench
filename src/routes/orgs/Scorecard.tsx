@@ -293,8 +293,8 @@ function CompletedScorecard({ latest }: { latest: Latest }) {
               <p className="text-muted-foreground">
                 {summary?.hardFailed} hard-fail
                 {summary?.hardFailed === 1 ? "" : "s"} must be resolved before
-                this traffic can be promoted. Hard-fails are tracked separately
-                and never averaged into the quality score.
+                this traffic can be promoted. A single hard-fail blocks
+                promotion regardless of the mean quality score.
               </p>
             </div>
           </CardContent>
@@ -345,7 +345,7 @@ function CompletedScorecard({ latest }: { latest: Latest }) {
               icon={Gauge}
               label="Mean score"
               value={formatScore(summary.meanScore)}
-              detail="Soft quality score, hard-fails excluded"
+              detail="Mean across all scored cases"
             />
             <MetricCard
               icon={ClipboardCheck}

@@ -181,36 +181,53 @@ export const importGatewayLogs = action({
  */
 const MATERIALIZE_CAP = 500;
 
-type MaterializeCandidate = {
-  importId: Id<"traceImports">;
-  alreadyMaterialized: boolean;
-  rawPayloadStorageId?: Id<"_storage">;
+type MaterializeCandidates = {
+  /** Unmaterialized rows with a payload, capped at MATERIALIZE_CAP. */
+  ready: { importId: Id<"traceImports">; rawPayloadStorageId: Id<"_storage"> }[];
+  alreadyMaterialized: number;
+  missingPayload: number;
 };
 
 /**
- * Load up to `MATERIALIZE_CAP` cloudflare_ai_gateway import rows for the
- * project and classify each (already materialized / missing payload / ready).
- * Auth-gated so the action never touches storage for an unauthorized caller.
+ * Classify every cloudflare_ai_gateway import row for the project and return
+ * the rows still needing materialization (capped at `MATERIALIZE_CAP` per
+ * call, so re-running drains backlogs larger than the cap). Counts cover the
+ * whole project so the caller's summary stays accurate. Auth-gated so the
+ * action never touches storage for an unauthorized caller.
  */
 export const loadMaterializationCandidates = internalQuery({
   args: { projectId: v.id("projects") },
-  handler: async (ctx, args): Promise<MaterializeCandidate[]> => {
+  handler: async (ctx, args): Promise<MaterializeCandidates> => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    // Full scan of the project's import rows — they are small identity rows
+    // and the import path caps batches at 5,000 lines; revisit if projects
+    // accumulate orders of magnitude more.
     const rows = await ctx.db
       .query("traceImports")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("source"), SOURCE))
-      .take(MATERIALIZE_CAP);
-    return rows.map((r) => ({
-      importId: r._id,
-      alreadyMaterialized: r.evalCaseId !== undefined,
-      rawPayloadStorageId: r.rawPayloadStorageId,
-    }));
+      .collect();
+    const result: MaterializeCandidates = {
+      ready: [],
+      alreadyMaterialized: 0,
+      missingPayload: 0,
+    };
+    for (const r of rows) {
+      if (r.evalCaseId !== undefined) result.alreadyMaterialized++;
+      else if (!r.rawPayloadStorageId) result.missingPayload++;
+      else if (result.ready.length < MATERIALIZE_CAP)
+        result.ready.push({
+          importId: r._id,
+          rawPayloadStorageId: r.rawPayloadStorageId,
+        });
+    }
+    return result;
   },
 });
 
 const evalCaseRowValidator = v.object({
   importId: v.id("traceImports"),
+  source: v.literal("production_log"),
   product: v.string(),
   title: v.string(),
   messages: v.array(v.object({ role: v.string(), content: v.string() })),
@@ -251,7 +268,6 @@ export const insertMaterializedCases = internalMutation({
       const evalCaseId = await ctx.db.insert("evalCases", {
         projectId: args.projectId,
         traceImportId: importId,
-        source: "production_log",
         createdById: userId,
         ...fields,
       });
@@ -284,25 +300,17 @@ export const materializeImportedTraces = action({
     missingPayload: number;
     failed: number;
   }> => {
-    const candidates: MaterializeCandidate[] = await ctx.runQuery(
+    const candidates: MaterializeCandidates = await ctx.runQuery(
       internal.gatewayImport.loadMaterializationCandidates,
       { projectId: args.projectId },
     );
 
-    let alreadyMaterialized = 0;
-    let missingPayload = 0;
+    const { alreadyMaterialized } = candidates;
+    let missingPayload = candidates.missingPayload;
     let failed = 0;
     const rows: (typeof evalCaseRowValidator)["type"][] = [];
 
-    for (const candidate of candidates) {
-      if (candidate.alreadyMaterialized) {
-        alreadyMaterialized++;
-        continue;
-      }
-      if (!candidate.rawPayloadStorageId) {
-        missingPayload++;
-        continue;
-      }
+    for (const candidate of candidates.ready) {
       try {
         const blob = await ctx.storage.get(candidate.rawPayloadStorageId);
         if (!blob) {
