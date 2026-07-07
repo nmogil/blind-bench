@@ -174,8 +174,8 @@ export function GatewayOnboarding() {
                 <strong className="text-foreground">Log payloads</strong> for
                 the gateway (AI Gateway → your gateway → Settings) before
                 exporting. Without it, logs carry no request/response bodies —
-                imported traces have no output text, and nothing downstream can
-                be materialized or scored.
+                imported traces have no output text, so the eval cases built
+                from them cannot be scored.
               </p>
             </div>
           </div>

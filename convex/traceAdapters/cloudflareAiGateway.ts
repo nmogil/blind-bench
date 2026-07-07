@@ -85,7 +85,7 @@ export type SidecarEntry = Record<string, string | number | boolean>;
 export type SidecarMap = Record<string, SidecarEntry>;
 
 export interface SidecarLimits {
-  /** Maximum sidecar text size guard (UTF-16 char length upper bound). */
+  /** Maximum sidecar text size in UTF-8 bytes. */
   maxBytes: number;
   /** Maximum number of correlation-id entries parsed. */
   maxEntries: number;
@@ -119,7 +119,8 @@ export function parseSidecar(
   text: string,
   limits: SidecarLimits = DEFAULT_SIDECAR_LIMITS,
 ): SidecarParseResult {
-  if (text.length > limits.maxBytes) return { sidecar: undefined, entries: 0 };
+  if (new TextEncoder().encode(text).length > limits.maxBytes)
+    return { sidecar: undefined, entries: 0 };
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -131,7 +132,9 @@ export function parseSidecar(
   const keys = Object.keys(outer);
   if (keys.length > limits.maxEntries) return { sidecar: undefined, entries: 0 };
 
-  const sidecar: SidecarMap = {};
+  // Prototype-less so hostile correlation ids ("__proto__", "toString") are
+  // plain own keys — lookups can never hit inherited Object.prototype members.
+  const sidecar: SidecarMap = Object.create(null) as SidecarMap;
   let entries = 0;
   for (const key of keys) {
     const inner = asRecord(outer[key]);
@@ -169,9 +172,14 @@ export function mergeSidecarIntoRecord(
   const existing =
     asRecord(get(rec, ["metadata", "request.metadata", "event.metadata"])) ?? {};
 
+  // Own-key lookup only — a plain-object SidecarMap must never match
+  // inherited members (toString, constructor) as correlation ids.
+  const lookup = (id: string): SidecarEntry | undefined =>
+    Object.prototype.hasOwnProperty.call(sidecar, id) ? sidecar[id] : undefined;
+
   let entry: SidecarEntry | undefined;
   const traceId = str(existing.trace_id);
-  if (traceId !== undefined) entry = sidecar[traceId];
+  if (traceId !== undefined) entry = lookup(traceId);
   if (entry === undefined) {
     const logId = getStr(rec, [
       "log_id",
@@ -182,7 +190,7 @@ export function mergeSidecarIntoRecord(
       "cf.ray_id",
       "ray_id",
     ]);
-    if (logId !== undefined) entry = sidecar[logId];
+    if (logId !== undefined) entry = lookup(logId);
   }
   if (entry === undefined) return false;
 
