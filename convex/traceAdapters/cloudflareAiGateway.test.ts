@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_SIDECAR_LIMITS,
   normalizeGatewayLog,
   parseGatewayJsonl,
+  parseSidecar,
   summarizeTraces,
 } from "./cloudflareAiGateway";
 
@@ -112,5 +114,117 @@ describe("convex cloudflare gateway parser", () => {
     expect(s.latest).toBe("2026-06-23T12:01:00Z");
     // summary carries no message/output text
     expect(JSON.stringify(s)).not.toContain("payoff");
+  });
+});
+
+describe("convex gateway metadata sidecar", () => {
+  // Record whose ground-truth metadata carries a trace_id (survives the 5-key
+  // cap) plus an inline `product` the sidecar must not override.
+  const withTrace = {
+    ...chat,
+    log_id: "log_TRACE_001",
+    metadata: { trace_id: "tr_abc", product: "support-assistant" },
+  };
+
+  it("merges a sidecar entry by metadata.trace_id, into rawPayloadJson", () => {
+    const { sidecar } = parseSidecar(
+      JSON.stringify({ tr_abc: { release: "2026.7.0", environment: "prod" } }),
+    );
+    const { traces, sidecarMerged } = parseGatewayJsonl(
+      JSON.stringify(withTrace),
+      undefined,
+      sidecar,
+    );
+    expect(sidecarMerged).toEqual([true]);
+    // The merged metadata is in the stored blob (rawPayloadJson), so
+    // materialization/readProduct picks it up for free.
+    const stored = JSON.parse(traces[0]!.rawPayloadJson);
+    expect(stored.metadata.release).toBe("2026.7.0");
+    expect(stored.metadata.environment).toBe("prod");
+  });
+
+  it("falls back to the log id when there is no metadata.trace_id", () => {
+    const { sidecar } = parseSidecar(
+      JSON.stringify({ log_TEST_001: { release: "fallback-rel" } }),
+    );
+    // `chat` has log_id but no metadata.trace_id.
+    const { traces, sidecarMerged } = parseGatewayJsonl(
+      JSON.stringify(chat),
+      undefined,
+      sidecar,
+    );
+    expect(sidecarMerged).toEqual([true]);
+    expect(JSON.parse(traces[0]!.rawPayloadJson).metadata.release).toBe(
+      "fallback-rel",
+    );
+  });
+
+  it("lets inline record metadata win on key conflicts", () => {
+    const { sidecar } = parseSidecar(
+      JSON.stringify({ tr_abc: { product: "WRONG", release: "r1" } }),
+    );
+    const { traces } = parseGatewayJsonl(
+      JSON.stringify(withTrace),
+      undefined,
+      sidecar,
+    );
+    const meta = JSON.parse(traces[0]!.rawPayloadJson).metadata;
+    // Gateway-logged value is ground truth.
+    expect(meta.product).toBe("support-assistant");
+    expect(meta.release).toBe("r1");
+  });
+
+  it("rejects entries whose values aren't primitives (counted, not thrown)", () => {
+    const { sidecar, entries } = parseSidecar(
+      JSON.stringify({
+        tr_abc: { release: "ok" },
+        tr_bad: { nested: { deep: 1 } },
+      }),
+    );
+    expect(entries).toBe(1); // only the primitive-valued entry counts
+    expect(sidecar).toBeDefined();
+    expect(sidecar!.tr_bad).toBeUndefined();
+    expect(sidecar!.tr_abc).toEqual({ release: "ok" });
+  });
+
+  it("treats an over-limit sidecar as invalid, without throwing", () => {
+    const tooMany = Object.fromEntries(
+      Array.from({ length: DEFAULT_SIDECAR_LIMITS.maxEntries + 1 }, (_, i) => [
+        `tr_${i}`,
+        { release: "r" },
+      ]),
+    );
+    const byEntries = parseSidecar(JSON.stringify(tooMany));
+    expect(byEntries.sidecar).toBeUndefined();
+    expect(byEntries.entries).toBe(0);
+
+    const oversized = "x".repeat(DEFAULT_SIDECAR_LIMITS.maxBytes + 1);
+    const byBytes = parseSidecar(oversized);
+    expect(byBytes.sidecar).toBeUndefined();
+    expect(byBytes.entries).toBe(0);
+  });
+
+  it("treats malformed sidecar JSON as invalid, without throwing", () => {
+    const bad = parseSidecar("{ not json");
+    expect(bad.sidecar).toBeUndefined();
+    expect(bad.entries).toBe(0);
+    const notObject = parseSidecar("[1,2,3]");
+    expect(notObject.sidecar).toBeUndefined();
+    expect(notObject.entries).toBe(0);
+  });
+
+  it("reports no merge for records with no matching sidecar key", () => {
+    const { sidecar } = parseSidecar(JSON.stringify({ tr_other: { a: "b" } }));
+    const { sidecarMerged, traces } = parseGatewayJsonl(
+      JSON.stringify(withTrace),
+      undefined,
+      sidecar,
+    );
+    expect(sidecarMerged).toEqual([false]);
+    // Untouched metadata still has only the inline keys.
+    expect(JSON.parse(traces[0]!.rawPayloadJson).metadata).toEqual({
+      trace_id: "tr_abc",
+      product: "support-assistant",
+    });
   });
 });

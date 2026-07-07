@@ -29,6 +29,14 @@ gateway (not a global key). See the in-app *Gateway onboarding* page for the
 metadata conventions (`product`, `module`, `prompt_version`, …) that make
 imported logs groupable.
 
+> **Prerequisite — enable payload logging.** Cloudflare only stores
+> request/response bodies when **Log payloads is enabled on the gateway**
+> (**AI Gateway → your gateway → Settings → payload logging** toggle). Without
+> it, exported logs carry metadata but no prompt/output text, so imported
+> traces have no output to score, materialized eval cases can't be scored, and
+> the scorecard reports them as skipped. It is not retroactive — enable it
+> before generating the traffic you onboard.
+
 The parser reads common field shapes opportunistically:
 
 | Field | Source paths tried |
@@ -52,6 +60,30 @@ The importer returns a management-safe summary: imported / deduped / parsed
 counts, invalid line numbers, missing-request / missing-response counts, the
 set of models and providers seen, and the earliest/latest timestamp.
 
+### Metadata sidecar
+
+Cloudflare stores at most 5 custom-metadata keys per request and silently drops
+the rest, so grouping keys that overflow the cap don't survive on the log. The
+importer accepts an **optional sidecar** — pass it to `importGatewayLogs` as the
+`sidecarJson` string argument — to merge those overflow keys back at import
+time:
+
+- **Format:** a JSON object `{ "<correlation-id>": { "<key>": <primitive>, … }, … }`.
+  Outer key is the correlation id; inner values must be primitives (string /
+  number / boolean). An entry with a non-primitive value is dropped and counted.
+- **Matching:** each record is correlated by its `metadata.trace_id` first (the
+  documented convention that survives the 5-key cap), falling back to the log id
+  fields (`log_id` / `id` / `event_id` / …). A matched entry is merged into the
+  record's metadata **before** the raw payload is stored, so downstream
+  materialization sees it. The record's own inline metadata **wins** on key
+  conflicts (the gateway-logged value is ground truth).
+- **Limits:** sidecar text ≤ **2 MB** and ≤ **5,000 entries**. Over either limit
+  (or malformed JSON) the sidecar is dropped and the import proceeds without it —
+  it never fails the import.
+- **Summary:** when a `sidecarJson` is supplied the result carries
+  `sidecar: { entries, matched }` (valid entries parsed / imported records
+  merged), counts only — sidecar content is never echoed.
+
 ## 3. Data boundary
 
 - **Import identity** is persisted: `(projectId, source, sourceTraceId)` rows
@@ -73,6 +105,8 @@ set of models and providers seen, and the earliest/latest timestamp.
 | Lines per import | 5,000 | Stops early, `truncated: true` in summary |
 | Payload size | 8 MB | Importer rejects with a "split into batches" error |
 | Invalid lines reported | 50 | Remainder counted but line numbers omitted |
+| Sidecar text | 2 MB | Sidecar dropped, import proceeds (`sidecar.entries: 0`) |
+| Sidecar entries | 5,000 | Sidecar dropped, import proceeds (`sidecar.entries: 0`) |
 
 Defaults live in `convex/traceAdapters/cloudflareAiGateway.ts`
 (`DEFAULT_LIMITS`).
@@ -105,6 +139,3 @@ No external state is created, so rollback needs no Cloudflare-side action.
 
 - **Materialization:** turn imported traces into prompt versions / completed
   run outputs (`setMaterialized` already exists) to drive baseline evals.
-- **Sidecar metadata merge:** the local adapter supports a `trace_id`-keyed
-  sidecar for fields too large for Gateway custom metadata; the Convex importer
-  does not yet accept one.

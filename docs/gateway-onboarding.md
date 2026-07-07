@@ -17,6 +17,14 @@ production logs stay `prod_sensitive` and customer-scoped inside the workspace �
 never commit them to the repo. The repo and any demo use **synthetic or redacted
 samples only**.
 
+> **⚠️ Enable payload logging on the gateway first.** Cloudflare only stores
+> request/response bodies when **Log payloads is enabled on the gateway**
+> (**AI Gateway → your gateway → Settings → payload logging** toggle). Without
+> it, exported logs carry metadata but **no prompt/output text** — imported
+> traces then have no output to score, materialized eval cases can't be scored,
+> and the baseline scorecard reports them as **skipped**. Turn it on *before*
+> generating the traffic you plan to onboard; it is not retroactive.
+
 ---
 
 ## Onboarding checklist
@@ -45,12 +53,12 @@ only at step 7.
    product / time window, then import it (step 1's path). Each new, non-duplicate
    trace is stored as a deduplicated `traceImports` row; the importer returns a
    summary (imported / deduped / parsed / invalid counts, models, providers, and
-   the time window). **Manual/planned:** turning imported traces into runnable
-   eval cases uses `setMaterialized` in the backend, but the Convex importer does
-   not yet expose materialization in the UI (see
-   `cloudflare-gateway-live-import.md` "Follow-up"). Today the local path
-   (`normalizeCloudflareAiGatewayLog → convertTraceToEvalCase`) is how a trace
-   becomes an eval case.
+   the time window). Then click **Materialize into eval cases** on the same
+   page — imported traces become runnable eval cases in-app (idempotent;
+   re-run to drain backlogs larger than one 500-row batch), and the per-org
+   **Quality scorecard** page grades them. The local CLI path
+   (`normalizeCloudflareAiGatewayLog → convertTraceToEvalCase`) remains for
+   offline work.
 5. **Run a baseline eval.** Score the current production prompt against the pack
    to establish the baseline scorecard. The runner is
    `src/lib/evals/modelComparison.ts` (`npm run compare:demo`), and the
@@ -125,10 +133,28 @@ priority is `trace_id, tenant, product, prompt_version, variant`
 (`SMOKE_METADATA_KEYS` in `src/lib/evals/fireworksGatewaySmoke.ts`). Values must
 also stay short. Anything larger — full prompt text, long ids, structured
 context, and any keys that didn't make the cut — goes in a **sidecar record
-keyed by `trace_id`**, not inline in Gateway metadata. Note that the Convex
-importer does **not yet accept a sidecar** (the local exported-JSONL adapter
-does — see `cloudflare-gateway-live-import.md` "Follow-up"), so for now keep
-everything you need for grouping inside your 5 metadata keys.
+keyed by `trace_id`**, not inline in Gateway metadata.
+
+**The Convex importer now accepts a sidecar** (as does the local exported-JSONL
+adapter). Pass it to `importGatewayLogs` as the optional `sidecarJson` string
+argument. Format and rules:
+
+- **Shape:** a JSON object `{ "<correlation-id>": { "<key>": <primitive>, … }, … }`
+  — outer key is the correlation id, inner object is the extra metadata.
+  Values must be primitives (string / number / boolean); an entry with a
+  non-primitive value is dropped and counted, never merged.
+- **Matching:** each log record is correlated by its `metadata.trace_id` first
+  (the convention that survives the 5-key cap), falling back to the record's log
+  id fields (`log_id` / `id` / `event_id` / …). A matched entry is merged into
+  the record's metadata **before** the raw payload is stored, so materialized
+  eval cases (which read `product` and friends from the stored record) pick it
+  up for free. The record's own inline metadata **wins** on key conflicts — the
+  gateway-logged value is ground truth.
+- **Limits:** sidecar text ≤ **2 MB** and ≤ **5,000 entries**; over either
+  limit (or malformed JSON) the sidecar is dropped and the import proceeds
+  without it. The import summary reports `sidecar: { entries, matched }`
+  (valid entries parsed / imported records merged), counts only — never sidecar
+  content.
 
 Metadata travels two ways on a request: in the request body's `metadata` field
 and in a `cf-aig-metadata` header
