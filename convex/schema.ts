@@ -636,6 +636,8 @@ const schema = defineSchema({
       v.literal("promptlayer"),
       v.literal("manual_paste"),
       v.literal("cloudflare_ai_gateway"),
+      // #265: Claude Code session .jsonl upload — first trajectory ingestion.
+      v.literal("claude_code"),
     ),
     // Provider's stable trace identifier when available — manual_paste imports
     // don't have one. Combined with `source` it forms the dedup key.
@@ -691,6 +693,200 @@ const schema = defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_trace_import", ["traceImportId"]),
+
+  // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
+  // Deliberately tiny — metadata + usage rollups only, NO step content — so it
+  // stays well under the Convex ~1MiB doc cap regardless of trace length. Step
+  // bodies live in `agentTraceSteps` rows + file storage. `traceId` is the
+  // normalizer's stable id (opaque external ref + dedup key), distinct from the
+  // Convex `_id`. `status` drives async-import progress and in-flight dedup.
+  // Free text (final answer) goes to storage, never inline, to keep the row
+  // bounded. `errorMessage` is sanitized (counts/generic strings only).
+  agentTraces: defineTable({
+    projectId: v.id("projects"),
+    // Provenance. Optional so a trace can be persisted directly (round-trip
+    // tests, non-import paths) without a traceImports row.
+    traceImportId: v.optional(v.id("traceImports")),
+    traceId: v.string(),
+    source: v.literal("agent_harness"),
+    harnessName: v.string(),
+    harnessVersion: v.optional(v.string()),
+    harnessSdk: v.optional(v.string()),
+    product: v.string(),
+    module: v.optional(v.string()),
+    environment: v.optional(v.string()),
+    model: v.optional(v.string()),
+    runId: v.optional(v.string()),
+    stepCount: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    errorMessage: v.optional(v.string()),
+    privacyClass: v.union(
+      v.literal("public"),
+      v.literal("internal"),
+      v.literal("confidential"),
+      v.literal("pii"),
+      v.literal("phi"),
+    ),
+    costUsd: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    // Final answer bodies → storage (full + precomputed blind projection), so
+    // the parent row never carries unbounded free text.
+    finalAnswerStorageId: v.optional(v.id("_storage")),
+    finalAnswerBlindStorageId: v.optional(v.id("_storage")),
+    importedById: v.id("users"),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_trace_id", ["traceId"])
+    .index("by_project_and_status", ["projectId", "status"]),
+
+  // #264 (M31 Trajectory Spine): one row per trace step, ordered by
+  // (agentTraceId, stepIndex). Own ~1MiB doc budget per row. Light,
+  // indexable/renderable scalars inline; heavy payloads (tool args/results,
+  // reasoning, terminal output, state snapshots, message content) go to file
+  // storage. Two body pointers per step: `fullBodyStorageId` (reviewer view)
+  // and `blindBodyStorageId` (PRECOMPUTED blind projection). The blind
+  // projection is computed once at ingest — never on the fly in the read query
+  // — and the paginated step query hands a blind principal ONLY the blind
+  // blob's URL; the full storage id is never returned to them (enforcement at
+  // the function boundary, minimal leak surface). Bodyless steps (policy_event)
+  // leave both pointers null. #266 refines the projection function; because the
+  // slot already exists, that is a reprocess, not a schema migration.
+  agentTraceSteps: defineTable({
+    agentTraceId: v.id("agentTraces"),
+    stepIndex: v.number(),
+    kind: v.union(
+      v.literal("message"),
+      v.literal("tool_call"),
+      v.literal("tool_result"),
+      v.literal("state"),
+      v.literal("policy_event"),
+    ),
+    role: v.optional(v.string()),
+    toolName: v.optional(v.string()),
+    toolCallId: v.optional(v.string()),
+    label: v.optional(v.string()),
+    policy: v.optional(v.string()),
+    action: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    timestamp: v.optional(v.string()),
+    privacyClass: v.optional(
+      v.union(
+        v.literal("public"),
+        v.literal("internal"),
+        v.literal("confidential"),
+        v.literal("pii"),
+        v.literal("phi"),
+      ),
+    ),
+    // Populated by richer importers (#265 Claude Code JSONL); absent here.
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    fullBodyStorageId: v.optional(v.id("_storage")),
+    blindBodyStorageId: v.optional(v.id("_storage")),
+  }).index("by_trace_and_index", ["agentTraceId", "stepIndex"]),
+
+  // #267 (M31.4): step-granular review annotations on an agent trace. Anchored
+  // by `stepIndex` (stable + identical for blind and owner — the opaque
+  // `call-N` tool-call id a blind reviewer sees is NOT a durable anchor), with
+  // a `kind` discriminator so a comment on a tool call reads distinctly from a
+  // comment on a whole step or the whole trajectory. Reuses the conventional-
+  // comment label + tag vocabulary from outputFeedback/cycleFeedback.
+  agentTraceComments: defineTable({
+    agentTraceId: v.id("agentTraces"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    target: v.union(
+      v.object({ kind: v.literal("trace") }),
+      v.object({ kind: v.literal("step"), stepIndex: v.number() }),
+      v.object({ kind: v.literal("tool_call"), stepIndex: v.number() }),
+    ),
+    comment: v.string(),
+    label: v.union(
+      v.literal("suggestion"),
+      v.literal("issue"),
+      v.literal("praise"),
+      v.literal("question"),
+      v.literal("nitpick"),
+      v.literal("thought"),
+    ),
+    tags: v.optional(
+      v.array(
+        v.union(
+          v.literal("accuracy"),
+          v.literal("tone"),
+          v.literal("length"),
+          v.literal("relevance"),
+          v.literal("safety"),
+          v.literal("format"),
+          v.literal("clarity"),
+          v.literal("other"),
+        ),
+      ),
+    ),
+  })
+    .index("by_trace", ["agentTraceId"])
+    .index("by_trace_and_user", ["agentTraceId", "userId"]),
+
+  // #267 (M31.4): whole-trajectory verdict, reusing the best/acceptable/weak
+  // rating vocabulary. One row per (trace, reviewer).
+  agentTraceVerdicts: defineTable({
+    agentTraceId: v.id("agentTraces"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    rating: v.union(
+      v.literal("best"),
+      v.literal("acceptable"),
+      v.literal("weak"),
+    ),
+    note: v.optional(v.string()),
+  })
+    .index("by_trace", ["agentTraceId"])
+    .index("by_trace_and_user", ["agentTraceId", "userId"]),
+
+  // #267 (M31.4): step-level pairwise preference — two blind trajectories of the
+  // same task aligned at a divergence point; the reviewer picks the better next
+  // action. This is the DPO-shaped signal (single-turn preference over the next
+  // action given an identical prefix) the training-export bridge (#53) needs.
+  // Mirrors reviewMatchups (winner left/right/tie/skip + reasonTags).
+  agentTraceMatchups: defineTable({
+    projectId: v.id("projects"),
+    leftTraceId: v.id("agentTraces"),
+    rightTraceId: v.id("agentTraces"),
+    // Length of the shared prefix; both sides diverge at this step index.
+    divergenceStepIndex: v.number(),
+    leftBlindLabel: v.string(),
+    rightBlindLabel: v.string(),
+    userId: v.optional(v.id("users")),
+    winner: v.optional(
+      v.union(
+        v.literal("left"),
+        v.literal("right"),
+        v.literal("tie"),
+        v.literal("skip"),
+      ),
+    ),
+    reasonTags: v.array(
+      v.union(
+        v.literal("tone"),
+        v.literal("accuracy"),
+        v.literal("clarity"),
+        v.literal("length"),
+        v.literal("format"),
+        v.literal("relevance"),
+        v.literal("safety"),
+        v.literal("other"),
+      ),
+    ),
+    decidedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_left", ["leftTraceId"]),
 
   // #259: per-org scorecard runs. Grades every org eval case that has a
   // captured production output against its assigned deterministic scorers.
