@@ -692,6 +692,103 @@ const schema = defineSchema({
     .index("by_project", ["projectId"])
     .index("by_trace_import", ["traceImportId"]),
 
+  // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
+  // Deliberately tiny — metadata + usage rollups only, NO step content — so it
+  // stays well under the Convex ~1MiB doc cap regardless of trace length. Step
+  // bodies live in `agentTraceSteps` rows + file storage. `traceId` is the
+  // normalizer's stable id (opaque external ref + dedup key), distinct from the
+  // Convex `_id`. `status` drives async-import progress and in-flight dedup.
+  // Free text (final answer) goes to storage, never inline, to keep the row
+  // bounded. `errorMessage` is sanitized (counts/generic strings only).
+  agentTraces: defineTable({
+    projectId: v.id("projects"),
+    // Provenance. Optional so a trace can be persisted directly (round-trip
+    // tests, non-import paths) without a traceImports row.
+    traceImportId: v.optional(v.id("traceImports")),
+    traceId: v.string(),
+    source: v.literal("agent_harness"),
+    harnessName: v.string(),
+    harnessVersion: v.optional(v.string()),
+    harnessSdk: v.optional(v.string()),
+    product: v.string(),
+    module: v.optional(v.string()),
+    environment: v.optional(v.string()),
+    model: v.optional(v.string()),
+    runId: v.optional(v.string()),
+    stepCount: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    errorMessage: v.optional(v.string()),
+    privacyClass: v.union(
+      v.literal("public"),
+      v.literal("internal"),
+      v.literal("confidential"),
+      v.literal("pii"),
+      v.literal("phi"),
+    ),
+    costUsd: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+    // Final answer bodies → storage (full + precomputed blind projection), so
+    // the parent row never carries unbounded free text.
+    finalAnswerStorageId: v.optional(v.id("_storage")),
+    finalAnswerBlindStorageId: v.optional(v.id("_storage")),
+    importedById: v.id("users"),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_trace_id", ["traceId"])
+    .index("by_project_and_status", ["projectId", "status"]),
+
+  // #264 (M31 Trajectory Spine): one row per trace step, ordered by
+  // (agentTraceId, stepIndex). Own ~1MiB doc budget per row. Light,
+  // indexable/renderable scalars inline; heavy payloads (tool args/results,
+  // reasoning, terminal output, state snapshots, message content) go to file
+  // storage. Two body pointers per step: `fullBodyStorageId` (reviewer view)
+  // and `blindBodyStorageId` (PRECOMPUTED blind projection). The blind
+  // projection is computed once at ingest — never on the fly in the read query
+  // — and the paginated step query hands a blind principal ONLY the blind
+  // blob's URL; the full storage id is never returned to them (enforcement at
+  // the function boundary, minimal leak surface). Bodyless steps (policy_event)
+  // leave both pointers null. #266 refines the projection function; because the
+  // slot already exists, that is a reprocess, not a schema migration.
+  agentTraceSteps: defineTable({
+    agentTraceId: v.id("agentTraces"),
+    stepIndex: v.number(),
+    kind: v.union(
+      v.literal("message"),
+      v.literal("tool_call"),
+      v.literal("tool_result"),
+      v.literal("state"),
+      v.literal("policy_event"),
+    ),
+    role: v.optional(v.string()),
+    toolName: v.optional(v.string()),
+    toolCallId: v.optional(v.string()),
+    label: v.optional(v.string()),
+    policy: v.optional(v.string()),
+    action: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    timestamp: v.optional(v.string()),
+    privacyClass: v.optional(
+      v.union(
+        v.literal("public"),
+        v.literal("internal"),
+        v.literal("confidential"),
+        v.literal("pii"),
+        v.literal("phi"),
+      ),
+    ),
+    // Populated by richer importers (#265 Claude Code JSONL); absent here.
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    fullBodyStorageId: v.optional(v.id("_storage")),
+    blindBodyStorageId: v.optional(v.id("_storage")),
+  }).index("by_trace_and_index", ["agentTraceId", "stepIndex"]),
+
   // #259: per-org scorecard runs. Grades every org eval case that has a
   // captured production output against its assigned deterministic scorers.
   // `summary` and `errorMessage` are sanitized — counts + generic strings only,
