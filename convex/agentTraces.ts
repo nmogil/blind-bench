@@ -171,6 +171,17 @@ export const finalizeTrace = internalMutation({
   },
 });
 
+/** Link import provenance onto an already-persisted trace (set once, when new). */
+export const linkTraceImport = internalMutation({
+  args: {
+    agentTraceId: v.id("agentTraces"),
+    traceImportId: v.id("traceImports"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.agentTraceId, { traceImportId: args.traceImportId });
+  },
+});
+
 /** Mark a partially-imported trace failed with a sanitized message. */
 export const markTraceFailed = internalMutation({
   args: { agentTraceId: v.id("agentTraces"), message: v.string() },

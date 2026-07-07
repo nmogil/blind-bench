@@ -18,6 +18,7 @@ const WelcomeFirstRun = lazy(() => import("./routes/welcome/WelcomeFirstRun").th
 const OrgHome = lazy(() => import("./routes/orgs/OrgHome").then(m => ({ default: m.OrgHome })));
 const GatewayOnboarding = lazy(() => import("./routes/orgs/GatewayOnboarding").then(m => ({ default: m.GatewayOnboarding })));
 const GatewayImport = lazy(() => import("./routes/orgs/GatewayImport").then(m => ({ default: m.GatewayImport })));
+const TraceImport = lazy(() => import("./routes/orgs/TraceImport").then(m => ({ default: m.TraceImport })));
 const Scorecard = lazy(() => import("./routes/orgs/Scorecard").then(m => ({ default: m.Scorecard })));
 const OrgSettings = lazy(() => import("./routes/orgs/settings/OrgSettings").then(m => ({ default: m.OrgSettings })));
 const OrgMembers = lazy(() => import("./routes/orgs/settings/OrgMembers").then(m => ({ default: m.OrgMembers })));
@@ -78,6 +79,7 @@ export function App() {
             <Route index element={<OrgHome />} />
             <Route path="gateway-onboarding" element={<GatewayOnboarding />} />
             <Route path="gateway-import" element={<GatewayImport />} />
+            <Route path="trace-import" element={<TraceImport />} />
             <Route path="scorecard" element={<Scorecard />} />
             <Route path="settings" element={<OrgSettings />} />
             <Route path="settings/members" element={<OrgMembers />} />

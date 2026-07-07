@@ -636,6 +636,8 @@ const schema = defineSchema({
       v.literal("promptlayer"),
       v.literal("manual_paste"),
       v.literal("cloudflare_ai_gateway"),
+      // #265: Claude Code session .jsonl upload — first trajectory ingestion.
+      v.literal("claude_code"),
     ),
     // Provider's stable trace identifier when available — manual_paste imports
     // don't have one. Combined with `source` it forms the dedup key.
