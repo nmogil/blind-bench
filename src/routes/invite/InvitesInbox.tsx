@@ -4,7 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardCheck, FolderOpen, Inbox, Users } from "lucide-react";
+import { ClipboardCheck, FolderOpen, Inbox, Route, Users } from "lucide-react";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -29,9 +29,33 @@ function labelForScope(scope: "org" | "project" | "cycle"): string {
   return "review";
 }
 
+function TraceReviewCard({ count }: { count: number }) {
+  return (
+    <Link
+      to="/eval/traces"
+      className="block rounded-lg border border-primary/30 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Route className="h-4 w-4 shrink-0 text-primary" />
+          <p className="text-sm font-medium">
+            {count} {count === 1 ? "trajectory" : "trajectories"} to review
+          </p>
+        </div>
+        <span aria-hidden="true" className="text-primary">
+          →
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export function InvitesInbox() {
   const invites = useQuery(api.invitations.listMine);
+  const traces = useQuery(api.agentTraces.listReviewableTraces, {});
   const navigate = useNavigate();
+
+  const traceCount = traces?.length ?? 0;
 
   if (invites === undefined) {
     return (
@@ -44,6 +68,22 @@ export function InvitesInbox() {
   }
 
   if (invites.length === 0) {
+    if (traceCount > 0) {
+      return (
+        <div className="max-w-2xl mx-auto p-6 space-y-6">
+          <TraceReviewCard count={traceCount} />
+          <EmptyState
+            icon={Inbox}
+            heading="You're all caught up"
+            description="No pending invitations. Trajectories shared with you are above."
+            action={{
+              label: "Back to dashboard",
+              onClick: () => navigate("/"),
+            }}
+          />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <EmptyState
@@ -61,6 +101,7 @@ export function InvitesInbox() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
+      {traceCount > 0 && <TraceReviewCard count={traceCount} />}
       <section className="space-y-3">
         <h1 className="text-lg font-medium">Invitations waiting for you</h1>
         <div className="space-y-2">
