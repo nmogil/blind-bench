@@ -22,5 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "convex"]
+  "include": ["src", "convex"],
+  "exclude": ["src/**/*.ct.spec.tsx", "src/routes/traces/__smoke__"]
 }

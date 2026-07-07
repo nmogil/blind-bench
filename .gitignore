@@ -35,3 +35,8 @@ npm-debug.log*
 skills-lock.json
 .agents/
 .vercel
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
