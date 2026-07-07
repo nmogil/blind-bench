@@ -40,6 +40,16 @@ describe("#53 training-export data-boundary gate", () => {
     expect(excluded.every((e) => e.reason === "pii_leak")).toBe(true);
   });
 
+  test("degenerate DPO pairs (chosen === rejected) are excluded — no training signal", () => {
+    const rows: ClassifiedRow[] = [
+      { row: dpo({ chosen: "same action", rejected: "same action" }), privacyClass: "public" },
+      { row: dpo({ chosen: "better", rejected: "worse" }), privacyClass: "public" },
+    ];
+    const { included, excluded } = gateRows(rows);
+    expect(included).toHaveLength(1);
+    expect(excluded[0]?.reason).toBe("degenerate");
+  });
+
   test("empty rows are excluded with a reason, never silently dropped", () => {
     const rows: ClassifiedRow[] = [
       { row: dpo({ chosen: "   " }), privacyClass: "public" },

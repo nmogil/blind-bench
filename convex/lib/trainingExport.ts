@@ -70,7 +70,7 @@ export interface ClassifiedRow {
 }
 
 export interface ExcludedRow {
-  reason: "prod_sensitive" | "pii_leak" | "empty";
+  reason: "prod_sensitive" | "pii_leak" | "empty" | "degenerate";
   privacyClass: PrivacyClass;
 }
 
@@ -128,6 +128,13 @@ export function gateRows(
     }
     if (SENSITIVE_CLASSES.has(privacyClass) && !opts.allowSensitive) {
       excluded.push({ reason: "prod_sensitive", privacyClass });
+      continue;
+    }
+    // A DPO pair with identical chosen/rejected carries no preference signal —
+    // it pollutes the dataset. Drop it (e.g. the matchup's divergence index
+    // landed on a shared-prefix step). Surfaced by the M31 dogfood pass.
+    if (row.kind === "dpo" && row.chosen.trim() === row.rejected.trim()) {
+      excluded.push({ reason: "degenerate", privacyClass });
       continue;
     }
     const text = rowText(row);
