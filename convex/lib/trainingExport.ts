@@ -140,6 +140,55 @@ export function gateRows(
   return { included, excluded };
 }
 
+// --- trajectory rendering (steps → readable text for DPO prompt/answers) -----
+
+export interface StepMeta {
+  kind: "message" | "tool_call" | "tool_result" | "state" | "policy_event";
+  role?: string;
+  toolName?: string;
+  label?: string;
+  policy?: string;
+  action?: string;
+  reason?: string;
+}
+
+const asStr = (v: unknown): string =>
+  typeof v === "string" ? v : v === undefined ? "" : JSON.stringify(v);
+
+/** One step (metadata + its parsed body) → a single readable transcript line. */
+export function renderStep(meta: StepMeta, body: unknown): string {
+  const b = (body ?? {}) as Record<string, unknown>;
+  switch (meta.kind) {
+    case "message":
+      return `${meta.role ?? "assistant"}: ${asStr(b.content)}`;
+    case "tool_call":
+      return `${meta.role ?? "assistant"} → ${meta.toolName ?? "tool"}(${asStr(b.args)})`;
+    case "tool_result":
+      return `tool ${meta.toolName ?? ""} result: ${asStr(b.result)}`;
+    case "state":
+      return `[state ${meta.label ?? ""}] ${asStr(b.snapshot)}`;
+    case "policy_event":
+      return `[policy ${meta.policy ?? ""}/${meta.action ?? ""}${meta.reason ? `: ${meta.reason}` : ""}]`;
+  }
+}
+
+/** Ordered (meta, body) pairs → a transcript string (DPO prefix / SFT turns). */
+export function renderTranscript(steps: Array<{ meta: StepMeta; body: unknown }>): string {
+  return steps.map((s) => renderStep(s.meta, s.body)).join("\n");
+}
+
+/** The more-sensitive of two privacy classes (for a matchup spanning two traces). */
+const CLASS_RANK: Record<PrivacyClass, number> = {
+  public: 0,
+  internal: 1,
+  confidential: 2,
+  pii: 3,
+  phi: 4,
+};
+export function moreSensitive(a: PrivacyClass, b: PrivacyClass): PrivacyClass {
+  return CLASS_RANK[a] >= CLASS_RANK[b] ? a : b;
+}
+
 const jsonl = (objs: unknown[]): string => objs.map((o) => JSON.stringify(o)).join("\n");
 
 /** Serialize gated rows to JSONL for the given format. Rows must match `format`. */
