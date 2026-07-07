@@ -50,6 +50,7 @@ const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreat
 const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail").then(m => ({ default: m.CycleDetail })));
 const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/VersionDashboard").then(m => ({ default: m.VersionDashboard })));
 const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
+const ExportTraining = lazy(() => import("./routes/orgs/projects/ExportTraining").then(m => ({ default: m.ExportTraining })));
 const TraceList = lazy(() => import("./routes/traces/TraceList").then(m => ({ default: m.TraceList })));
 const TraceViewer = lazy(() => import("./routes/traces/TraceViewer").then(m => ({ default: m.TraceViewer })));
 const TraceMatchup = lazy(() => import("./routes/traces/TraceMatchup").then(m => ({ default: m.TraceMatchup })));
@@ -122,6 +123,7 @@ export function App() {
                 element={<CycleDetail />}
               />
               <Route path="evaluate" element={<EvaluatePage />} />
+              <Route path="export" element={<ExportTraining />} />
               <Route path="traces" element={<TraceList />} />
               <Route
                 path="traces/:agentTraceId"

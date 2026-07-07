@@ -888,6 +888,28 @@ const schema = defineSchema({
     .index("by_project", ["projectId"])
     .index("by_left", ["leftTraceId"]),
 
+  // #53 (export bridge): a generated training-data export. The JSONL is in
+  // storage; this row tracks provenance + counts and gates the download to a
+  // 1-hour window (AC6). `excludedCount` reflects rows dropped by the
+  // data-boundary gate (reported to the user, never silently lost).
+  trainingExports: defineTable({
+    projectId: v.id("projects"),
+    source: v.union(
+      v.literal("trajectory"),
+      v.literal("output_preference"),
+    ),
+    format: v.union(
+      v.literal("dpo"),
+      v.literal("annotated"),
+      v.literal("sft"),
+    ),
+    storageId: v.id("_storage"),
+    rowCount: v.number(),
+    excludedCount: v.number(),
+    createdById: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_project", ["projectId"]),
+
   // #259: per-org scorecard runs. Grades every org eval case that has a
   // captured production output against its assigned deterministic scorers.
   // `summary` and `errorMessage` are sanitized — counts + generic strings only,

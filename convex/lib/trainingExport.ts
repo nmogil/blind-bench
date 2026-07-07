@@ -1,0 +1,224 @@
+/**
+ * #53 (export bridge): Convex-safe serializers for training-data export.
+ *
+ * Pure, zero-dep (no node, no zod) so it runs in the Convex export action and in
+ * plain vitest. This module owns only the TARGET JSONL shapes (fixed by #53) and
+ * the data-boundary gate applied at serialization time; the per-source mapping
+ * (output preferences / trajectory matchups → these rows) lives in the export
+ * action. Formats:
+ *
+ *   DPO:       {prompt, chosen, rejected, metadata}
+ *   Annotated: {prompt, output, annotations:[{from,to,text,comment,tags}], preference, metadata}
+ *   SFT:       {messages:[{role,content}], metadata?}
+ *
+ * Data-boundary contract (mirrors src/lib/evals/trainingDataset.ts / #228):
+ *  - Default-deny by privacy class: only `public`/`internal` rows export; any
+ *    `confidential`/`pii`/`phi` (prod-sensitive) row is EXCLUDED unless the
+ *    caller passes an explicit consent flag.
+ *  - Excluded rows are reported with a reason, never dropped silently.
+ *  - Defense-in-depth: a row whose serialized text still contains an email or an
+ *    api-key-looking token is excluded (`pii_leak`) even if its class allowed it.
+ *  Anonymization is by CONSTRUCTION in the action (allowlisted fields only); this
+ *  gate is the backstop.
+ */
+
+export type ExportFormat = "dpo" | "annotated" | "sft";
+export type PrivacyClass = "public" | "internal" | "confidential" | "pii" | "phi";
+
+export interface Annotation {
+  from: number;
+  to: number;
+  text: string;
+  comment: string;
+  tags: string[];
+}
+
+export interface DpoPair {
+  prompt: string;
+  chosen: string;
+  rejected: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AnnotatedRow {
+  prompt: string;
+  output: string;
+  annotations: Annotation[];
+  preference: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface SftMessage {
+  role: string;
+  content: string;
+}
+
+export interface SftRow {
+  messages: SftMessage[];
+  metadata?: Record<string, unknown>;
+}
+
+export type ExportRow =
+  | ({ kind: "dpo" } & DpoPair)
+  | ({ kind: "annotated" } & AnnotatedRow)
+  | ({ kind: "sft" } & SftRow);
+
+/** Every export row carries its privacy class so the gate can decide. */
+export interface ClassifiedRow {
+  row: ExportRow;
+  privacyClass: PrivacyClass;
+}
+
+export interface ExcludedRow {
+  reason: "prod_sensitive" | "pii_leak" | "empty";
+  privacyClass: PrivacyClass;
+}
+
+export interface GateResult {
+  included: ExportRow[];
+  excluded: ExcludedRow[];
+}
+
+const SENSITIVE_CLASSES: ReadonlySet<PrivacyClass> = new Set([
+  "confidential",
+  "pii",
+  "phi",
+]);
+
+// Belt-and-suspenders leak scan: email + common secret-key prefixes.
+const EMAIL = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+const API_KEY = /\b(sk-[a-z0-9]{16,}|xox[baprs]-[a-z0-9-]{10,}|AKIA[0-9A-Z]{12,}|ghp_[a-z0-9]{20,})\b/i;
+
+const rowText = (row: ExportRow): string => {
+  switch (row.kind) {
+    case "dpo":
+      return `${row.prompt}\n${row.chosen}\n${row.rejected}`;
+    case "annotated":
+      return `${row.prompt}\n${row.output}\n${row.annotations.map((a) => `${a.text} ${a.comment}`).join("\n")}`;
+    case "sft":
+      return row.messages.map((m) => m.content).join("\n");
+  }
+};
+
+const isEmptyRow = (row: ExportRow): boolean => {
+  switch (row.kind) {
+    case "dpo":
+      return !row.prompt.trim() || !row.chosen.trim() || !row.rejected.trim();
+    case "annotated":
+      return !row.prompt.trim() || !row.output.trim();
+    case "sft":
+      return row.messages.length === 0 || row.messages.every((m) => !m.content.trim());
+  }
+};
+
+/**
+ * Apply the data-boundary gate. `allowSensitive` opts sensitive-class rows in
+ * (explicit consent); the pii-leak scan and empty-row drop always apply.
+ */
+export function gateRows(
+  rows: ClassifiedRow[],
+  opts: { allowSensitive?: boolean } = {},
+): GateResult {
+  const included: ExportRow[] = [];
+  const excluded: ExcludedRow[] = [];
+  for (const { row, privacyClass } of rows) {
+    if (isEmptyRow(row)) {
+      excluded.push({ reason: "empty", privacyClass });
+      continue;
+    }
+    if (SENSITIVE_CLASSES.has(privacyClass) && !opts.allowSensitive) {
+      excluded.push({ reason: "prod_sensitive", privacyClass });
+      continue;
+    }
+    const text = rowText(row);
+    if (EMAIL.test(text) || API_KEY.test(text)) {
+      excluded.push({ reason: "pii_leak", privacyClass });
+      continue;
+    }
+    included.push(row);
+  }
+  return { included, excluded };
+}
+
+// --- trajectory rendering (steps → readable text for DPO prompt/answers) -----
+
+export interface StepMeta {
+  kind: "message" | "tool_call" | "tool_result" | "state" | "policy_event";
+  role?: string;
+  toolName?: string;
+  label?: string;
+  policy?: string;
+  action?: string;
+  reason?: string;
+}
+
+const asStr = (v: unknown): string =>
+  typeof v === "string" ? v : v === undefined ? "" : JSON.stringify(v);
+
+/** One step (metadata + its parsed body) → a single readable transcript line. */
+export function renderStep(meta: StepMeta, body: unknown): string {
+  const b = (body ?? {}) as Record<string, unknown>;
+  switch (meta.kind) {
+    case "message":
+      return `${meta.role ?? "assistant"}: ${asStr(b.content)}`;
+    case "tool_call":
+      return `${meta.role ?? "assistant"} → ${meta.toolName ?? "tool"}(${asStr(b.args)})`;
+    case "tool_result":
+      return `tool ${meta.toolName ?? ""} result: ${asStr(b.result)}`;
+    case "state":
+      return `[state ${meta.label ?? ""}] ${asStr(b.snapshot)}`;
+    case "policy_event":
+      return `[policy ${meta.policy ?? ""}/${meta.action ?? ""}${meta.reason ? `: ${meta.reason}` : ""}]`;
+  }
+}
+
+/** Ordered (meta, body) pairs → a transcript string (DPO prefix / SFT turns). */
+export function renderTranscript(steps: Array<{ meta: StepMeta; body: unknown }>): string {
+  return steps.map((s) => renderStep(s.meta, s.body)).join("\n");
+}
+
+/** The more-sensitive of two privacy classes (for a matchup spanning two traces). */
+const CLASS_RANK: Record<PrivacyClass, number> = {
+  public: 0,
+  internal: 1,
+  confidential: 2,
+  pii: 3,
+  phi: 4,
+};
+export function moreSensitive(a: PrivacyClass, b: PrivacyClass): PrivacyClass {
+  return CLASS_RANK[a] >= CLASS_RANK[b] ? a : b;
+}
+
+const jsonl = (objs: unknown[]): string => objs.map((o) => JSON.stringify(o)).join("\n");
+
+/** Serialize gated rows to JSONL for the given format. Rows must match `format`. */
+export function toJsonl(format: ExportFormat, rows: ExportRow[]): string {
+  if (format === "dpo") {
+    return jsonl(
+      rows.map((r) => {
+        const p = r as DpoPair;
+        return { prompt: p.prompt, chosen: p.chosen, rejected: p.rejected, metadata: p.metadata };
+      }),
+    );
+  }
+  if (format === "annotated") {
+    return jsonl(
+      rows.map((r) => {
+        const a = r as AnnotatedRow;
+        return {
+          prompt: a.prompt,
+          output: a.output,
+          annotations: a.annotations,
+          preference: a.preference,
+          metadata: a.metadata,
+        };
+      }),
+    );
+  }
+  return jsonl(
+    rows.map((r) => {
+      const s = r as SftRow;
+      return s.metadata ? { messages: s.messages, metadata: s.metadata } : { messages: s.messages };
+    }),
+  );
+}
