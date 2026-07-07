@@ -22,6 +22,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireAuth, requireProjectRole, isBlindReviewer } from "./lib/auth";
@@ -142,6 +143,53 @@ export const insertTraceParent = internalMutation({
   },
 });
 
+/**
+ * Parent insert for the OTLP ingest path (#263). Same dedup + insert as
+ * insertTraceParent but token-authed upstream (the HTTP action verified the
+ * ingest token), so it takes `importedById` explicitly instead of resolving a
+ * signed-in user. Only reachable from the verified ingest action (internal).
+ */
+export const insertTraceParentForIngest = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    importedById: v.id("users"),
+    traceImportId: v.optional(v.id("traceImports")),
+    traceId: v.string(),
+    harnessName: v.string(),
+    harnessVersion: v.optional(v.string()),
+    harnessSdk: v.optional(v.string()),
+    product: v.string(),
+    module: v.optional(v.string()),
+    environment: v.optional(v.string()),
+    model: v.optional(v.string()),
+    runId: v.optional(v.string()),
+    stepCount: v.number(),
+    privacyClass: privacyClassValidator,
+    costUsd: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    totalTokens: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ agentTraceId: Id<"agentTraces">; deduped: boolean }> => {
+    const existing = await ctx.db
+      .query("agentTraces")
+      .withIndex("by_trace_id", (q) => q.eq("traceId", args.traceId))
+      .filter((q) => q.eq(q.field("projectId"), args.projectId))
+      .first();
+    if (existing) return { agentTraceId: existing._id, deduped: true };
+    const { importedById, ...rest } = args;
+    const agentTraceId = await ctx.db.insert("agentTraces", {
+      ...rest,
+      source: "agent_harness",
+      status: "pending",
+      importedById,
+    });
+    return { agentTraceId, deduped: false };
+  },
+});
+
 /** Insert a chunk of step rows for an already-created parent. */
 export const insertSteps = internalMutation({
   args: {
@@ -240,51 +288,60 @@ export const persistTrace = action({
     );
     // Idempotent: an already-imported trace keeps its stored steps untouched.
     if (deduped) return { agentTraceId, deduped: true, stepCount };
-
-    try {
-      // Store per-step body blobs, then insert rows carrying the storage ids.
-      const rows: Array<Record<string, unknown>> = [];
-      for (const step of trace.steps) {
-        const { row, fullBody, blindBody } = splitStep(step);
-        const fullBodyStorageId =
-          fullBody === undefined ? undefined : await storeJson(ctx, fullBody);
-        const blindBodyStorageId =
-          blindBody === undefined ? undefined : await storeJson(ctx, blindBody);
-        rows.push({ ...row, fullBodyStorageId, blindBodyStorageId });
-      }
-      for (let i = 0; i < rows.length; i += STEP_INSERT_CHUNK) {
-        await ctx.runMutation(internal.agentTraces.insertSteps, {
-          agentTraceId,
-          steps: rows.slice(i, i + STEP_INSERT_CHUNK) as never,
-        });
-      }
-
-      // Final answer → storage (full + precomputed blind), keeps parent bounded.
-      let finalAnswerStorageId: Id<"_storage"> | undefined;
-      let finalAnswerBlindStorageId: Id<"_storage"> | undefined;
-      if (trace.final_answer !== undefined) {
-        finalAnswerStorageId = await storeJson(ctx, { text: trace.final_answer });
-        finalAnswerBlindStorageId = await storeJson(ctx, {
-          text: redactValue(trace.final_answer, "blind_view"),
-        });
-      }
-
-      await ctx.runMutation(internal.agentTraces.finalizeTrace, {
-        agentTraceId,
-        finalAnswerStorageId,
-        finalAnswerBlindStorageId,
-      });
-      return { agentTraceId, deduped: false, stepCount };
-    } catch {
-      // Sanitized — never echo trace content.
-      await ctx.runMutation(internal.agentTraces.markTraceFailed, {
-        agentTraceId,
-        message: "Trace import failed while persisting steps.",
-      });
-      throw new Error("Trace import failed while persisting steps.");
-    }
+    await storeTraceSteps(ctx, agentTraceId, trace);
+    return { agentTraceId, deduped: false, stepCount };
   },
 });
+
+/**
+ * Store a trace's step bodies (full + precomputed blind) and step rows, plus the
+ * final answer, then flip the parent to "ready". Shared by persistTrace and the
+ * OTLP ingest path (#263) — the only difference between them is the parent-row
+ * insert (user-auth vs token-auth). On failure the parent is marked failed with
+ * a sanitized message.
+ */
+export async function storeTraceSteps(
+  ctx: ActionCtx,
+  agentTraceId: Id<"agentTraces">,
+  trace: AgentRunTrace,
+): Promise<void> {
+  try {
+    const rows: Array<Record<string, unknown>> = [];
+    for (const step of trace.steps) {
+      const { row, fullBody, blindBody } = splitStep(step);
+      const fullBodyStorageId =
+        fullBody === undefined ? undefined : await storeJson(ctx, fullBody);
+      const blindBodyStorageId =
+        blindBody === undefined ? undefined : await storeJson(ctx, blindBody);
+      rows.push({ ...row, fullBodyStorageId, blindBodyStorageId });
+    }
+    for (let i = 0; i < rows.length; i += STEP_INSERT_CHUNK) {
+      await ctx.runMutation(internal.agentTraces.insertSteps, {
+        agentTraceId,
+        steps: rows.slice(i, i + STEP_INSERT_CHUNK) as never,
+      });
+    }
+    let finalAnswerStorageId: Id<"_storage"> | undefined;
+    let finalAnswerBlindStorageId: Id<"_storage"> | undefined;
+    if (trace.final_answer !== undefined) {
+      finalAnswerStorageId = await storeJson(ctx, { text: trace.final_answer });
+      finalAnswerBlindStorageId = await storeJson(ctx, {
+        text: redactValue(trace.final_answer, "blind_view"),
+      });
+    }
+    await ctx.runMutation(internal.agentTraces.finalizeTrace, {
+      agentTraceId,
+      finalAnswerStorageId,
+      finalAnswerBlindStorageId,
+    });
+  } catch {
+    await ctx.runMutation(internal.agentTraces.markTraceFailed, {
+      agentTraceId,
+      message: "Trace import failed while persisting steps.",
+    });
+    throw new Error("Trace import failed while persisting steps.");
+  }
+}
 
 // --- reads (auth + blind projection at the boundary) ------------------------
 

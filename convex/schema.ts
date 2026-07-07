@@ -638,6 +638,8 @@ const schema = defineSchema({
       v.literal("cloudflare_ai_gateway"),
       // #265: Claude Code session .jsonl upload — first trajectory ingestion.
       v.literal("claude_code"),
+      // #263: OTLP Gen-AI span push (Cloudflare AI Gateway + any OTel source).
+      v.literal("otlp"),
     ),
     // Provider's stable trace identifier when available — manual_paste imports
     // don't have one. Combined with `source` it forms the dedup key.
@@ -909,6 +911,23 @@ const schema = defineSchema({
     createdById: v.id("users"),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),
+
+  // #263: per-project ingest tokens for the OTLP push endpoint. Opaque 128-bit
+  // bearer token (generateToken), stored plaintext with a by_token index — the
+  // house pattern (invitations); it only needs comparison, not decryption. The
+  // customer configures it in their gateway/exporter (BYOK — Blind Bench never
+  // holds the customer's Cloudflare/provider credential). Revoke by setting
+  // `revokedAt`; the list surface never returns the full token after creation.
+  ingestTokens: defineTable({
+    projectId: v.id("projects"),
+    token: v.string(),
+    label: v.string(),
+    createdById: v.id("users"),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_project", ["projectId"]),
 
   // #259: per-org scorecard runs. Grades every org eval case that has a
   // captured production output against its assigned deterministic scorers.

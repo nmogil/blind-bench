@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyWebhook } from "./lib/polarSignature";
+import { otlpIngestHandler } from "./otlpIngest";
 
 const http = httpRouter();
 
@@ -155,6 +156,27 @@ http.route({
   method: "OPTIONS",
   handler: httpAction(async () => {
     return new Response(null, { status: 204, headers: corsHeaders });
+  }),
+});
+
+// --- #263: OTLP Gen-AI trace ingest (per-project token auth) ---
+http.route({
+  path: "/otlp/v1/traces",
+  method: "POST",
+  handler: otlpIngestHandler,
+});
+http.route({
+  path: "/otlp/v1/traces",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-blindbench-ingest-token",
+      },
+    });
   }),
 });
 
