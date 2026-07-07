@@ -1,15 +1,22 @@
 import { v } from "convex/values";
-import { action, internalMutation } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  query,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
 import {
   DEFAULT_LIMITS,
   MAX_REPORTED_INVALID_LINES,
+  normalizeGatewayLog,
   parseGatewayJsonl,
   summarizeTraces,
 } from "./traceAdapters/cloudflareAiGateway";
 import type { TraceAggregate } from "./traceAdapters/cloudflareAiGateway";
+import { materializeEvalCase } from "./traceAdapters/materializeEvalCase";
 
 const SOURCE = "cloudflare_ai_gateway" as const;
 
@@ -159,6 +166,203 @@ export const importGatewayLogs = action({
       invalidLines: invalidLines.slice(0, MAX_REPORTED_INVALID_LINES),
       truncated,
       ...agg,
+    };
+  },
+});
+
+// ===========================================================================
+// #259: Materialize imported Cloudflare AI Gateway traces into eval cases.
+// ===========================================================================
+
+/**
+ * Per-invocation cap on how many cloudflare_ai_gateway trace-import rows a
+ * single `materializeImportedTraces` call considers. Materialization is
+ * idempotent, so the UI can re-run to drain a backlog larger than this cap.
+ */
+const MATERIALIZE_CAP = 500;
+
+type MaterializeCandidates = {
+  /** Unmaterialized rows with a payload, capped at MATERIALIZE_CAP. */
+  ready: { importId: Id<"traceImports">; rawPayloadStorageId: Id<"_storage"> }[];
+  alreadyMaterialized: number;
+  missingPayload: number;
+};
+
+/**
+ * Classify every cloudflare_ai_gateway import row for the project and return
+ * the rows still needing materialization (capped at `MATERIALIZE_CAP` per
+ * call, so re-running drains backlogs larger than the cap). Counts cover the
+ * whole project so the caller's summary stays accurate. Auth-gated so the
+ * action never touches storage for an unauthorized caller.
+ */
+export const loadMaterializationCandidates = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<MaterializeCandidates> => {
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    // Full scan of the project's import rows — they are small identity rows
+    // and the import path caps batches at 5,000 lines; revisit if projects
+    // accumulate orders of magnitude more.
+    const rows = await ctx.db
+      .query("traceImports")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("source"), SOURCE))
+      .collect();
+    const result: MaterializeCandidates = {
+      ready: [],
+      alreadyMaterialized: 0,
+      missingPayload: 0,
+    };
+    for (const r of rows) {
+      if (r.evalCaseId !== undefined) result.alreadyMaterialized++;
+      else if (!r.rawPayloadStorageId) result.missingPayload++;
+      else if (result.ready.length < MATERIALIZE_CAP)
+        result.ready.push({
+          importId: r._id,
+          rawPayloadStorageId: r.rawPayloadStorageId,
+        });
+    }
+    return result;
+  },
+});
+
+const evalCaseRowValidator = v.object({
+  importId: v.id("traceImports"),
+  source: v.literal("production_log"),
+  product: v.string(),
+  title: v.string(),
+  messages: v.array(v.object({ role: v.string(), content: v.string() })),
+  outputText: v.optional(v.string()),
+  scorerIds: v.array(v.string()),
+  requestMissing: v.boolean(),
+  responseMissing: v.boolean(),
+  model: v.optional(v.string()),
+  provider: v.optional(v.string()),
+  timestamp: v.optional(v.string()),
+  inputTokens: v.optional(v.number()),
+  outputTokens: v.optional(v.number()),
+  costUsd: v.optional(v.number()),
+  durationMs: v.optional(v.number()),
+});
+
+/**
+ * Insert eval cases + link them back to their trace-import rows, transactionally.
+ * Re-checks `evalCaseId` per row so a concurrent run can't double-insert
+ * (idempotent). Returns how many rows were actually materialized.
+ */
+export const insertMaterializedCases = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    rows: v.array(evalCaseRowValidator),
+  },
+  handler: async (ctx, args): Promise<{ materialized: number }> => {
+    const { userId } = await requireProjectRole(ctx, args.projectId, [
+      "owner",
+      "editor",
+    ]);
+    let materialized = 0;
+    for (const row of args.rows) {
+      const imp = await ctx.db.get(row.importId);
+      // Skip if the import vanished, moved projects, or was already linked.
+      if (!imp || imp.projectId !== args.projectId || imp.evalCaseId) continue;
+      const { importId, ...fields } = row;
+      const evalCaseId = await ctx.db.insert("evalCases", {
+        projectId: args.projectId,
+        traceImportId: importId,
+        createdById: userId,
+        ...fields,
+      });
+      await ctx.db.patch(importId, { evalCaseId });
+      materialized++;
+    }
+    return { materialized };
+  },
+});
+
+/**
+ * Materialize this project's imported Cloudflare AI Gateway traces into runnable
+ * eval cases. Idempotent: rows already linked to an eval case are skipped, so
+ * re-running materializes nothing new. Considers at most `MATERIALIZE_CAP` rows
+ * per call.
+ *
+ * An action (not a mutation) because reading the persisted raw payload from
+ * storage is action-only. Per-row parse/normalize failures are counted
+ * (`failed`) and never abort the batch; error handling surfaces counts only,
+ * never trace content.
+ */
+export const materializeImportedTraces = action({
+  args: { projectId: v.id("projects") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    materialized: number;
+    alreadyMaterialized: number;
+    missingPayload: number;
+    failed: number;
+  }> => {
+    const candidates: MaterializeCandidates = await ctx.runQuery(
+      internal.gatewayImport.loadMaterializationCandidates,
+      { projectId: args.projectId },
+    );
+
+    const { alreadyMaterialized } = candidates;
+    let missingPayload = candidates.missingPayload;
+    let failed = 0;
+    const rows: (typeof evalCaseRowValidator)["type"][] = [];
+
+    for (const candidate of candidates.ready) {
+      try {
+        const blob = await ctx.storage.get(candidate.rawPayloadStorageId);
+        if (!blob) {
+          missingPayload++;
+          continue;
+        }
+        const raw = JSON.parse(await blob.text());
+        const trace = normalizeGatewayLog(raw);
+        const fields = materializeEvalCase(trace, raw);
+        rows.push({ importId: candidate.importId, ...fields });
+      } catch {
+        // Management-safe: count only, never echo trace content.
+        failed++;
+      }
+    }
+
+    let materialized = 0;
+    if (rows.length > 0) {
+      const res: { materialized: number } = await ctx.runMutation(
+        internal.gatewayImport.insertMaterializedCases,
+        { projectId: args.projectId, rows },
+      );
+      materialized = res.materialized;
+    }
+
+    return { materialized, alreadyMaterialized, missingPayload, failed };
+  },
+});
+
+/**
+ * Progress of materialization over the project's cloudflare_ai_gateway imports:
+ * how many exist and how many have been materialized into an eval case.
+ */
+export const materializationStatus = query({
+  args: { projectId: v.id("projects") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ total: number; materialized: number }> => {
+    await requireProjectRole(ctx, args.projectId, [
+      "owner",
+      "editor",
+      "evaluator",
+    ]);
+    const rows = await ctx.db
+      .query("traceImports")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("source"), SOURCE))
+      .collect();
+    return {
+      total: rows.length,
+      materialized: rows.filter((r) => r.evalCaseId !== undefined).length,
     };
   },
 });
