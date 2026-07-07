@@ -50,6 +50,9 @@ const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreat
 const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail").then(m => ({ default: m.CycleDetail })));
 const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/VersionDashboard").then(m => ({ default: m.VersionDashboard })));
 const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
+const TraceList = lazy(() => import("./routes/traces/TraceList").then(m => ({ default: m.TraceList })));
+const TraceViewer = lazy(() => import("./routes/traces/TraceViewer").then(m => ({ default: m.TraceViewer })));
+const TraceMatchup = lazy(() => import("./routes/traces/TraceMatchup").then(m => ({ default: m.TraceMatchup })));
 const HistoryPage = lazy(() => import("./routes/orgs/projects/HistoryPage").then(m => ({ default: m.HistoryPage })));
 const Terms = lazy(() => import("./routes/legal/Terms").then(m => ({ default: m.Terms })));
 const Privacy = lazy(() => import("./routes/legal/Privacy").then(m => ({ default: m.Privacy })));
@@ -116,6 +119,15 @@ export function App() {
                 element={<CycleDetail />}
               />
               <Route path="evaluate" element={<EvaluatePage />} />
+              <Route path="traces" element={<TraceList />} />
+              <Route
+                path="traces/:agentTraceId"
+                element={<TraceViewer />}
+              />
+              <Route
+                path="matchups/:matchupId"
+                element={<TraceMatchup />}
+              />
               <Route path="history" element={<HistoryPage />} />
               <Route path="settings" element={<ProjectSettings />} />
               <Route
