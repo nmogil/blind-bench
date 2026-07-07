@@ -56,6 +56,21 @@ Metadata we send to Polar at checkout is limited to `orgId`, `packageKey`, and
 Checkout and portal **fail closed** with a `ConvexError` when the token or a
 product id is missing — nothing half-works.
 
+### Sandbox validation (2026-07-07)
+
+Validated against the live Polar sandbox. Real product ids created for cutover
+reference (sandbox org `Mogil Ventures Sandbox`,
+`801c0378-2a22-439e-816f-f874be389bd3`, API base `https://sandbox-api.polar.sh`):
+
+| Env var | Sandbox product id | Product |
+|---------|--------------------|---------|
+| `POLAR_PRODUCT_STARTER` | `3e538112-f161-4961-8cd5-4048bd347b4a` | Blind Bench — Starter, $49/mo |
+| `POLAR_PRODUCT_TEAM` | `a94df903-fbe7-4329-9c41-3ee6fb9c5b47` | Blind Bench — Team, $199/mo |
+| `POLAR_PRODUCT_SCALE` | `e329c871-9750-4c4e-88a6-0b60aaaec577` | Blind Bench — Scale, $499/mo |
+
+These prices are sandbox placeholders; production prices are set when the
+production products are created (see Cutover).
+
 ## Webhook setup
 
 1. In Polar, add a webhook endpoint pointing at
@@ -74,6 +89,13 @@ double-credits).
 - Unit tests, no live Polar:
   - `env -u NODE_ENV npx vitest run --config convex/vitest.config.ts convex/lib/__tests__/polarSignature.test.ts` — signature sign/verify/replay.
   - `env -u NODE_ENV npm run test:convex` — webhook idempotency + ledger/entitlement (`convex/tests/billing.test.ts`). Requires `_generated` (run `npx convex dev` once to codegen).
+  - The full webhook path is now covered end-to-end by
+    `convex/tests/billingWebhook.test.ts`: signed, real-shape Polar events
+    (`order.paid` including the `customer.external_id` fallback, `order.refunded`,
+    `subscription.revoked`) driven through the `/polar/webhook` route, plus the
+    401/400/503 rejection cases. The outbound checkout/portal calls and a real
+    card → webhook delivery remain a manual smoke test against a deployed
+    endpoint (see Cutover).
 - Drive a webhook by hand: use `signWebhook(id, timestamp, body, secret)` from
   `convex/lib/polarSignature.ts` to build a valid `webhook-signature`, then
   `curl` your local `/polar/webhook` with the three headers and a JSON body
