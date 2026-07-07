@@ -19,7 +19,7 @@
  * numbers. `modelComparison.test.ts` scans the rendered artifacts to enforce this.
  *
  * Run it:
- *   npm run compare:customer-pilot   # writes artifacts/customer-pilot-model-comparison.{md,json}
+ *   npm run compare:demo   # writes artifacts/model-comparison.{md,json}
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -506,12 +506,12 @@ export function formatComparisonMarkdown(cmp: ModelComparison): string {
 // --- CLI entrypoint ----------------------------------------------------------
 
 const OUT_DIR = "artifacts";
-const BASENAME = "customer-pilot-model-comparison";
+const BASENAME = "model-comparison";
 // Default demo: baseline = planted hard-fail fixtures, candidate = all-pass fixtures,
-// over the SAME synthetic customer-pilot pack. Candidate is a clear improvement
+// over the SAME synthetic demo pack. Candidate is a clear improvement
 // (clears the planted privacy hard-fail) so the CLI exits 0.
-const DEFAULT_BASELINE_PACK = "customer-pilot/smoke";
-const DEFAULT_CANDIDATE_PACK = "customer-pilot/smoke-pass";
+const DEFAULT_BASELINE_PACK = "demo/smoke";
+const DEFAULT_CANDIDATE_PACK = "demo/smoke-pass";
 
 export async function main(argv: string[]): Promise<number> {
   const baselinePack = argv[0] ?? DEFAULT_BASELINE_PACK;

@@ -3,14 +3,14 @@
  * writes JSON + Markdown summaries. No network, no hosted infra.
  *
  *   npx tsx src/lib/evals/cli.ts \
- *     --pack customer-pilot/smoke \
+ *     --pack demo/smoke \
  *     --source fixtures \
  *     --output /tmp/blindbench-report.json \
  *     --markdown /tmp/blindbench-report.md \
  *     --allow-failures
  *
  * Exit code: non-zero when any case hard-fails, UNLESS --allow-failures is set.
- * The default customer-pilot/smoke pack ships one intentional hard-fail fixture, so it
+ * The default demo/smoke pack ships one intentional hard-fail fixture, so it
  * exits non-zero without --allow-failures (proving the gate).
  *
  * Baseline vs candidate (optional):
@@ -55,7 +55,7 @@ function loadFixtures(path: string): Record<string, AgentOutput> {
 
 export async function main(argv: string[]): Promise<number> {
   const flags = parseArgs(argv);
-  const pack = (flags.pack as string) ?? "customer-pilot/smoke";
+  const pack = (flags.pack as string) ?? "demo/smoke";
   const allowFailures = flags["allow-failures"] === true;
 
   const candidateFixtures = flags["candidate-fixtures"]

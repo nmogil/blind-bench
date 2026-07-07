@@ -212,7 +212,7 @@ export async function main(
   const config = loadConfig({
     ...env,
     TENANT_LABEL: env.TENANT_LABEL ?? "smoke-synthetic-tenant",
-    PRODUCT: env.PRODUCT ?? "migo",
+    PRODUCT: env.PRODUCT ?? "support-assistant",
   });
 
   const traceId = `smoke-${randomUUID()}`;

@@ -12,18 +12,18 @@ API call. The caller supplies `generated_at` so artifacts are byte-stable.
 ## Run it
 
 ```bash
-npm run dataset:customer-pilot            # uses a fixed default generated_at
-npm run dataset:customer-pilot 2026-06-24T00:00:00Z   # override timestamp
+npm run dataset:demo            # uses a fixed default generated_at
+npm run dataset:demo 2026-06-24T00:00:00Z   # override timestamp
 ```
 
 Writes (into the gitignored `artifacts/`):
 
-- `customer-pilot-training-dataset.train.jsonl`
-- `customer-pilot-training-dataset.validation.jsonl`
-- `customer-pilot-training-dataset.test.jsonl`
-- `customer-pilot-training-dataset.manifest.json`
+- `training-dataset.train.jsonl`
+- `training-dataset.validation.jsonl`
+- `training-dataset.test.jsonl`
+- `training-dataset.manifest.json`
 
-The pilot source is the **synthetic** customer-pilot smoke pack only — fake data.
+The pilot source is the **synthetic** demo smoke pack only — fake data.
 
 ## Output shapes
 

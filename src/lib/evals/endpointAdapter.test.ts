@@ -17,7 +17,7 @@ const ENDPOINT = EndpointConfig.parse({
 
 const CASE: EvalCaseInput = {
   id: "case-1",
-  product: "migo",
+  product: "support-assistant",
   title: "greeting",
   source: "synthetic",
   input: { messages: [{ role: "user", content: "hi" }] },
@@ -197,7 +197,7 @@ describe("fireworksCandidateEndpoint", () => {
       CF_AIG_GATEWAY: "gw",
       FIREWORKS_MODEL: "accounts/x/models/y",
       TENANT_LABEL: "tenant-a",
-      PRODUCT: "migo",
+      PRODUCT: "support-assistant",
     });
     expect(ep.url).toBe(
       "https://gateway.ai.cloudflare.com/v1/acct/gw/compat/chat/completions",
@@ -205,7 +205,7 @@ describe("fireworksCandidateEndpoint", () => {
     expect(ep.model).toBe("fireworks-ai/accounts/x/models/y");
     expect(ep.headers.Authorization).toBe("Bearer $FIREWORKS_API_KEY");
     expect(ep.headers["cf-aig-authorization"]).toBe("Bearer $CF_AIG_TOKEN");
-    expect(ep.headers["cf-aig-metadata"]).toContain('"product":"migo"');
+    expect(ep.headers["cf-aig-metadata"]).toContain('"product":"support-assistant"');
   });
 
   it("fails closed when required env is missing", () => {

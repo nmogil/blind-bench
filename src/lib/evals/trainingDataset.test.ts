@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EvalCase } from "./evalCase";
-import { customerPilotSmokeCases } from "./packs/customerPilot";
+import { demoSmokeCases } from "./packs/demoPack";
 import {
   PromotionPolicy,
   ReviewDecision,
@@ -10,7 +10,7 @@ import {
 import {
   SPLITS,
   compileTrainingDataset,
-  customerPilotTrainingSourceRows,
+  demoTrainingSourceRows,
   formatManifest,
   toJsonl,
   type TrainingDatasetSourceRow,
@@ -23,7 +23,7 @@ function syntheticRow(
   i: number,
   over: Partial<TrainingDatasetSourceRow> = {},
 ): TrainingDatasetSourceRow {
-  const c = EvalCase.parse(customerPilotSmokeCases[i]);
+  const c = EvalCase.parse(demoSmokeCases[i]);
   const candidate = approveForTraining(
     c,
     ReviewDecision.parse({
@@ -103,7 +103,7 @@ describe("eval-set contamination prevention", () => {
 
 describe("deterministic splits + manifest", () => {
   it("produces identical splits, hashes, and JSONL across runs", () => {
-    const rows = customerPilotTrainingSourceRows();
+    const rows = demoTrainingSourceRows();
     const a = compile(rows);
     const b = compile(rows);
     expect(a.manifest.dataset_hash).toBe(b.manifest.dataset_hash);
@@ -112,8 +112,8 @@ describe("deterministic splits + manifest", () => {
   });
 
   it("every held-out pilot row lands in test, never train/validation", () => {
-    const { splits } = compile(customerPilotTrainingSourceRows());
-    const heldOut = customerPilotTrainingSourceRows()
+    const { splits } = compile(demoTrainingSourceRows());
+    const heldOut = demoTrainingSourceRows()
       .filter((r) => r.eval_only)
       .map((r) => r.candidate.source_case_id);
     const trainVal = [...splits.train, ...splits.validation].map((r) => r.metadata.case_id);
@@ -122,7 +122,7 @@ describe("deterministic splits + manifest", () => {
   });
 
   it("manifest counts reconcile with split sizes and source rows", () => {
-    const rows = customerPilotTrainingSourceRows();
+    const rows = demoTrainingSourceRows();
     const { manifest, splits } = compile(rows);
     const exported = SPLITS.reduce((n, s) => n + splits[s].length, 0);
     expect(exported + manifest.excluded.length).toBe(rows.length);
@@ -132,9 +132,9 @@ describe("deterministic splits + manifest", () => {
 
 describe("filters", () => {
   it("filters by product and min_rating", () => {
-    const rows = customerPilotTrainingSourceRows();
-    const { manifest } = compile(rows, { filters: { products: ["migo"] } });
-    expect(manifest.products).toEqual(["migo"]);
+    const rows = demoTrainingSourceRows();
+    const { manifest } = compile(rows, { filters: { products: ["support-assistant"] } });
+    expect(manifest.products).toEqual(["support-assistant"]);
     expect(manifest.excluded.some((e) => e.reason === "filtered_out:product")).toBe(true);
 
     const lowRating = compile([syntheticRow(0, { metrics: { rating: 2 } })], {
@@ -146,7 +146,7 @@ describe("filters", () => {
 
 describe("output safety", () => {
   it("emits messages-only JSONL that is valid JSON, no sidecar metadata inline", () => {
-    const { splits } = compile(customerPilotTrainingSourceRows());
+    const { splits } = compile(demoTrainingSourceRows());
     const blob = SPLITS.map((s) => toJsonl(splits[s])).join("");
     for (const line of blob.split("\n").filter(Boolean)) {
       const row = JSON.parse(line); // throws if not strictly valid JSON

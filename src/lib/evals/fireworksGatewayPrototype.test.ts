@@ -13,9 +13,9 @@ import {
 const ENV = {
   CF_ACCOUNT_ID: "acct_TEST",
   CF_AIG_GATEWAY: "gw_TEST",
-  FIREWORKS_MODEL: "accounts/test/models/migo-ft-0001",
+  FIREWORKS_MODEL: "accounts/test/models/support-assistant-ft-0001",
   TENANT_LABEL: "tenant-test",
-  PRODUCT: "migo",
+  PRODUCT: "support-assistant",
 };
 
 describe("loadConfig", () => {
@@ -33,7 +33,7 @@ describe("loadConfig", () => {
   it("env overrides file and clears synthetic flag", () => {
     const c = loadConfig(ENV, { file: { product: "ignored" }, syntheticFallback: true });
     expect(c.synthetic).toBe(false);
-    expect(c.product).toBe("migo");
+    expect(c.product).toBe("support-assistant");
     expect(c.cf_account_id).toBe("acct_TEST");
   });
 });
@@ -58,7 +58,7 @@ describe("URL + cURL generation", () => {
   it("compat mode prefixes the provider slug onto the model field", () => {
     const c = loadConfig({ ...ENV, CF_AIG_MODE: "compat" });
     expect(gatewayUrlForMode(c)).toBe(buildGatewayUrls(c).compat);
-    expect(modelField(c)).toBe("fireworks-ai/accounts/test/models/migo-ft-0001");
+    expect(modelField(c)).toBe("fireworks-ai/accounts/test/models/support-assistant-ft-0001");
   });
 
   it("redacts secrets to env-var placeholders and never embeds real keys", () => {

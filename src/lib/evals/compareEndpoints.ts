@@ -9,7 +9,7 @@
  * which block promotion (fail-closed).
  *
  *   npx tsx src/lib/evals/compareEndpoints.ts \
- *     --pack customer-pilot/smoke \
+ *     --pack demo/smoke \
  *     --baseline ./baseline-endpoint.json \
  *     --candidate fireworks:env \
  *     --out-dir artifacts
@@ -80,7 +80,7 @@ export interface Deps {
 
 export async function main(argv: string[], deps: Deps = {}): Promise<number> {
   const flags = parseArgs(argv);
-  const packName = flags.pack ?? "customer-pilot/smoke";
+  const packName = flags.pack ?? "demo/smoke";
   const pack = PACKS[packName];
   if (!flags.baseline || !flags.candidate || !pack) {
     if (!pack) process.stderr.write(`Unknown pack: ${packName}. Known: ${Object.keys(PACKS).join(", ")}\n`);

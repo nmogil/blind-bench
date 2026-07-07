@@ -126,7 +126,7 @@ export type ScorerAssignment = z.infer<typeof ScorerAssignment>;
 
 export const EvalCase = z.object({
   id: z.string(),
-  /** Owning product/agent, open string for portability: "eavesly", "migo", ... */
+  /** Owning product/agent, open string for portability: "doc-summarizer", "support-assistant", ... */
   product: z.string(),
   title: z.string(),
   description: z.string().optional(),

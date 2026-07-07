@@ -8,12 +8,12 @@ import { PACKS } from "./runner";
 
 const TEST_PACK = "test/live-endpoints";
 
-// Two synthetic cases with UNIQUE message sets (the customer-pilot pack reuses
+// Two synthetic cases with UNIQUE message sets (the demo pack reuses
 // message sets across cases, so stub fetches can't key on them — a private pack can).
 const CASES: EvalCaseInput[] = [
   {
     id: "live-1",
-    product: "migo",
+    product: "support-assistant",
     title: "greeting",
     source: "synthetic",
     input: { messages: [{ role: "user", content: "unique message one" }] },
@@ -22,7 +22,7 @@ const CASES: EvalCaseInput[] = [
   },
   {
     id: "live-2",
-    product: "migo",
+    product: "support-assistant",
     title: "no leak",
     source: "synthetic",
     input: { messages: [{ role: "user", content: "unique message two" }] },
