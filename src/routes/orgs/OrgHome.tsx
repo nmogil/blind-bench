@@ -47,21 +47,39 @@ export function OrgHome() {
         </div>
       )}
 
-      <Link
-        to={`/orgs/${org.slug}/gateway-onboarding`}
-        className="mt-4 flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <Plug aria-hidden="true" className="h-4 w-4 text-primary shrink-0" />
-          <div>
-            <div className="text-sm font-medium">Gateway onboarding</div>
-            <div className="text-xs text-muted-foreground">
-              Feed Cloudflare AI Gateway logs into Blind Bench.
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Link
+          to={`/orgs/${org.slug}/gateway-onboarding`}
+          className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Plug aria-hidden="true" className="h-4 w-4 text-primary shrink-0" />
+            <div>
+              <div className="text-sm font-medium">Gateway onboarding</div>
+              <div className="text-xs text-muted-foreground">
+                Feed Cloudflare AI Gateway logs into Blind Bench.
+              </div>
             </div>
           </div>
-        </div>
-        <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
-      </Link>
+          <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+        </Link>
+
+        <Link
+          to={`/orgs/${org.slug}/scorecard`}
+          className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <ClipboardCheck aria-hidden="true" className="h-4 w-4 text-primary shrink-0" />
+            <div>
+              <div className="text-sm font-medium">Quality scorecard</div>
+              <div className="text-xs text-muted-foreground">
+                Run deterministic quality checks over your imported traffic.
+              </div>
+            </div>
+          </div>
+          <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      </div>
 
       <div className="mt-6">
         {projects === undefined ? (

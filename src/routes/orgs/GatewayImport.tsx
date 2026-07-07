@@ -10,10 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { friendlyError } from "@/lib/errors";
-import { CloudDownload, ShieldAlert, ArrowLeft } from "lucide-react";
+import {
+  CloudDownload,
+  ShieldAlert,
+  ArrowLeft,
+  Layers,
+  ClipboardCheck,
+} from "lucide-react";
 
 type ImportSummary = FunctionReturnType<
   typeof api.gatewayImport.importGatewayLogs
+>;
+
+type MaterializeResult = FunctionReturnType<
+  typeof api.gatewayImport.materializeImportedTraces
 >;
 
 export function GatewayImport() {
@@ -147,6 +157,13 @@ export function GatewayImport() {
       {summary && <ImportSummaryCard summary={summary} />}
 
       {projectId && (
+        <MaterializationCard
+          projectId={projectId as Id<"projects">}
+          scorecardHref={`${base}/scorecard`}
+        />
+      )}
+
+      {projectId && (
         <p className="mt-6 text-sm">
           <Link
             to={`${base}/projects/${projectId}/history`}
@@ -205,6 +222,121 @@ function ImportSummaryCard({ summary }: { summary: ImportSummary }) {
         {(summary.earliest || summary.latest) && (
           <p className="text-xs text-muted-foreground">
             Window: {summary.earliest ?? "?"} → {summary.latest ?? "?"}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MaterializationCard({
+  projectId,
+  scorecardHref,
+}: {
+  projectId: Id<"projects">;
+  scorecardHref: string;
+}) {
+  const status = useQuery(api.gatewayImport.materializationStatus, {
+    projectId,
+  });
+  const materialize = useAction(api.gatewayImport.materializeImportedTraces);
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<MaterializeResult | null>(null);
+
+  const total = status?.total;
+  const materialized = status?.materialized;
+  const fullyMaterialized =
+    total !== undefined && materialized !== undefined && total === materialized;
+
+  async function handleMaterialize() {
+    setBusy(true);
+    setError("");
+    setResult(null);
+    try {
+      const res = await materialize({ projectId });
+      setResult(res);
+    } catch (err) {
+      setError(
+        friendlyError(
+          err,
+          "Could not materialize imported traces. Try again in a moment.",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Layers aria-hidden="true" className="h-4 w-4 text-primary" />
+          Materialize into eval cases
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {status === undefined ? (
+          <p className="text-muted-foreground">Loading materialization status…</p>
+        ) : total === 0 ? (
+          <p className="text-muted-foreground">
+            No imported traces yet — import Gateway logs above, then materialize
+            them into eval cases here.
+          </p>
+        ) : (
+          <p>
+            <span className="font-semibold tabular-nums">{materialized}</span> of{" "}
+            <span className="font-semibold tabular-nums">{total}</span> imported
+            traces materialized as eval cases.
+          </p>
+        )}
+
+        {error && (
+          <p className="text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        <Button
+          onClick={handleMaterialize}
+          disabled={busy || !total || fullyMaterialized}
+        >
+          {busy
+            ? "Materializing…"
+            : fullyMaterialized
+              ? "All traces materialized"
+              : "Materialize into eval cases"}
+        </Button>
+
+        {result && (
+          <dl className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+            {[
+              { label: "Materialized", value: result.materialized },
+              { label: "Already done", value: result.alreadyMaterialized },
+              { label: "Missing payload", value: result.missingPayload },
+              { label: "Failed", value: result.failed },
+            ].map((s) => (
+              <div key={s.label}>
+                <dt className="text-xs text-muted-foreground">{s.label}</dt>
+                <dd className="text-lg font-semibold tabular-nums">
+                  {s.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {materialized !== undefined && materialized > 0 && (
+          <p className="pt-1">
+            <Link
+              to={scorecardHref}
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              <ClipboardCheck aria-hidden="true" className="h-3.5 w-3.5" />
+              Run the quality scorecard →
+            </Link>
           </p>
         )}
       </CardContent>
