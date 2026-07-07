@@ -650,8 +650,88 @@ const schema = defineSchema({
     // can re-parse without re-fetching from the source.
     rawPayloadStorageId: v.optional(v.id("_storage")),
   })
+    // #259: once a cloudflare_ai_gateway import is materialized into an eval
+    // case this points at that row. Presence is the idempotency signal for
+    // `gatewayImport.materializeImportedTraces` (skip already-materialized).
+    evalCaseId: v.optional(v.id("evalCases")),
+  })
     .index("by_project", ["projectId"])
     .index("by_source_trace", ["source", "sourceTraceId"]),
+
+  // #259: imported production-log traces materialized into runnable eval cases.
+  // Project-scoped. One row per materialized traceImport (`by_trace_import`
+  // enforces idempotency). Stores the captured production output alongside the
+  // request messages so the per-org scorecard can grade the real output; it is
+  // NEVER exposed to blind reviewers and scorecard client queries return only
+  // ids/products/scorer keys/numbers, never messages/outputText.
+  evalCases: defineTable({
+    projectId: v.id("projects"),
+    traceImportId: v.id("traceImports"),
+    // Only production-log cases for now; keep as a literal so a future
+    // synthetic/replay source is an explicit, migrated schema change.
+    source: v.literal("production_log"),
+    // From the trace's metadata.product, fallback "unknown".
+    product: v.string(),
+    title: v.string(),
+    messages: v.array(v.object({ role: v.string(), content: v.string() })),
+    // The captured production output; absent when the response was redacted.
+    outputText: v.optional(v.string()),
+    // Deterministic scorer ids assigned at materialization (see
+    // convex/traceAdapters/materializeEvalCase.ts).
+    scorerIds: v.array(v.string()),
+    requestMissing: v.boolean(),
+    responseMissing: v.boolean(),
+    model: v.optional(v.string()),
+    provider: v.optional(v.string()),
+    timestamp: v.optional(v.string()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    durationMs: v.optional(v.number()),
+    createdById: v.id("users"),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_trace_import", ["traceImportId"]),
+
+  // #259: per-org scorecard runs. Grades every org eval case that has a
+  // captured production output against its assigned deterministic scorers.
+  // `summary` and `errorMessage` are sanitized — counts + generic strings only,
+  // never trace/message/output content.
+  scorecardRuns: defineTable({
+    orgId: v.id("organizations"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    triggeredById: v.id("users"),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    summary: v.optional(
+      v.object({
+        cases: v.number(),
+        passed: v.number(),
+        hardFailed: v.number(),
+        meanScore: v.number(),
+        skippedNoOutput: v.number(),
+      }),
+    ),
+  }).index("by_org", ["orgId"]),
+
+  // #259: one row per graded case in a scorecard run. `failingScorers` holds the
+  // scorer keys whose result did not pass. No content — ids, product, scorer
+  // keys, numbers, booleans only.
+  scorecardResults: defineTable({
+    runId: v.id("scorecardRuns"),
+    caseId: v.id("evalCases"),
+    product: v.string(),
+    score: v.number(),
+    passed: v.boolean(),
+    hardFailed: v.boolean(),
+    failingScorers: v.array(v.string()),
+  }).index("by_run", ["runId"]),
 
   // M26: dedup ledger for "new draft published" emails to non-blind
   // reviewers. One row per (reviewer, project, version) so we can rate-limit
