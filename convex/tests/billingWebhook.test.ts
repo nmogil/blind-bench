@@ -2,7 +2,12 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import schema from "../schema";
+import type { Id } from "../_generated/dataModel";
 import { signWebhook } from "../lib/polarSignature";
+
+// Properly-typed harness (the concrete convexTest(schema) result) so table
+// queries in helpers resolve their indexes under `tsc -b`.
+type Harness = Awaited<ReturnType<typeof seedBillingEnv>>["t"];
 
 // A plain (non-`whsec_`) secret is accepted as UTF-8 bytes by verifyWebhook,
 // which is fine for driving the route in tests.
@@ -114,7 +119,7 @@ function subscriptionRevokedBody(
 
 // Drive the route with a valid signature over the exact body bytes.
 async function postSigned(
-  t: ReturnType<typeof convexTest>,
+  t: Harness,
   id: string,
   body: unknown,
 ) {
@@ -133,11 +138,11 @@ async function postSigned(
   });
 }
 
-async function ledgerFor(t: ReturnType<typeof convexTest>, orgId: string) {
+async function ledgerFor(t: Harness, orgId: Id<"organizations">) {
   return t.run(async (ctx) => {
     const rows = await ctx.db
       .query("billingLedger")
-      .withIndex("by_org", (q) => q.eq("organizationId", orgId as any))
+      .withIndex("by_org", (q) => q.eq("organizationId", orgId))
       .collect();
     return rows;
   });
