@@ -285,7 +285,8 @@ function ImportSummaryCard({ summary }: { summary: ImportSummary }) {
 
         {summary.sidecar && (
           <p className="text-xs text-muted-foreground">
-            Sidecar: {summary.sidecar.entries} entries,{" "}
+            Sidecar: {summary.sidecar.entries}{" "}
+            {summary.sidecar.entries === 1 ? "entry" : "entries"},{" "}
             {summary.sidecar.matched} newly imported{" "}
             {summary.sidecar.matched === 1 ? "trace" : "traces"} enriched
             (previously imported duplicates keep their original metadata)

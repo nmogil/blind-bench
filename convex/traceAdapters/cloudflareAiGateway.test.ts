@@ -213,6 +213,69 @@ describe("convex gateway metadata sidecar", () => {
     expect(notObject.entries).toBe(0);
   });
 
+  it("measures the size limit in UTF-8 bytes, not UTF-16 chars", () => {
+    // "€" is 1 UTF-16 char but 3 UTF-8 bytes — a multibyte payload must not
+    // sneak past maxBytes on character count.
+    const overByBytes = "€".repeat(
+      Math.floor(DEFAULT_SIDECAR_LIMITS.maxBytes / 3) + 1,
+    );
+    expect(new TextEncoder().encode(overByBytes).length).toBeGreaterThan(
+      DEFAULT_SIDECAR_LIMITS.maxBytes,
+    );
+    expect(overByBytes.length).toBeLessThan(DEFAULT_SIDECAR_LIMITS.maxBytes);
+    const rejected = parseSidecar(overByBytes);
+    expect(rejected.sidecar).toBeUndefined();
+    expect(rejected.entries).toBe(0);
+
+    // Exactly at the byte limit is allowed (guard is strict >).
+    const atLimitJson = JSON.stringify({ tr_abc: { release: "ok" } });
+    const padding = DEFAULT_SIDECAR_LIMITS.maxBytes - atLimitJson.length;
+    const atLimit = parseSidecar(atLimitJson + " ".repeat(padding));
+    expect(new TextEncoder().encode(atLimitJson + " ".repeat(padding)).length).toBe(
+      DEFAULT_SIDECAR_LIMITS.maxBytes,
+    );
+    expect(atLimit.entries).toBe(1);
+  });
+
+  it("never matches inherited object members as correlation ids", () => {
+    // A record whose trace_id collides with Object.prototype members must not
+    // pick up a phantom sidecar entry.
+    const hostileRecord = {
+      log_id: "log_h1",
+      metadata: { trace_id: "toString", product: "support-assistant" },
+      request: { messages: [{ role: "user", content: "hi" }] },
+      response: { choices: [{ message: { content: "ok" } }] },
+    };
+    const { sidecar } = parseSidecar(JSON.stringify({ tr_other: { a: "b" } }));
+    const { sidecarMerged } = parseGatewayJsonl(
+      JSON.stringify(hostileRecord),
+      undefined,
+      sidecar,
+    );
+    expect(sidecarMerged).toEqual([false]);
+
+    // A "__proto__" sidecar key stays a plain own key: it merges only into the
+    // record that carries that literal trace_id, and pollutes nothing.
+    const proto = parseSidecar(
+      JSON.stringify({ ["__proto__"]: { release: "r9" } }),
+    );
+    expect(proto.entries).toBe(1);
+    expect(({} as Record<string, unknown>).release).toBeUndefined();
+    const protoRecord = {
+      ...hostileRecord,
+      metadata: { trace_id: "__proto__", product: "support-assistant" },
+    };
+    const merged = parseGatewayJsonl(
+      JSON.stringify(protoRecord),
+      undefined,
+      proto.sidecar,
+    );
+    expect(merged.sidecarMerged).toEqual([true]);
+    expect(
+      JSON.parse(merged.traces[0]!.rawPayloadJson).metadata.release,
+    ).toBe("r9");
+  });
+
   it("reports no merge for records with no matching sidecar key", () => {
     const { sidecar } = parseSidecar(JSON.stringify({ tr_other: { a: "b" } }));
     const { sidecarMerged, traces } = parseGatewayJsonl(
