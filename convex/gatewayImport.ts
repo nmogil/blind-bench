@@ -13,9 +13,13 @@ import {
   MAX_REPORTED_INVALID_LINES,
   normalizeGatewayLog,
   parseGatewayJsonl,
+  parseSidecar,
   summarizeTraces,
 } from "./traceAdapters/cloudflareAiGateway";
-import type { TraceAggregate } from "./traceAdapters/cloudflareAiGateway";
+import type {
+  SidecarMap,
+  TraceAggregate,
+} from "./traceAdapters/cloudflareAiGateway";
 import { materializeEvalCase } from "./traceAdapters/materializeEvalCase";
 
 const SOURCE = "cloudflare_ai_gateway" as const;
@@ -33,6 +37,14 @@ type ImportGatewayLogsResult = {
   invalid: number;
   invalidLines: number[];
   truncated: boolean;
+  /**
+   * Present only when a `sidecarJson` arg was supplied. `entries` = valid
+   * sidecar entries parsed; `matched` = imported (non-duplicate) log records
+   * that had a sidecar entry merged into their metadata. An invalid/over-limit
+   * sidecar yields `{ entries: 0, matched: 0 }` and never fails the import.
+   * Management-safe: counts only, never sidecar content.
+   */
+  sidecar?: { entries: number; matched: number };
 } & TraceAggregate;
 
 /**
@@ -119,6 +131,7 @@ export const importGatewayLogs = action({
   args: {
     projectId: v.id("projects"),
     jsonl: v.string(),
+    sidecarJson: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<ImportGatewayLogsResult> => {
     // UTF-16 char length, not exact bytes — a cheap upper-bound guard before
@@ -129,9 +142,21 @@ export const importGatewayLogs = action({
       );
     }
 
-    const { traces, invalidLines, truncated } = parseGatewayJsonl(
+    // Optional metadata sidecar. Never fails the import: a malformed or
+    // over-limit sidecar is dropped (management-safe, counted as 0 entries) and
+    // the import proceeds without it.
+    let sidecarMap: SidecarMap | undefined;
+    let sidecarEntries = 0;
+    if (args.sidecarJson !== undefined) {
+      const parsed = parseSidecar(args.sidecarJson);
+      sidecarMap = parsed.sidecar;
+      sidecarEntries = parsed.entries;
+    }
+
+    const { traces, invalidLines, truncated, sidecarMerged } = parseGatewayJsonl(
       args.jsonl,
       DEFAULT_LIMITS,
+      sidecarMap,
     );
 
     const { imported, deduped, newRows }: InsertImportRowsResult =
@@ -145,11 +170,15 @@ export const importGatewayLogs = action({
     // for dedup hits. Sequential keeps it simple and bounded by maxLines.
     const updates: { importId: Id<"traceImports">; storageId: Id<"_storage"> }[] =
       [];
+    // Count sidecar matches over the imported subset only — the stored blob for
+    // each new row already carries the merged metadata.
+    let sidecarMatched = 0;
     for (const { importId, index } of newRows) {
       const storageId = await ctx.storage.store(
         new Blob([traces[index]!.rawPayloadJson], { type: "application/json" }),
       );
       updates.push({ importId, storageId });
+      if (sidecarMerged[index]) sidecarMatched++;
     }
     if (updates.length > 0) {
       await ctx.runMutation(internal.gatewayImport.attachRawPayloads, {
@@ -158,7 +187,7 @@ export const importGatewayLogs = action({
     }
 
     const agg = summarizeTraces(traces);
-    return {
+    const result: ImportGatewayLogsResult = {
       imported,
       deduped,
       parsed: traces.length,
@@ -167,6 +196,10 @@ export const importGatewayLogs = action({
       truncated,
       ...agg,
     };
+    if (args.sidecarJson !== undefined) {
+      result.sidecar = { entries: sidecarEntries, matched: sidecarMatched };
+    }
+    return result;
   },
 });
 

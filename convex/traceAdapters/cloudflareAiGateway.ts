@@ -59,6 +59,145 @@ export interface ParseResult {
   invalidLines: number[];
   /** True when the import hit `maxLines` and stopped early. */
   truncated: boolean;
+  /**
+   * Parallel to `traces`: whether a sidecar entry was merged into that trace's
+   * record before `rawPayloadJson` was produced. Populated only when a sidecar
+   * is supplied; empty/all-false otherwise. The importer counts matches over
+   * the subset of traces it actually imported (non-duplicates).
+   */
+  sidecarMerged: boolean[];
+}
+
+// ---- metadata sidecar --------------------------------------------------
+//
+// Cloudflare AI Gateway stores at most 5 custom-metadata keys per request and
+// silently drops the rest, so grouping keys that overflow the cap don't survive
+// on the log. The sidecar is an out-of-band JSON map — keyed by correlation id
+// (a `metadata.trace_id`, our documented convention, or a gateway log id) —
+// whose entries are merged back into a log record's metadata at import time,
+// BEFORE `rawPayloadJson` is produced. That way the stored blob and everything
+// downstream (materializeEvalCase.readProduct) see the merged metadata for
+// free. Mirrors `metadataSidecar` in `src/lib/evals/cloudflareAiGateway.ts`.
+
+/** A sidecar entry: extra metadata, primitive values only. */
+export type SidecarEntry = Record<string, string | number | boolean>;
+/** Outer key = correlation id (trace_id / log id); inner = extra metadata. */
+export type SidecarMap = Record<string, SidecarEntry>;
+
+export interface SidecarLimits {
+  /** Maximum sidecar text size in UTF-8 bytes. */
+  maxBytes: number;
+  /** Maximum number of correlation-id entries parsed. */
+  maxEntries: number;
+}
+
+export const DEFAULT_SIDECAR_LIMITS: SidecarLimits = {
+  maxBytes: 2 * 1024 * 1024,
+  maxEntries: 5000,
+};
+
+export interface SidecarParseResult {
+  /** Parsed map, or `undefined` when the whole sidecar was rejected. */
+  sidecar?: SidecarMap;
+  /** Count of valid entries kept (entries with a non-primitive value dropped). */
+  entries: number;
+}
+
+const isPrimitive = (v: unknown): v is string | number | boolean =>
+  typeof v === "string" ||
+  (typeof v === "number" && Number.isFinite(v)) ||
+  typeof v === "boolean";
+
+/**
+ * Parse sidecar JSON text into a validated `SidecarMap`. Management-safe: over
+ * a size/entry limit, non-object shape, malformed JSON, or a non-object entry
+ * are treated as invalid and counted — never thrown, never echoed. Entries
+ * whose values aren't all primitives are dropped (the gateway-logged value is
+ * ground truth; a structured sidecar override is rejected rather than merged).
+ */
+export function parseSidecar(
+  text: string,
+  limits: SidecarLimits = DEFAULT_SIDECAR_LIMITS,
+): SidecarParseResult {
+  if (new TextEncoder().encode(text).length > limits.maxBytes)
+    return { sidecar: undefined, entries: 0 };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { sidecar: undefined, entries: 0 };
+  }
+  const outer = asRecord(parsed);
+  if (!outer) return { sidecar: undefined, entries: 0 };
+  const keys = Object.keys(outer);
+  if (keys.length > limits.maxEntries) return { sidecar: undefined, entries: 0 };
+
+  // Prototype-less so hostile correlation ids ("__proto__", "toString") are
+  // plain own keys — lookups can never hit inherited Object.prototype members.
+  const sidecar: SidecarMap = Object.create(null) as SidecarMap;
+  let entries = 0;
+  for (const key of keys) {
+    const inner = asRecord(outer[key]);
+    if (!inner) continue; // non-object entry -> reject (counted by omission)
+    const clean: SidecarEntry = {};
+    let ok = true;
+    for (const [k, val] of Object.entries(inner)) {
+      if (!isPrimitive(val)) {
+        ok = false; // reject the whole entry, don't partially merge
+        break;
+      }
+      clean[k] = val;
+    }
+    if (!ok) continue;
+    sidecar[key] = clean;
+    entries++;
+  }
+  return { sidecar, entries };
+}
+
+/**
+ * Merge a matching sidecar entry into a raw record's `metadata` IN PLACE, so a
+ * subsequently-produced `rawPayloadJson` (and downstream materialization) sees
+ * it. Correlation: the record's `metadata.trace_id` first (our convention —
+ * it survives the 5-key cap), else the record's log-id fields (same paths the
+ * adapter uses for the dedup id). The record's own inline metadata wins on key
+ * conflicts. Returns true when an entry was merged.
+ */
+export function mergeSidecarIntoRecord(
+  record: unknown,
+  sidecar: SidecarMap,
+): boolean {
+  const rec = asRecord(record);
+  if (!rec) return false;
+  const existing =
+    asRecord(get(rec, ["metadata", "request.metadata", "event.metadata"])) ?? {};
+
+  // Own-key lookup only — a plain-object SidecarMap must never match
+  // inherited members (toString, constructor) as correlation ids.
+  const lookup = (id: string): SidecarEntry | undefined =>
+    Object.prototype.hasOwnProperty.call(sidecar, id) ? sidecar[id] : undefined;
+
+  let entry: SidecarEntry | undefined;
+  const traceId = str(existing.trace_id);
+  if (traceId !== undefined) entry = lookup(traceId);
+  if (entry === undefined) {
+    const logId = getStr(rec, [
+      "log_id",
+      "id",
+      "log.id",
+      "event_id",
+      "event.id",
+      "cf.ray_id",
+      "ray_id",
+    ]);
+    if (logId !== undefined) entry = lookup(logId);
+  }
+  if (entry === undefined) return false;
+
+  // Inline metadata wins: sidecar first, then existing over the top. Written to
+  // the canonical `metadata` path, which readProduct resolves first.
+  rec.metadata = { ...entry, ...existing };
+  return true;
 }
 
 // ---- tiny readers (ported, zod-free) -----------------------------------
@@ -216,9 +355,11 @@ export function normalizeGatewayLog(record: unknown): NormalizedGatewayTrace {
 export function parseGatewayJsonl(
   text: string,
   limits: GatewayLimits = DEFAULT_LIMITS,
+  sidecar?: SidecarMap,
 ): ParseResult {
   const traces: NormalizedGatewayTrace[] = [];
   const invalidLines: number[] = [];
+  const sidecarMerged: boolean[] = [];
   const lines = text.split(/\r?\n/);
   let processed = 0;
   let truncated = false;
@@ -238,14 +379,17 @@ export function parseGatewayJsonl(
       invalidLines.push(i + 1);
       continue;
     }
+    // Merge BEFORE normalize so the merged metadata lands in rawPayloadJson.
+    const merged = sidecar ? mergeSidecarIntoRecord(obj, sidecar) : false;
     try {
       traces.push(normalizeGatewayLog(obj));
+      sidecarMerged.push(merged);
     } catch {
       invalidLines.push(i + 1);
     }
   }
 
-  return { traces, invalidLines, truncated };
+  return { traces, invalidLines, truncated, sidecarMerged };
 }
 
 export interface TraceAggregate {

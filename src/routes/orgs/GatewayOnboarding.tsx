@@ -161,6 +161,25 @@ export function GatewayOnboarding() {
         <h2 id="checklist-heading" className="text-lg font-semibold">
           Onboarding checklist
         </h2>
+        <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+          <div className="flex items-start gap-2 text-sm">
+            <ShieldAlert
+              aria-hidden="true"
+              className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+            />
+            <div className="space-y-1">
+              <p className="font-semibold">Enable payload logging first</p>
+              <p className="text-muted-foreground">
+                Turn on{" "}
+                <strong className="text-foreground">Log payloads</strong> for
+                the gateway (AI Gateway → your gateway → Settings) before
+                exporting. Without it, logs carry no request/response bodies —
+                imported traces have no output text, so the eval cases built
+                from them cannot be scored.
+              </p>
+            </div>
+          </div>
+        </div>
         <ol className="mt-3 space-y-3">
           {STEPS.map((step, i) => (
             <li

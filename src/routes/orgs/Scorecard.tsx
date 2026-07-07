@@ -274,6 +274,45 @@ function CompletedScorecard({ latest }: { latest: Latest }) {
   const hardFailFindings = latest.hardFailFindings ?? [];
   const blocked = (summary?.hardFailed ?? 0) > 0;
 
+  // Every materialized case was skipped for want of a captured output — the
+  // scorecard graded nothing. Make that the headline instead of an empty grid.
+  const nothingScored =
+    !!summary && summary.cases === 0 && summary.skippedNoOutput > 0;
+
+  if (nothingScored) {
+    return (
+      <div className="space-y-8">
+        <p className="text-xs text-muted-foreground">
+          as of {formatTimestamp(latest.completedAt ?? latest.startedAt)}
+        </p>
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileWarning
+                aria-hidden="true"
+                className="h-4 w-4 text-amber-600 dark:text-amber-400"
+              />
+              No cases could be scored
+            </CardTitle>
+            <CardDescription>
+              All {summary.skippedNoOutput} materialized case
+              {summary.skippedNoOutput === 1 ? "" : "s"} had no captured output
+              to score — usually payload logging is off on the gateway. Enable{" "}
+              <strong className="text-foreground">Log payloads</strong> in
+              Cloudflare (AI Gateway → your gateway → Settings), re-generate
+              traffic, and re-import.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+        <Separator />
+        <p className="text-xs text-muted-foreground">
+          This surface shows only case IDs, product labels, scorer keys, and
+          aggregate counts — never prompts, model outputs, or scorer reasons.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <p className="text-xs text-muted-foreground">
@@ -355,13 +394,19 @@ function CompletedScorecard({ latest }: { latest: Latest }) {
             />
           </div>
           {summary.skippedNoOutput > 0 && (
-            <div className="mt-3">
+            <div className="mt-3 space-y-2">
               <MetricCard
                 icon={FileWarning}
                 label="Skipped — no output"
                 value={String(summary.skippedNoOutput)}
                 detail="Imported traces with no captured output to grade"
               />
+              <p className="text-xs text-muted-foreground">
+                {summary.skippedNoOutput} case
+                {summary.skippedNoOutput === 1 ? "" : "s"} had no captured
+                output to score — usually payload logging is off on the gateway.
+                Enable Log payloads in Cloudflare and re-import.
+              </p>
             </div>
           )}
         </section>
