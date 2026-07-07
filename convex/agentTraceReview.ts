@@ -226,8 +226,10 @@ export const getMatchup = query({
     const matchup = await ctx.db.get(args.matchupId);
     if (!matchup) return null;
     await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
+    const project = await ctx.db.get(matchup.projectId);
     return {
       _id: matchup._id,
+      projectName: project?.name ?? "Project",
       leftTraceId: matchup.leftTraceId,
       rightTraceId: matchup.rightTraceId,
       divergenceStepIndex: matchup.divergenceStepIndex,

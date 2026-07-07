@@ -53,6 +53,9 @@ const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").th
 const TraceList = lazy(() => import("./routes/traces/TraceList").then(m => ({ default: m.TraceList })));
 const TraceViewer = lazy(() => import("./routes/traces/TraceViewer").then(m => ({ default: m.TraceViewer })));
 const TraceMatchup = lazy(() => import("./routes/traces/TraceMatchup").then(m => ({ default: m.TraceMatchup })));
+const TraceReviewList = lazy(() => import("./routes/traces/TraceReviewList").then(m => ({ default: m.TraceReviewList })));
+const TraceReview = lazy(() => import("./routes/traces/TraceReview").then(m => ({ default: m.TraceReview })));
+const TraceMatchupReview = lazy(() => import("./routes/traces/TraceMatchupReview").then(m => ({ default: m.TraceMatchupReview })));
 const HistoryPage = lazy(() => import("./routes/orgs/projects/HistoryPage").then(m => ({ default: m.HistoryPage })));
 const Terms = lazy(() => import("./routes/legal/Terms").then(m => ({ default: m.Terms })));
 const Privacy = lazy(() => import("./routes/legal/Privacy").then(m => ({ default: m.Privacy })));
@@ -138,6 +141,9 @@ export function App() {
           </Route>
           <Route path="/eval" element={<EvalLayout />}>
             <Route index element={<InvitesInbox />} />
+            <Route path="traces" element={<TraceReviewList />} />
+            <Route path="traces/:agentTraceId" element={<TraceReview />} />
+            <Route path="matchups/:matchupId" element={<TraceMatchupReview />} />
           </Route>
           <Route path="/denied" element={<Denied />} />
           <Route path="*" element={<NotFound />} />

@@ -24,7 +24,7 @@ import { paginationOptsValidator } from "convex/server";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { requireProjectRole, isBlindReviewer } from "./lib/auth";
+import { requireAuth, requireProjectRole, isBlindReviewer } from "./lib/auth";
 import type { AgentRunTrace } from "./lib/agentTrace";
 import { redactValue } from "./lib/agentTrace";
 import { splitStep } from "./lib/agentTraceStorage";
@@ -301,11 +301,15 @@ export const getTrace = query({
     if (!trace) return null;
     await requireProjectRole(ctx, trace.projectId, ["owner", "editor", "evaluator"]);
     const blind = await isBlindReviewer(ctx, trace.projectId);
+    const project = await ctx.db.get(trace.projectId);
     const finalAnswerId = blind
       ? trace.finalAnswerBlindStorageId
       : trace.finalAnswerStorageId;
     const view = {
       _id: trace._id as string,
+      // Eval project name (not harness/model provenance) — powers the
+      // "Evaluation — {project}" document title on the blind surface.
+      projectName: project?.name ?? "Project",
       traceId: trace.traceId,
       product: trace.product,
       module: trace.module,
@@ -407,6 +411,56 @@ export const listTraces = query({
       harnessName: blind ? undefined : r.harnessName,
       model: blind ? undefined : r.model,
     }));
+  },
+});
+
+/**
+ * Traces the caller can review across ALL projects they collaborate on — the
+ * discovery list for the blind eval surface (`/eval/traces`), where the reviewer
+ * has no project context. Blind-projected per project (a reviewer can be blind
+ * on one project, not another). Only `ready` traces; newest first, capped.
+ */
+export const listReviewableTraces = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+    const collabs = await ctx.db
+      .query("projectCollaborators")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const out: Array<{
+      _id: Id<"agentTraces">;
+      projectName: string;
+      status: string;
+      stepCount: number;
+      createdAt: number;
+      product?: string;
+      harnessName?: string;
+      model?: string;
+    }> = [];
+    for (const c of collabs) {
+      const blind = await isBlindReviewer(ctx, c.projectId);
+      const project = await ctx.db.get(c.projectId);
+      const traces = await ctx.db
+        .query("agentTraces")
+        .withIndex("by_project", (q) => q.eq("projectId", c.projectId))
+        .order("desc")
+        .take(100);
+      for (const tr of traces) {
+        if (tr.status !== "ready") continue;
+        out.push({
+          _id: tr._id,
+          projectName: project?.name ?? "Project",
+          status: tr.status,
+          stepCount: tr.stepCount,
+          createdAt: tr._creationTime,
+          product: blind ? undefined : tr.product,
+          harnessName: blind ? undefined : tr.harnessName,
+          model: blind ? undefined : tr.model,
+        });
+      }
+    }
+    return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, 200);
   },
 });
 

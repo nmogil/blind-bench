@@ -107,6 +107,21 @@ describe("#267 step-level trace review", () => {
     expect(count).toBe(1);
   });
 
+  test("blind reviewer discovers reviewable traces across their projects, blinded", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner, asBlind } = await seed(t);
+    await persist(asOwner, ids.projectId, baseRun);
+
+    const list = await asBlind.query(api.agentTraces.listReviewableTraces, {});
+    expect(list).toHaveLength(1);
+    expect(list[0]?.projectName).toBe("P");
+    expect(list[0]?.stepCount).toBeGreaterThan(0);
+    // Blinded: no harness/model/product for the evaluator.
+    expect(list[0]?.harnessName).toBeUndefined();
+    expect(list[0]?.model).toBeUndefined();
+    expect(JSON.stringify(list)).not.toContain("jeeves_clog");
+  });
+
   test("step-level pairwise: owner sets up, blind reviewer picks the winner", async () => {
     const t = convexTest(schema);
     const { ids, asOwner, asBlind } = await seed(t);
