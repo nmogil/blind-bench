@@ -13,8 +13,8 @@ npm run scorecard:demo
 This runs the synthetic `demo/smoke` pack through the local scorers and
 writes (artifacts are git-ignored — regenerate on demand):
 
-- `artifacts/customer-ai-quality-scorecard.md` — customer-facing scorecard
-- `artifacts/customer-ai-quality-scorecard.json` — same data, machine-readable
+- `artifacts/ai-quality-scorecard.md` — customer-facing scorecard
+- `artifacts/ai-quality-scorecard.json` — same data, machine-readable
 
 It is deterministic and local-only: no network, no hosted infra, no timestamps,
 so re-runs are byte-identical. The scorecard exposes only case IDs, product
