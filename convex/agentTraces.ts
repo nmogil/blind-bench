@@ -28,6 +28,7 @@ import { requireProjectRole, isBlindReviewer } from "./lib/auth";
 import type { AgentRunTrace } from "./lib/agentTrace";
 import { redactValue } from "./lib/agentTrace";
 import { splitStep } from "./lib/agentTraceStorage";
+import { blindStepView, blindTraceView } from "./lib/blindProjection";
 
 const STEP_INSERT_CHUNK = 100;
 
@@ -277,10 +278,10 @@ export const persistTrace = action({
 // --- reads (auth + blind projection at the boundary) ------------------------
 
 /**
- * Parent metadata for one trace. Harness identity + model are withheld from
- * blind principals (a coarse #264 measure; #266 refines). Final answer, when
- * present, is returned as an opaque storage URL — the blind blob for blind
- * principals, the full blob otherwise.
+ * Parent metadata for one trace. For blind principals the full projection
+ * (#266, `blindTraceView`) strips every direct identifier — harness, model,
+ * provider, real ids, product, environment. Final answer, when present, is an
+ * opaque storage URL — the blind blob for blind principals, the full otherwise.
  */
 export const getTrace = query({
   args: { agentTraceId: v.id("agentTraces") },
@@ -292,8 +293,8 @@ export const getTrace = query({
     const finalAnswerId = blind
       ? trace.finalAnswerBlindStorageId
       : trace.finalAnswerStorageId;
-    return {
-      _id: trace._id,
+    const view = {
+      _id: trace._id as string,
       traceId: trace.traceId,
       product: trace.product,
       module: trace.module,
@@ -301,9 +302,9 @@ export const getTrace = query({
       status: trace.status,
       stepCount: trace.stepCount,
       privacyClass: trace.privacyClass,
-      model: blind ? undefined : trace.model,
-      harnessName: blind ? undefined : trace.harnessName,
-      harnessVersion: blind ? undefined : trace.harnessVersion,
+      model: trace.model,
+      harnessName: trace.harnessName,
+      harnessVersion: trace.harnessVersion,
       usage: {
         costUsd: trace.costUsd,
         durationMs: trace.durationMs,
@@ -311,6 +312,7 @@ export const getTrace = query({
       },
       finalAnswerUrl: finalAnswerId ? await ctx.storage.getUrl(finalAnswerId) : null,
     };
+    return blind ? blindTraceView(view) : view;
   },
 });
 
@@ -339,12 +341,10 @@ export const listSteps = query({
     const page = await Promise.all(
       result.page.map(async (row) => {
         const bodyId = blind ? row.blindBodyStorageId : row.fullBodyStorageId;
-        return {
+        const item = {
           stepIndex: row.stepIndex,
           kind: row.kind,
           role: row.role,
-          // ponytail: toolName still visible to blind reviewers — harness
-          // fingerprint scrubbing is #266's job, not the spine's.
           toolName: row.toolName,
           toolCallId: row.toolCallId,
           label: row.label,
@@ -358,6 +358,9 @@ export const listSteps = query({
           durationMs: row.durationMs,
           bodyUrl: bodyId ? await ctx.storage.getUrl(bodyId) : null,
         };
+        // #266: blind principals get the identifier-scrubbed projection
+        // (aliased tool name, opaque call id, no wall-clock timestamp).
+        return blind ? blindStepView(item) : item;
       }),
     );
     return { ...result, page };
