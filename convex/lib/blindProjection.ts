@@ -86,6 +86,7 @@ export function blindStepView(item: StepView): StepView {
 
 export interface TraceView {
   _id: string;
+  projectName: string;
   traceId?: string;
   product?: string;
   module?: string;
@@ -109,6 +110,7 @@ export interface TraceView {
 export function blindTraceView(trace: TraceView): TraceView {
   return {
     _id: trace._id,
+    projectName: trace.projectName,
     traceId: undefined,
     product: undefined,
     module: undefined,
