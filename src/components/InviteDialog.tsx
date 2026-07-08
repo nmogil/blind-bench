@@ -41,7 +41,7 @@ type RoleOption = {
 
 const ROLE_OPTIONS: Record<Scope, RoleOption[]> = {
   org: [
-    { value: "org_member", label: "Member", description: "Can access org prompts they're added to" },
+    { value: "org_member", label: "Member", description: "Can access org projects they're added to" },
     { value: "org_admin", label: "Admin", description: "Can manage members and projects" },
     { value: "org_owner", label: "Owner", description: "Full control including billing" },
   ],

@@ -1362,8 +1362,9 @@ const schema = defineSchema({
     .index("by_subscription", ["polarSubscriptionId"]),
 
   // Append-only credit ledger. Remaining credits = sum of `creditDelta` for an
-  // org. Purchases add positive deltas; refunds/revocations add negative ones.
-  // Carries Polar IDs for idempotency and audit — never trace/test-case data.
+  // org. Purchases/trials add positive deltas; refunds/revocations and eval
+  // consumption add negative ones. Carries Polar IDs and product-run IDs for
+  // idempotency and audit — never trace/test-case content.
   billingLedger: defineTable({
     organizationId: v.id("organizations"),
     creditDelta: v.number(),
@@ -1372,12 +1373,16 @@ const schema = defineSchema({
     polarOrderId: v.optional(v.string()),
     polarSubscriptionId: v.optional(v.string()),
     polarEventId: v.optional(v.string()),
+    promptRunId: v.optional(v.id("promptRuns")),
+    scorecardRunId: v.optional(v.id("scorecardRuns")),
     createdAt: v.number(),
   })
     .index("by_org", ["organizationId"])
     .index("by_order", ["polarOrderId"])
     .index("by_subscription", ["polarSubscriptionId"])
-    .index("by_event", ["polarEventId"]),
+    .index("by_event", ["polarEventId"])
+    .index("by_prompt_run", ["promptRunId"])
+    .index("by_scorecard_run", ["scorecardRunId"]),
 
   // Idempotency + audit log of every webhook delivery we accepted. Keyed by the
   // Standard Webhooks `webhook-id`; a repeat delivery is a no-op.

@@ -12,6 +12,7 @@ import {
   foldScorecardResults,
   type ScorecardResultRow,
 } from "./lib/scorecardAggregation";
+import { consumeEvalCredit } from "./lib/billingCredits";
 
 // ===========================================================================
 // #259: Per-org scorecard runs.
@@ -56,6 +57,10 @@ export const start = mutation({
       status: "pending",
       triggeredById: userId,
       startedAt: Date.now(),
+    });
+    await consumeEvalCredit(ctx, args.orgId, {
+      kind: "scorecard_run",
+      scorecardRunId: runId,
     });
     await ctx.scheduler.runAfter(0, internal.scorecardsActions.runScorecard, {
       runId,

@@ -62,6 +62,7 @@ export function Scorecard() {
   const canRun = role === "owner" || role === "admin";
 
   const latest = useQuery(api.scorecards.latest, { orgId });
+  const creditStatus = useQuery(api.billing.getCreditStatus, { orgId });
   const startRun = useMutation(api.scorecards.start);
 
   const [busy, setBusy] = useState(false);
@@ -89,10 +90,25 @@ export function Scorecard() {
 
   const runButton = canRun ? (
     <div className="flex flex-col items-end gap-1">
-      <Button onClick={handleRun} disabled={busy || inFlight}>
+      <Button
+        onClick={handleRun}
+        disabled={
+          busy ||
+          inFlight ||
+          (creditStatus !== undefined &&
+            creditStatus.remainingCredits < creditStatus.evalRunCost)
+        }
+      >
         <Play aria-hidden="true" className="h-4 w-4" />
         {inFlight ? "Scorecard running…" : busy ? "Starting…" : "Run scorecard"}
       </Button>
+      {creditStatus !== undefined && (
+        <p className="text-xs text-muted-foreground">
+          {creditStatus.remainingCredits < creditStatus.evalRunCost
+            ? "Out of eval credits — add credits in Billing to run the scorecard."
+            : `Costs ${creditStatus.evalRunCost} eval credit · ${creditStatus.remainingCredits.toLocaleString()} remaining`}
+        </p>
+      )}
       {error && (
         <p className="text-xs text-destructive" role="alert">
           {error}

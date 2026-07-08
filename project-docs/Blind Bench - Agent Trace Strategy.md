@@ -1,7 +1,7 @@
 ---
 title: "Blind Bench - Agent Trace Strategy"
 created: 2026-07-07
-modified: 2026-07-07
+modified: 2026-07-08
 type: strategy
 status: draft
 tags:
@@ -220,6 +220,25 @@ import, we do not build sandbox infra.
 - **DPO overpromise.** Never market "human feedback → DPO" naively; the
   single-turn constraint shapes what we can honestly export.
 
+## Post-deployment critique (2026-07-08)
+
+After the M31 deployments plus the agent-first landing rewrite, the strategy is
+clearer but the following critiques are load-bearing. Treat these as guardrails,
+not objections to the pivot.
+
+| Critique | Why it matters | Guardrail / response |
+|---|---|---|
+| Demand density is still unproven | The niche may be smaller than the whitespace: teams running serious agents, with internal experts, who care enough to review traces. | Measure activation around one concrete loop: import one run → blind review link opened → verdict/comment submitted → result reused. Kill or narrow if reviewers do not finish. |
+| App and landing can disagree | `blindbench.dev` is now agent-first, but stale app/onboarding copy that says only "prompts" or "optimizer" weakens trust immediately after signup. | Keep all first-run/auth/onboarding surfaces aligned to "blind review for agent runs and model outputs." |
+| Adapter sprawl can bury the product | Native JSON, OTLP, Cloudflare Gateway, Claude Code JSONL, Harbor, and future harness emitters are all plausible, but buyers need one obvious path. | The native `eval-record` v1 contract is the source of truth; every adapter must be thin, pilot-driven, and normalize into the same spine. No adapter without a real user or demo loop. |
+| Trace blinding is weaker than output blinding | Tool names, timing, error formats, and step patterns can fingerprint a harness/model. | Product copy must say "bias reduction, not anonymity" for trajectories; server-side projection remains mandatory. |
+| Training export is valuable but fragile | DPO rows only help when matchups are comparable and non-degenerate; real dogfood already found a degenerate-pair failure mode. | Gate exports aggressively, report exclusions, and avoid marketing DPO until the UI captures enough comparable step-level choices. |
+| Harbor matrix is demo-gold and product-dangerous | Running model+harness matrices proves the thesis, but owning orchestration drifts toward a sandbox/benchmark platform. | Integrate/import only. Harbor/Daytona/etc. own execution; Blind Bench owns blinded judgment and reuse of the verdict. |
+| Billing credibility is not finished | Credits are visible/promised before trial seeding and consumption enforcement are complete. | Finish trial seeding + credit enforcement or remove metered claims until they are real. |
+| Reviewer completion is the hardest UX risk | Rendering a 300-step trace is not success if experts abandon it or leave low-signal comments. | Optimize for short tasks, divergence-focused review, and time-to-verdict. Track completion and useful-comment rate. |
+| Persona widening reintroduces competition | Senior engineers reviewing traces puts Blind Bench nearer Braintrust/LangSmith surfaces. | Stay out of observability. The defensible job is blind expert judgment, shareable review, and evidence artifacts. |
+| The product needs one canonical demo | The strategy is now broad enough to confuse a buyer. | Lead with: bring in an agent run → send one blind review link → get a verdict → route it to regression/training/revision. Everything else serves that path. |
+
 ## Codex second opinion (independent review, 2026-07-07)
 
 Codex reviewed the repo and the pivot unanchored by this doc's recommendation.
@@ -264,8 +283,9 @@ moved ahead of OTLP. The remaining genuine disagreement is E-vs-A priority
 
 ## Next action
 
-Noah reads this doc and approves/amends the Pipeline actions. Then: write the
-M31 issue set (trajectory spine + Harbor integration spike + CC JSONL
-importer + step-level annotation + export bridge), update the Build Plan with
-an M31+ section, update Positioning with the "domain expert reviewer"
-resolution, and start the spine schema.
+The M31 spine, blind trace review surface, Harbor spike, training export bridge,
+OTLP ingest, and native `eval-record` v1 endpoint have shipped. The next work is
+not more breadth by default; it is consolidation against the post-deployment
+critique above: keep app copy aligned with the agent-first landing page, make
+billing credits real, and keep demos/onboarding centered on the canonical loop
+(import one agent run → blind review link → verdict → reuse).

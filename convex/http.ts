@@ -16,17 +16,21 @@ auth.addHttpRoutes(http);
  * Pull ONLY the scalar billing fields we need out of a Polar event. Never
  * forwards arbitrary payload (no trace/test-case content can leak this way).
  * `orgId`/`packageKey` come from the metadata we set at checkout, falling back
- * to the customer's external id (which is the org id).
+ * to the customer's external id (which is the org id) and product id.
  */
 function sanitizePolarEvent(eventId: string, event: unknown) {
   if (!event || typeof event !== "object") return null;
   const e = event as Record<string, unknown>;
   const eventType = typeof e.type === "string" ? e.type : "";
   if (!eventType) return null;
-  const data = (e.data ?? {}) as Record<string, unknown>;
-  const meta = (data.metadata ?? {}) as Record<string, unknown>;
-  const customer = (data.customer ?? {}) as Record<string, unknown>;
-  const subscription = (data.subscription ?? {}) as Record<string, unknown>;
+  const asRecord = (x: unknown): Record<string, unknown> =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? (x as Record<string, unknown>)
+      : {};
+  const data = asRecord(e.data);
+  const meta = asRecord(data.metadata);
+  const customer = asRecord(data.customer);
+  const subscription = asRecord(data.subscription);
 
   const str = (x: unknown): string | undefined =>
     typeof x === "string" && x.length > 0 ? x : undefined;
@@ -46,6 +50,7 @@ function sanitizePolarEvent(eventId: string, event: unknown) {
     polarCustomerId: str(data.customer_id) ?? str(customer.id),
     polarOrderId:
       eventType.startsWith("order") ? str(data.id) ?? str(data.order_id) : str(data.order_id),
+    polarProductId: str(data.product_id) ?? str(asRecord(data.product).id),
     polarSubscriptionId:
       str(data.subscription_id) ?? str(subscription.id) ??
       (eventType.startsWith("subscription") ? str(data.id) : undefined),

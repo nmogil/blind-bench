@@ -11,11 +11,14 @@ import { QueryCtx, MutationCtx } from "./_generated/server";
 import { requireOrgRole } from "./lib/auth";
 import {
   BILLING_PACKAGES,
+  CREDIT_COSTS,
   TRIAL,
   getPackage,
+  resolvePackageKeyByProductId,
   resolveProductId,
   publicPackageCatalog,
 } from "./lib/billingPlans";
+import { sumBillingCredits } from "./lib/billingCredits";
 
 // Webhook event types we act on. Anything else is acknowledged and ignored.
 const GRANT_EVENTS = new Set(["order.paid"]);
@@ -31,11 +34,7 @@ async function sumCredits(
   ctx: QueryCtx,
   orgId: Id<"organizations">,
 ): Promise<number> {
-  const rows = await ctx.db
-    .query("billingLedger")
-    .withIndex("by_org", (q) => q.eq("organizationId", orgId))
-    .collect();
-  return rows.reduce((acc, r) => acc + r.creditDelta, 0);
+  return sumBillingCredits(ctx, orgId);
 }
 
 async function activeEntitlement(ctx: QueryCtx, orgId: Id<"organizations">) {
@@ -106,6 +105,18 @@ export const getBillingOverview = query({
       // the Polar access token to be configured server-side.
       portalAvailable: !!customer,
       checkoutConfigured: !!process.env.POLAR_ACCESS_TOKEN,
+    };
+  },
+});
+
+export const getCreditStatus = query({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    await requireOrgRole(ctx, args.orgId, ["owner", "admin", "member"]);
+    return {
+      remainingCredits: await sumCredits(ctx, args.orgId),
+      evalRunCost: CREDIT_COSTS.evalRun,
+      trialCredits: TRIAL.evalCredits,
     };
   },
 });
@@ -305,6 +316,7 @@ export const applyPolarEvent = internalMutation({
     packageKey: v.optional(v.string()),
     polarCustomerId: v.optional(v.string()),
     polarOrderId: v.optional(v.string()),
+    polarProductId: v.optional(v.string()),
     polarSubscriptionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -354,7 +366,9 @@ export const applyPolarEvent = internalMutation({
 
     // 4. Branch on event type.
     if (GRANT_EVENTS.has(args.eventType)) {
-      const pkg = args.packageKey ? getPackage(args.packageKey) : undefined;
+      const packageKey =
+        args.packageKey ?? resolvePackageKeyByProductId(args.polarProductId);
+      const pkg = packageKey ? getPackage(packageKey) : undefined;
       if (!pkg) return finish("ignored_unknown_package", {});
 
       // Order-level idempotency: never double-credit the same order.

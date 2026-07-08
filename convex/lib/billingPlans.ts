@@ -12,8 +12,12 @@
  *   - Packages: a monthly subscription that grants a fixed bundle of eval
  *     credits + reviewer seats + trace-import headroom + a support level.
  *   - Credits: a fungible per-eval unit tracked in `billingLedger`. A package
- *     purchase adds a positive ledger entry; a refund/revoke adds a negative
- *     one. Remaining credits = sum of all ledger deltas for the org.
+ *     purchase adds a positive ledger entry; a refund/revoke or eval
+ *     consumption adds a negative one. Remaining credits = sum of all ledger
+ *     deltas for the org.
+ *   - Consumption: v1 charges 1 credit when Blind Bench starts a prompt run or
+ *     a scorecard run. Fan-out outputs, deterministic scorer count, and trace
+ *     imports are not separately metered yet.
  *   - Trial: every workspace starts with a small free credit grant (no card).
  *   - Manual enterprise: the largest tier is sales-assisted, not self-serve;
  *     `manualEnterprise: true` hides the self-serve checkout button.
@@ -52,6 +56,15 @@ export const TRIAL = {
   evalCredits: 50,
   reviewerSeats: 2,
   traceImportLimit: 10,
+} as const;
+
+/**
+ * Launch metering unit. One credit is consumed when the app starts one prompt
+ * run or one scorecard run. Output fan-out, deterministic scorer count, and
+ * trace imports are deliberately not separate credit multipliers in v1.
+ */
+export const CREDIT_COSTS = {
+  evalRun: 1,
 } as const;
 
 export const BILLING_PACKAGES: Record<PackageKey, BillingPackage> = {
@@ -127,6 +140,18 @@ export function resolveProductId(
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
   return env[pkg.productEnvVar];
+}
+
+/** Resolve a package key from a Polar product id for off-app purchases. */
+export function resolvePackageKeyByProductId(
+  productId: string | undefined,
+  env: Record<string, string | undefined> = process.env,
+): PackageKey | undefined {
+  if (!productId) return undefined;
+  return PACKAGE_ORDER.find((key) => {
+    const pkg = BILLING_PACKAGES[key];
+    return resolveProductId(pkg, env) === productId;
+  });
 }
 
 /**

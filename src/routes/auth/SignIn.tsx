@@ -1,7 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { EyeOff, Link2, Sparkles } from "lucide-react";
+import { EyeOff, Link2, Route } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Grainient from "@/components/Grainient";
 import BlurText from "@/components/BlurText";
@@ -12,17 +12,17 @@ const features = [
   {
     icon: Link2,
     label: "One link. No account.",
-    desc: "Experts, teammates, or customers annotate in the browser.",
+    desc: "Domain experts review agent runs and model outputs in the browser.",
   },
   {
     icon: EyeOff,
-    label: "Blinded at the API, not the UI.",
-    desc: "Reviewers never see the version, model, or author.",
+    label: "Blind by construction.",
+    desc: "Version, model, and harness are stripped before reviewers judge.",
   },
   {
-    icon: Sparkles,
-    label: "Annotations become prompt edits.",
-    desc: "The optimizer rewrites from feedback — every edit cites its comment.",
+    icon: Route,
+    label: "Verdicts route back.",
+    desc: "Ratings and comments become regression sets, training data, and revisions.",
   },
 ];
 
@@ -125,7 +125,7 @@ export function SignIn() {
             transition={{ duration: 0.5, ease: EASE, delay: 0.08 }}
             className="mt-3 text-xl text-white drop-shadow-[0_1px_8px_rgba(0,0,0,0.55)]"
           >
-            Real human feedback on every prompt you ship.
+            Blind human review for the agents you ship.
           </motion.p>
           <motion.p
             initial={reduceMotion ? false : { opacity: 0, y: 8 }}
@@ -133,8 +133,8 @@ export function SignIn() {
             transition={{ duration: 0.5, ease: EASE, delay: 0.14 }}
             className="mt-2 text-sm text-white/90 drop-shadow-[0_1px_6px_rgba(0,0,0,0.5)]"
           >
-            One link. Experts, teammates, customers annotate — the optimizer
-            applies it.
+            Import a run, send one review link, and learn whether the agent
+            actually improved.
           </motion.p>
           <div className="mt-8 space-y-4">
             {features.map((f, i) => (
@@ -174,11 +174,11 @@ export function SignIn() {
               Blind Bench
             </h1>
             <p className="text-sm text-foreground/90">
-              Real human feedback on every prompt you ship.
+              Blind human review for the agents you ship.
             </p>
             <p className="text-xs text-muted-foreground">
-              One link. Experts, teammates, customers annotate — the optimizer
-              applies it.
+              Import a run, send one review link, and learn whether the agent
+              actually improved.
             </p>
           </div>
 
@@ -271,7 +271,7 @@ export function SignIn() {
             )}
           </div>
           <p className="text-center text-xs text-muted-foreground">
-            Bring your own OpenRouter key. No per-seat billing. No credit card.
+            Bring your own model key. New workspaces include trial eval credits.
           </p>
           <p className="text-center text-[11px] text-muted-foreground">
             By continuing, you agree to our{" "}

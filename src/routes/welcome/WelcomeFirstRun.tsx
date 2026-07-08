@@ -126,7 +126,7 @@ export function WelcomeFirstRun() {
               What are you working on?
             </h1>
             <p className="text-sm text-muted-foreground">
-              Pick a path. Both land you in a real, editable project.
+              Bring in an agent prompt now, or load the example blind-review loop.
             </p>
           </div>
 
@@ -134,7 +134,7 @@ export function WelcomeFirstRun() {
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="paste" className="gap-2">
                 <FileText className="h-3.5 w-3.5" />
-                I have a prompt
+                I have an agent prompt
               </TabsTrigger>
               <TabsTrigger value="example" className="gap-2">
                 <Sparkles className="h-3.5 w-3.5" />
@@ -183,7 +183,7 @@ export function WelcomeFirstRun() {
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {pasteRole === "system"
-                      ? "Persistent instructions sent at the top of every run."
+                      ? "Persistent instructions sent at the top of every agent run."
                       : "The turn the model responds to. Use {{name}} for variables."}
                   </p>
                 </div>
@@ -203,11 +203,10 @@ export function WelcomeFirstRun() {
 
             <TabsPanel value="example" className="space-y-4 pt-4">
               <div className="space-y-2 rounded-md border bg-muted/30 p-4 text-xs">
-                <p className="font-medium">Tone-rewrite walkthrough</p>
+                <p className="font-medium">Blind-review walkthrough</p>
                 <p className="text-muted-foreground">
-                  A complete prompt with variables, a test case, three blind
-                  outputs, evaluator feedback, and an optimizer suggestion —
-                  all yours to edit, run, and re-optimize.
+                  A complete example: run a candidate, review outputs blind,
+                  capture feedback, and route the verdict into the next version.
                 </p>
               </div>
               <Button

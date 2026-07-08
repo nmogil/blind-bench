@@ -382,7 +382,7 @@ function RevealPhase({
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           Run real LLM outputs through blind evaluation, collect annotations,
-          and optimize prompts with AI feedback.
+          and route blind-review feedback into the next revision.
         </p>
         <Link
           to="/auth/sign-in"
