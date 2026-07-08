@@ -47,34 +47,42 @@ const APP_URL = 'https://app.blindbench.dev';
       <p
         class="font-mono text-[11px] tracking-[0.18em] text-white/70 uppercase"
       >
-        Google Docs for AI evaluation
+        The blind review layer for AI agents
       </p>
 
       <h1
         class="mt-6 text-[2rem] font-semibold leading-[1.12] tracking-tight text-white sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem]"
       >
-        Get feedback from{' '}
+        Get blind review from{' '}
         <span class="hero-rotator" data-hero-rotator>
           <!-- Invisible sizer reserves width of the longest persona so the
                H1's line 1 never re-wraps as words rotate. Keep in sync with
                the ROLES array below. -->
-          <span class="hero-rotator-sizer" aria-hidden="true">customers</span>
+          <span class="hero-rotator-sizer" aria-hidden="true">engineers</span>
+          <!-- Screen readers get one stable headline; the rotating word is
+               presentation-only. -->
+          <span class="sr-only">experts</span>
           <span
             class="hero-rotator-clip"
             data-hero-rotator-active
-            aria-live="polite"
-            aria-atomic="true"
+            aria-hidden="true"
           ></span>
         </span>
         <br />
-        to ship better AI products.
+        before you trust the agent.
       </h1>
 
       <p
         class="mt-6 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
       >
-        From prompt drafts to production traces. One shareable link. No
-        account. Comments become improvements, automatically.
+        LLM judges drift, and human reviewers anchor on what they can see.
+        Blind Bench strips the version, model, and harness from every agent
+        trajectory and model output, so your experts judge the work &mdash;
+        not the label on it.
+      </p>
+
+      <p class="mt-6 max-w-xl text-lg font-medium text-white sm:text-xl">
+        Stop guessing whether your agent got better. Know.
       </p>
 
       <div
@@ -177,7 +185,7 @@ const APP_URL = 'https://app.blindbench.dev';
 <script>
   import { trackLandingEvent } from '../lib/analytics';
 
-  const ROTATOR_PERSONAS = ['PMs', 'legal', 'marketing', 'customers', 'experts'] as const;
+  const ROTATOR_PERSONAS = ['engineers', 'legal', 'support', 'PMs', 'experts'] as const;
 
   function normalizePersona(value: string | undefined) {
     return ROTATOR_PERSONAS.find((persona) => persona === value) ?? 'unknown';
