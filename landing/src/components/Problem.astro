@@ -1,19 +1,26 @@
 ---
-// Problem section: three lived failure modes instead of abstract claims.
-// Preserves the redact-reveal animation — punchline phrases unblur on scroll.
+// Problem section: the recognition moment for agent teams. Three failure modes
+// in the quality loop — the human check is anchored, the automated judge drifts
+// unchecked, and the good signal you do get evaporates. Maps to the hero's
+// handoff (judges drift, reviewers anchor) and adds the third: feedback dies.
+// Preserves the redact-reveal animation — punchline phrases unblur on scroll,
+// which is the reader un-blinding themselves to the hidden truth.
 
 const scenarios = [
   {
-    setup: 'You asked legal to review three responses.',
-    punchline: 'They said &ldquo;looks fine&rdquo; in Slack and moved on.',
+    setup: 'A senior engineer opens the coding agent’s trace to review the new version.',
+    punchline:
+      'Knowing it&rsquo;s the new one, they read to confirm it improved &mdash; not to find where it broke.',
   },
   {
-    setup: 'You sent a Google Doc to marketing.',
-    punchline: 'Feedback scattered across 12 comment threads.',
+    setup: 'An LLM judge scores every run and hands you a winner.',
+    punchline:
+      'It drifts toward its own phrasing, favors what it would have written &mdash; and nobody grades the grader.',
   },
   {
-    setup: 'You launched anyway.',
-    punchline: 'And hoped the brand voice held up.',
+    setup: 'Your sharpest reviewer explains exactly why the agent failed.',
+    punchline:
+      'The note dies in a Slack thread, never re-attached to the trace that produced it.',
   },
 ];
 ---
@@ -21,7 +28,7 @@ const scenarios = [
 <section class="redact-reveal border-y border-border/50 bg-muted/30 py-16 lg:py-20">
   <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
     <h2 class="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-      Getting human feedback on AI is broken.
+      You can’t trust the read on your own agents.
     </h2>
 
     <ul class="mt-8 space-y-5 text-base leading-relaxed text-muted-foreground">

@@ -7,24 +7,24 @@ import ApplyPanel from './ApplyPanel.astro';
 const steps = [
   {
     number: '01',
-    eyebrow: 'Set up',
-    title: 'Draft a prompt, pick the models.',
+    eyebrow: 'Bring it in',
+    title: 'Bring in what your agent did.',
     description:
-      'Write your system message, mark the variables, and choose a few models or temperatures to compare side-by-side.',
+      'Import trajectories from Claude Code, push your gateway logs, or POST the native JSON — or run a prompt across models yourself. BYOK throughout; Blind Bench never holds your keys.',
   },
   {
     number: '02',
-    eyebrow: 'Share',
-    title: 'Send one link. No login.',
+    eyebrow: 'Review blind',
+    title: 'Reviewers judge without the label.',
     description:
-      'Reviewers see outputs blind — no model names, no version numbers — and highlight the lines they like or hate right in the browser.',
+      'One link, no account. Candidate and control sit side by side with the version, model, and harness stripped, so your experts weigh the work — not the name on it.',
   },
   {
     number: '03',
-    eyebrow: 'Apply',
-    title: 'Turn feedback into prompt edits.',
+    eyebrow: 'Route it back',
+    title: 'Turn the verdict into the next run.',
     description:
-      'The optimizer reads every annotation and proposes a new version, with each change cited to the comment that motivated it.',
+      'Preferences roll up to standings. Comments re-attach to the trace that earned them and feed regression sets, training data, and prompt revisions that cite the exact note they answer.',
   },
 ];
 ---
@@ -36,14 +36,15 @@ const steps = [
       <h2
         class="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl"
       >
-        From prompt to production.
+        From agent run to a verdict you trust.
         <span class="block font-semibold text-muted-foreground/60">
           Three steps, one link.
         </span>
       </h2>
       <p class="mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg">
-        Draft, get blind reviewer feedback, and apply concrete prompt edits —
-        without leaving a tab open for your reviewers.
+        Bring in what your agent produced, get blind judgment from the people
+        who know the domain, and route their verdict back to where it changes
+        the next run.
       </p>
     </div>
   </div>

@@ -1,26 +1,30 @@
 ---
 // Replaces the former Differentiators feature cards. Promises a comparison
 // in the section headline ("What Blind Bench does that others don't") and
-// now actually delivers one — named alternatives, named failure modes.
+// delivers one on the honest competitive axis: incumbents ship capable human
+// review, but it is attribution-visible and the verdict rarely re-attaches to
+// the artifact. Never claims competitors lack human review (false); the gap is
+// BLIND + closed loop. We pair with these tools — see the "Bring your stack"
+// card below — so the framing stays respectful.
 
 const rows = [
   {
-    tried: 'Prompt management &amp; tracing',
-    examples: 'Langfuse, PromptLayer, PostHog, Braintrust',
-    gap: 'Built for developers. The reviewers whose judgment matters &mdash; PMs, legal, marketing &mdash; never open them, so feedback never reaches the prompt.',
-    bb: 'Pairs with them and closes the loop: reviewer comments become the next prompt version.',
+    tried: 'Annotation queues',
+    examples: 'in Braintrust, LangSmith, Langfuse',
+    gap: 'Capable tools &mdash; but every item shows the reviewer the version, the model, the harness. Your highest-stakes signal inherits that anchor.',
+    bb: 'Blind by construction. Provenance is stripped at the API boundary and kept out of the DOM and clipboard, so experts weigh the work, not the label.',
   },
   {
-    tried: 'Eval platforms',
-    examples: 'Promptfoo, LangSmith',
-    gap: 'Reviewers see which variant is yours, and scores sit in a dashboard instead of driving the next edit.',
-    bb: 'Blind by default. Every annotation maps to a concrete prompt change, cited to the comment.',
+    tried: 'LLM-as-judge',
+    examples: 'Promptfoo, plus your in-house graders',
+    gap: 'Fast and cheap, but a judge drifts toward its own phrasing and agrees without validity &mdash; with nothing checking the verdict.',
+    bb: 'Your experts review the same runs blind &mdash; un-anchored by the judge&rsquo;s score. Humans for the calls that decide a release.',
   },
   {
-    tried: 'Google Docs / Slack',
-    examples: 'or email threads',
-    gap: 'No structure, no blinding, no path from a comment to a prompt change.',
-    bb: 'Structured, blind, and traceable &mdash; every comment lands in the next iteration.',
+    tried: 'Docs, sheets, threads',
+    examples: 'the ad hoc review most teams run',
+    gap: 'No blinding, no structure, and the sharpest comment never finds its way back to the version that produced it.',
+    bb: 'Structured and blind, and the verdict routes back &mdash; to the trace, a regression set, and the next revision that cites it.',
   },
 ];
 ---
@@ -32,9 +36,9 @@ const rows = [
         What Blind Bench does that others don&rsquo;t.
       </h2>
       <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-        Other tools log prompts or collect scores. None of them close the loop.
-        Blind Bench routes every reviewer comment back into the prompt &mdash;
-        the next version is built from the feedback that drove it.
+        Human review already lives in these tools. What none of them do is hide
+        the label from the reviewer &mdash; or carry the verdict back to the
+        artifact. Blind Bench does both.
       </p>
     </div>
 
@@ -50,10 +54,10 @@ const rows = [
           class="grid grid-cols-[1.1fr_1.4fr_1fr] border-b border-border bg-muted/40"
         >
           <div class="px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-            You tried...
+            In your stack today
           </div>
           <div class="px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-            What went wrong
+            The gap
           </div>
           <div class="border-l border-border bg-primary/5 px-5 py-3 font-mono text-[11px] uppercase tracking-widest text-primary">
             Blind Bench
@@ -95,7 +99,7 @@ const rows = [
               <dl class="divide-y divide-border">
                 <div class="px-4 py-3">
                   <dt class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    What went wrong
+                    The gap
                   </dt>
                   <dd
                     class="mt-1 text-sm leading-relaxed text-muted-foreground"

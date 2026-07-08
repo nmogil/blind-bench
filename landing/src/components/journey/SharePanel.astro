@@ -40,7 +40,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
 
       <!-- Two-column outputs -->
       <div class="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0" id="demo-outputs">
-        <!-- Output A (secretly: Claude 3.5 Haiku · Prompt v1) -->
+        <!-- Output A (secretly: Claude Haiku · control) -->
         <button
           type="button"
           class="demo-choice p-5 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
@@ -50,14 +50,14 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
           <div class="mb-4 flex items-center gap-2">
             <span class="demo-blind-label inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary transition-opacity duration-300">A</span>
             <span class="demo-blind-tag text-xs text-muted-foreground transition-opacity duration-300">Output</span>
-            <span class="demo-real-label shimmer-text text-xs font-medium text-primary opacity-0 transition-opacity duration-300">Claude Haiku 4 &middot; Prompt v1 (first draft)</span>
+            <span class="demo-real-label shimmer-text text-xs font-medium text-primary opacity-0 transition-opacity duration-300">Claude Haiku 4 &middot; control</span>
           </div>
           <p class="text-sm leading-relaxed text-foreground/80">
             I&rsquo;m really sorry about the double charge &mdash; that&rsquo;s completely on us and I understand how frustrating that must be, especially as a long-time customer. I&rsquo;ve just issued a refund for the duplicate $49 charge. You should see it back in your account within 3&ndash;5 business days. If it doesn&rsquo;t show up by then, reply here and I&rsquo;ll escalate it right away.
           </p>
         </button>
 
-        <!-- Output B (secretly: GPT-4o · Prompt v7) -->
+        <!-- Output B (secretly: GPT-4o · candidate) -->
         <button
           type="button"
           class="demo-choice p-5 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
@@ -67,7 +67,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
           <div class="mb-4 flex items-center gap-2">
             <span class="demo-blind-label inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary transition-opacity duration-300">B</span>
             <span class="demo-blind-tag text-xs text-muted-foreground transition-opacity duration-300">Output</span>
-            <span class="demo-real-label shimmer-text text-xs font-medium text-primary opacity-0 transition-opacity duration-300">GPT-4o &middot; Prompt v7 (12 iterations)</span>
+            <span class="demo-real-label shimmer-text text-xs font-medium text-primary opacity-0 transition-opacity duration-300">GPT-4o &middot; candidate</span>
           </div>
           <p class="text-sm leading-relaxed text-foreground/80">
             Thank you for reaching out and for being a valued customer for two years. I&rsquo;ve reviewed your billing history and can confirm that a duplicate charge of $49.00 was processed on March 5th in error. I have initiated a full refund for the erroneous charge, which will be reflected in your statement within 3&ndash;5 business days. Additionally, I have flagged your account to ensure this issue does not recur. Please do not hesitate to contact us should you require any further assistance.
@@ -90,7 +90,7 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
     <p class="text-lg font-semibold text-foreground" id="reveal-headline"></p>
     <p class="mt-2 text-sm text-muted-foreground" id="reveal-stats"></p>
     <p class="mx-auto mb-6 mt-6 max-w-lg text-base leading-relaxed text-muted-foreground">
-      One blind test. Blind Bench makes it the default for every prompt.
+      One blind call. Blind Bench makes it the default for every agent change.
     </p>
     <a
       href="https://app.blindbench.dev"
@@ -193,8 +193,8 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
       if (revealHeadline) {
         revealHeadline.textContent =
           choice === 'A'
-            ? 'The first draft won.'
-            : 'You chose the polished version.';
+            ? 'You picked the control.'
+            : 'You picked the candidate.';
       }
       if (revealSection) {
         revealSection.style.opacity = '1';
@@ -218,8 +218,8 @@ const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
         if (revealHeadline) {
           revealHeadline.textContent =
             choice === 'A'
-              ? 'The first draft won.'
-              : 'You chose the polished version.';
+              ? 'You picked the control.'
+              : 'You picked the candidate.';
         }
         if (revealSection) {
           revealSection.style.opacity = '1';

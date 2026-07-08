@@ -7,6 +7,28 @@ Last updated: 2026-07-07
 
 ---
 
+## 2026-07-08 update — agent-first one-liner (supersedes the one-liner below)
+
+Approved by Noah 2026-07-08. The external framing is now
+[[Blind Bench - Positioning One-Pager]]; where this doc conflicts with it, the
+one-pager wins.
+
+- New one-liner: **"Blind Bench is the blind human-review layer for AI
+  agents"** — plain LLM outputs supported, agents lead. Replaces "Google Docs
+  for AI evaluation."
+- **Explicit reversal:** the line below stating blind evaluation "is not the
+  headline product claim" no longer holds. Blind is the identity. Rationale:
+  July 2026 landscape scan found annotation queues commoditized across all 12
+  incumbents, every one attribution-visible — blind internal expert review is
+  the empty seat, and it is emptier still for agent trajectories.
+- Trajectory caveat carried into all public language: bias reduction, not
+  anonymity (per M31 docs).
+- "Not an eval platform" confirmed: the judgment layer above Braintrust /
+  LangSmith / Langfuse / harnesses; integrations arrive via customer-side
+  exporters into the native `eval-record` v1 contract.
+
+---
+
 ## 2026-07-07 update — persona generalization (supersedes parts of this doc)
 
 Approved by Noah 2026-07-07. Source of truth:

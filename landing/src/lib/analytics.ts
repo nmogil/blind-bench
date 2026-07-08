@@ -14,7 +14,7 @@ import * as Sentry from '@sentry/browser';
 export interface LandingEventProps {
   hero_cta_click: {
     ctaLabel: 'get_started' | 'see_how';
-    rotatorPersona: 'PMs' | 'legal' | 'marketing' | 'customers' | 'experts' | 'unknown';
+    rotatorPersona: 'engineers' | 'legal' | 'support' | 'PMs' | 'experts' | 'unknown';
   };
 }
 
