@@ -1,10 +1,9 @@
 ---
 import Play from '../../icons/Play.astro';
 
-const models = [
-  { label: 'A', name: 'GPT-4o', vendor: 'OpenAI', temp: '0.7' },
-  { label: 'B', name: 'Claude Haiku 4', vendor: 'Anthropic', temp: '0.7' },
-  { label: 'C', name: 'Gemini 2.5 Pro', vendor: 'Google', temp: '1.0' },
+const outputs = [
+  { label: 'A', name: 'Control', detail: 'live in production' },
+  { label: 'B', name: 'Candidate', detail: 'new agent version' },
 ];
 ---
 
@@ -19,7 +18,7 @@ const models = [
       </div>
       <div class="ml-4 flex-1">
         <div class="mx-auto w-fit rounded-md bg-muted px-3 py-1 text-xs text-muted-foreground">
-          New review &middot; customer support tone &middot; v3
+          New review cycle &middot; support agent &middot; v3
         </div>
       </div>
     </div>
@@ -32,9 +31,9 @@ const models = [
       <div class="p-5 sm:p-6">
         <div class="mb-3 flex items-center justify-between gap-2">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            System message
+            Agent prompt
           </span>
-          <span class="font-mono text-[11px] text-muted-foreground">system.md</span>
+          <span class="font-mono text-[11px] text-muted-foreground">agent.md</span>
         </div>
         <div class="rounded-lg border border-border bg-muted/30 p-4">
           <p class="font-mono text-sm leading-relaxed text-foreground/85">
@@ -63,13 +62,13 @@ const models = [
       <div class="bg-muted/20 p-5 sm:p-6">
         <div class="mb-3 flex items-center justify-between gap-2">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Responses to compare
+            Candidate vs control
           </span>
-          <span class="text-[11px] text-muted-foreground">3 of 5</span>
+          <span class="text-[11px] text-muted-foreground">blind to reviewers</span>
         </div>
         <div class="space-y-2">
           {
-            models.map((m) => (
+            outputs.map((m) => (
               <div class="rounded-lg border border-border bg-card p-3">
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2 min-w-0">
@@ -78,9 +77,8 @@ const models = [
                     </span>
                     <span class="truncate text-xs font-medium text-foreground">{m.name}</span>
                   </div>
-                  <span class="font-mono text-[10px] text-muted-foreground">t={m.temp}</span>
                 </div>
-                <p class="mt-1 pl-7 text-[10px] text-muted-foreground">{m.vendor}</p>
+                <p class="mt-1 pl-7 text-[10px] text-muted-foreground">{m.detail}</p>
               </div>
             ))
           }
@@ -91,7 +89,7 @@ const models = [
     <!-- Bottom bar -->
     <div class="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
       <span class="text-xs text-muted-foreground">
-        3 test cases &middot; BYOK
+        3 cases &middot; BYOK
       </span>
       <span class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm">
         <Play class="h-3 w-3" />
