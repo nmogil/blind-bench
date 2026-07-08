@@ -13,7 +13,7 @@ import * as Sentry from '@sentry/browser';
 /** Closed schema: event name → its allowed props. */
 export interface LandingEventProps {
   hero_cta_click: {
-    ctaLabel: 'get_started' | 'see_how';
+    ctaLabel: 'get_started' | 'try_demo';
     rotatorPersona: 'engineers' | 'legal' | 'support' | 'PMs' | 'experts' | 'unknown';
   };
 }
