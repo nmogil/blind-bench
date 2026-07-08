@@ -41,9 +41,10 @@ const APP_URL = 'https://app.blindbench.dev';
     class="pointer-events-none absolute inset-0 bg-gradient-to-b from-neutral-950/30 via-transparent to-neutral-950/50"
   ></div>
   <div
-    class="relative mx-auto max-w-5xl px-4 pt-24 pb-24 sm:px-6 lg:px-8 lg:pt-36 lg:pb-32"
+    class="relative mx-auto max-w-5xl px-4 pt-24 pb-24 sm:px-6 lg:px-8 lg:pt-36 lg:pb-32 xl:max-w-7xl"
   >
-    <div class="hero-animate mx-auto max-w-3xl">
+    <div class="xl:flex xl:items-center xl:gap-12">
+      <div class="hero-animate mx-auto max-w-3xl xl:mx-0 xl:min-w-0 xl:flex-1">
       <h1
         class="mt-6 text-[2rem] font-semibold leading-[1.12] tracking-tight text-white sm:text-[2.5rem] md:text-[3rem] lg:text-[3.25rem]"
       >
@@ -69,13 +70,8 @@ const APP_URL = 'https://app.blindbench.dev';
       <p
         class="mt-6 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
       >
-        Reviewers anchor on what they can see. Blind Bench strips the
-        version, model, and harness from every trajectory and output &mdash;
-        so your experts judge the work, not the label.
-      </p>
-
-      <p class="mt-6 max-w-xl text-lg font-medium text-white sm:text-xl">
-        Stop guessing whether your agent got better. Know.
+        Blind Bench hides each run&rsquo;s version, model, and harness from
+        reviewers, so experts judge the work and you learn whether it improved.
       </p>
 
       <div
@@ -90,18 +86,128 @@ const APP_URL = 'https://app.blindbench.dev';
           <ArrowRight class="ml-2 h-4 w-4" />
         </a>
         <a
-          href="#how-it-works"
-          data-hero-cta="see_how"
+          href="#demo-section"
+          data-hero-cta="try_demo"
           class="inline-flex items-center justify-center rounded-md border border-white/30 bg-white/5 px-6 py-3 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
-          See how it works
+          Try a blind review
           <ArrowDown class="ml-1.5 h-4 w-4" />
         </a>
       </div>
+      </div>
 
-      <p class="mt-8 text-xs text-white/60">
-        Free in beta &middot; BYOK &middot; No per-seat billing
-      </p>
+      <!-- Decorative product glimpse: a blind-review comparison card. Two
+           outputs whose provenance (Version / Model) is visibly REDACTED —
+           the redaction is the message — with one marked Preferred. Body
+           text is skeleton bars, never readable fake content. Desktop only;
+           the mobile hero is unchanged. Purely presentational: aria-hidden
+           and pointer-events-none, sits on the bright right side of the
+           gradient with its own dark-glass treatment. -->
+      <div
+        aria-hidden="true"
+        class="pointer-events-none hidden xl:block xl:w-[340px] xl:shrink-0"
+      >
+        <div
+          class="relative rounded-xl border border-white/10 bg-white/5 p-4 shadow-2xl shadow-black/40 backdrop-blur-md"
+        >
+          <!-- Card header -->
+          <div class="mb-3 flex items-center justify-between">
+            <span
+              class="text-[11px] font-medium uppercase tracking-[0.14em] text-white/50"
+              >Blind review</span
+            >
+            <span class="text-[11px] tracking-tight text-white/40"
+              >Which is better?</span
+            >
+          </div>
+
+          <!-- Output A -->
+          <div class="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div class="mb-2.5 flex items-center gap-2">
+              <span
+                class="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[11px] font-semibold text-white/80"
+                >A</span
+              >
+              <span class="text-[11px] text-white/45">Output</span>
+            </div>
+            <!-- Redacted provenance: label + blurred block-character bar -->
+            <div class="mb-3 flex flex-wrap gap-1.5">
+              <span
+                class="inline-flex items-center gap-1.5 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40"
+              >
+                Version
+                <span class="hero-redact font-mono text-white/30">██████</span>
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40"
+              >
+                Model
+                <span class="hero-redact font-mono text-white/30">████████</span>
+              </span>
+            </div>
+            <!-- Skeleton body -->
+            <div class="space-y-1.5">
+              <span class="block h-1.5 w-full rounded-full bg-white/10"></span>
+              <span class="block h-1.5 w-[88%] rounded-full bg-white/10"></span>
+              <span class="block h-1.5 w-[64%] rounded-full bg-white/10"></span>
+            </div>
+          </div>
+
+          <!-- Output B — the preferred one -->
+          <div
+            class="relative mt-3 rounded-lg border border-violet-300/30 bg-violet-300/[0.06] p-3"
+          >
+            <span
+              class="absolute -top-2.5 right-3 inline-flex items-center gap-1 rounded-full border border-violet-300/40 bg-neutral-950/85 px-2 py-0.5 text-[10px] font-medium text-violet-200 backdrop-blur-sm"
+            >
+              <svg
+                viewBox="0 0 12 12"
+                class="h-2.5 w-2.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2.5 6.5 5 9l4.5-5.5" />
+              </svg>
+              Preferred
+            </span>
+            <div class="mb-2.5 flex items-center gap-2">
+              <span
+                class="flex h-5 w-5 items-center justify-center rounded bg-violet-300/20 text-[11px] font-semibold text-violet-100"
+                >B</span
+              >
+              <span class="text-[11px] text-white/45">Output</span>
+            </div>
+            <div class="mb-3 flex flex-wrap gap-1.5">
+              <span
+                class="inline-flex items-center gap-1.5 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40"
+              >
+                Version
+                <span class="hero-redact font-mono text-white/30">███████</span>
+              </span>
+              <span
+                class="inline-flex items-center gap-1.5 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/40"
+              >
+                Model
+                <span class="hero-redact font-mono text-white/30">██████</span>
+              </span>
+            </div>
+            <div class="space-y-1.5">
+              <span
+                class="block h-1.5 w-full rounded-full bg-violet-200/20"
+              ></span>
+              <span
+                class="block h-1.5 w-[92%] rounded-full bg-violet-200/20"
+              ></span>
+              <span
+                class="block h-1.5 w-[70%] rounded-full bg-violet-200/20"
+              ></span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <!-- Sentinel for the Nav.astro IntersectionObserver. When this element
          scrolls above the nav, the nav flips from transparent to solid. -->
@@ -172,6 +278,15 @@ const APP_URL = 'https://app.blindbench.dev';
   .hero-rotator-char {
     display: inline-block;
     will-change: transform, opacity;
+  }
+
+  /* Redacted provenance value. Blurred block characters read as suppressed
+     data — the redaction is the message. Static; no motion to respect. */
+  .hero-redact {
+    display: inline-block;
+    letter-spacing: -0.06em;
+    filter: blur(1.5px);
+    user-select: none;
   }
 </style>
 
@@ -299,7 +414,7 @@ const APP_URL = 'https://app.blindbench.dev';
         const persona = normalizePersona(rotator?.dataset.current);
         const label = el.getAttribute('data-hero-cta');
         trackLandingEvent('hero_cta_click', {
-          ctaLabel: label === 'see_how' ? 'see_how' : 'get_started',
+          ctaLabel: label === 'try_demo' ? 'try_demo' : 'get_started',
           rotatorPersona: persona,
         });
       });

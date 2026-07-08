@@ -105,7 +105,7 @@ async function main() {
               maxWidth: '900px',
               lineHeight: 1.3,
             },
-            children: 'The blind taste test for AI',
+            children: 'The blind review layer for AI agents',
           },
         },
       ],

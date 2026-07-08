@@ -11,20 +11,20 @@ const rows = [
   {
     tried: 'Annotation queues',
     examples: 'in Braintrust, LangSmith, Langfuse',
-    gap: 'Capable tools &mdash; but every item shows the reviewer the version, the model, the harness. Your highest-stakes signal inherits that anchor.',
-    bb: 'Blind by construction. Provenance is stripped at the API boundary and kept out of the DOM and clipboard, so experts weigh the work, not the label.',
+    gap: 'Capable tools &mdash; but each item shows the version, model, and harness. That anchors your highest-stakes signal.',
+    bb: 'Blind by construction. Provenance is stripped at the API boundary, so experts weigh the work, not the label.',
   },
   {
     tried: 'LLM-as-judge',
     examples: 'Promptfoo, plus your in-house graders',
-    gap: 'Fast and cheap, but a judge drifts toward its own phrasing and agrees without validity &mdash; with nothing checking the verdict.',
-    bb: 'Your experts review the same runs blind &mdash; un-anchored by the judge&rsquo;s score. Humans for the calls that decide a release.',
+    gap: 'Fast and cheap, but a judge drifts to its own phrasing, agreeing without validity &mdash; nothing checks it.',
+    bb: 'Your experts review the same runs blind, un-anchored by the judge&rsquo;s score &mdash; for calls that decide a release.',
   },
   {
     tried: 'Docs, sheets, threads',
     examples: 'the ad hoc review most teams run',
-    gap: 'No blinding, no structure, and the sharpest comment never finds its way back to the version that produced it.',
-    bb: 'Structured and blind, and the verdict routes back &mdash; to the trace, a regression set, and the next revision that cites it.',
+    gap: 'No blinding, no structure &mdash; and the sharpest comment never finds the version that produced it.',
+    bb: 'Structured and blind &mdash; the verdict routes back to the trace, a regression set, and the revision that cites it.',
   },
 ];
 ---
@@ -36,9 +36,9 @@ const rows = [
         What Blind Bench does that others don&rsquo;t.
       </h2>
       <p class="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-        Human review already lives in these tools. What none of them do is hide
-        the label from the reviewer &mdash; or carry the verdict back to the
-        artifact. Blind Bench does both.
+        These tools already run human review. None hide the label from the
+        reviewer or route the verdict back to the artifact. Blind Bench does
+        both.
       </p>
     </div>
 
