@@ -11,13 +11,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CopyButton } from "@/components/ui/copy-button";
 import { friendlyError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
-import { Radio, ShieldAlert, KeyRound, Settings2 } from "lucide-react";
+import { Radio, ShieldAlert, KeyRound, Settings2, Braces } from "lucide-react";
 
 type IngestToken = FunctionReturnType<
   typeof api.ingestTokens.listIngestTokens
 >[number];
 
 type IssueResult = FunctionReturnType<typeof api.ingestTokens.issueIngestToken>;
+
+/** {CONVEX_SITE_URL}/ingest/v1/traces — native JSON path; httpActions serve on .convex.site. */
+function deriveNativeIngestUrl(): string {
+  const raw = (import.meta.env.VITE_CONVEX_URL ?? "").trim();
+  const siteUrl = raw.replace(".convex.cloud", ".convex.site");
+  return siteUrl
+    ? `${siteUrl}/ingest/v1/traces`
+    : "https://<your-deployment>.convex.site/ingest/v1/traces";
+}
 
 /** {CONVEX_SITE_URL}/otlp/v1/traces — httpActions serve on .convex.site, not .cloud. */
 function deriveIngestUrl(): string {
@@ -44,6 +53,7 @@ export function IngestEndpoint() {
   const tokens = useQuery(api.ingestTokens.listIngestTokens, { projectId });
   const issueToken = useMutation(api.ingestTokens.issueIngestToken);
 
+  const nativeIngestUrl = deriveNativeIngestUrl();
   const ingestUrl = deriveIngestUrl();
 
   const [label, setLabel] = useState("Gateway token");
@@ -74,11 +84,13 @@ export function IngestEndpoint() {
       <header>
         <div className="flex items-center gap-2">
           <Radio aria-hidden="true" className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Continuous ingest (OTLP)</h1>
+          <h1 className="text-2xl font-bold">Continuous ingest</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Push agent traces to Blind Bench automatically from Cloudflare AI
-          Gateway or any OpenTelemetry source.
+          Meet your data where it is. POST Blind Bench's native JSON directly
+          from your app — or, if you already run an OpenTelemetry / AI gateway,
+          point its exporter at the OTLP adapter endpoint. Both paths use the
+          same per-project ingest token.
         </p>
       </header>
 
@@ -96,37 +108,14 @@ export function IngestEndpoint() {
           <p>
             Blind Bench{" "}
             <strong className="text-foreground">
-              never holds your gateway credential
+              never holds your model or gateway credentials
             </strong>
-            . You issue a token here and add it to YOUR gateway config — we only
-            receive what your gateway pushes.
+            . You issue an ingest token here and add it to YOUR caller — whether
+            that's your app POSTing native JSON or a gateway's OTLP exporter — so
+            we only ever receive what you push.
           </p>
         </CardContent>
       </Card>
-
-      {/* Ingest URL */}
-      <section className="mt-6 space-y-1.5">
-        <Label htmlFor="ingest-url">Ingest URL</Label>
-        <div className="flex items-center gap-2">
-          <Input
-            id="ingest-url"
-            value={ingestUrl}
-            readOnly
-            spellCheck={false}
-            className="font-mono text-xs"
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <CopyButton
-            text={ingestUrl}
-            label="Copy"
-            variant="inline"
-            className="h-8 shrink-0 border border-input px-2.5"
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Point your gateway's OTLP HTTP exporter at this endpoint.
-        </p>
-      </section>
 
       {/* Issue token */}
       <section className="mt-8">
@@ -169,9 +158,87 @@ export function IngestEndpoint() {
         </div>
       </section>
 
-      {/* Gateway setup */}
+      {/* Native JSON — the default path */}
+      <NativeIngestCard nativeUrl={nativeIngestUrl} />
+
+      {/* Gateway / OTLP adapter */}
       <GatewaySetupCard ingestUrl={ingestUrl} />
     </div>
+  );
+}
+
+function NativeIngestCard({ nativeUrl }: { nativeUrl: string }) {
+  const curl = [
+    `curl -X POST ${nativeUrl} \\`,
+    `  -H "Authorization: Bearer <your token>" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -d '{`,
+    `    "version": "1",`,
+    `    "id": "req_abc123",`,
+    `    "model": "anthropic/claude-4.7-opus",`,
+    `    "provider": "anthropic",`,
+    `    "input": { "messages": [{ "role": "user", "content": "Summarize this ticket…" }] },`,
+    `    "output": { "content": "The ticket describes…" },`,
+    `    "usage": { "input_tokens": 812, "output_tokens": 143, "cost_usd": 0.0121 },`,
+    `    "product": "support-assistant",`,
+    `    "metadata": { "team": "support" }`,
+    `  }'`,
+  ].join("\n");
+
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Braces aria-hidden="true" className="h-4 w-4 text-primary" />
+          POST native JSON (recommended)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <p>
+          No gateway required. POST one eval record per model interaction to this
+          endpoint with your ingest token as a bearer credential.
+        </p>
+
+        {/* Native ingest URL */}
+        <div className="space-y-1.5">
+          <Label htmlFor="native-ingest-url">Native ingest URL</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="native-ingest-url"
+              value={nativeUrl}
+              readOnly
+              spellCheck={false}
+              className="font-mono text-xs"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <CopyButton
+              text={nativeUrl}
+              label="Copy"
+              variant="inline"
+              className="h-8 shrink-0 border border-input px-2.5"
+            />
+          </div>
+        </div>
+
+        <div className="relative">
+          <pre className="overflow-x-auto rounded-lg border bg-muted/30 p-3 pr-12 font-mono text-xs text-foreground">
+            {curl}
+          </pre>
+          <CopyButton text={curl} label="Copy curl" variant="overlay" />
+        </div>
+
+        <p>
+          Send a single object, a JSON array, or{" "}
+          <code className="text-foreground">{`{"records":[...]}`}</code> to batch
+          many interactions in one request.
+        </p>
+
+        <p className="text-foreground">
+          Response is counts-only — Blind Bench never echoes your prompt/output
+          content back.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -310,10 +377,15 @@ function GatewaySetupCard({ ingestUrl }: { ingestUrl: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Settings2 aria-hidden="true" className="h-4 w-4 text-primary" />
-          Gateway setup
+          Already have a gateway? OTLP exporter
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <p>
+          Prefer to reuse an existing OpenTelemetry / AI gateway instead of
+          POSTing native JSON? Point its OTLP HTTP exporter at the adapter
+          endpoint below — it accepts the same ingest token.
+        </p>
         <ol className="list-decimal space-y-2 pl-5">
           <li>Issue an ingest token above and copy it.</li>
           <li>

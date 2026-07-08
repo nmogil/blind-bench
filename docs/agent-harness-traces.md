@@ -30,7 +30,13 @@ Expected fields are intentionally simple:
 }
 ```
 
-No SDK integration is required yet. The capture path is intentionally export/import first.
+No SDK integration is required for this export shape. Beyond it, a **native HTTP
+ingest endpoint** now exists — `POST /ingest/v1/traces` on `{deployment}.convex.site`,
+authenticated by a per-project ingest token — so a harness can push traces live
+without an export/import step. It accepts the versioned `eval-record` v1 schema
+(one record = one model interaction), which normalizes into the same
+`AgentRunTrace` spine described below. See [`native-ingest.md`](./native-ingest.md)
+for the full contract.
 
 ## Normalized shape
 
@@ -119,5 +125,8 @@ The eval case stores messages and scorer-visible tool/policy context while keepi
 
 - No LangGraph/LangSmith/Phoenix replacement.
 - No sandboxed agent execution yet.
-- No automatic capture from production Jeeves agents yet.
+- Live capture exists via the native ingest endpoint (`/ingest/v1/traces`, see
+  [`native-ingest.md`](./native-ingest.md)) and OTLP; there is still no
+  auto-instrumentation baked into the Jeeves agents themselves — the harness must
+  emit records to the endpoint.
 - No customer production data committed to the repo.

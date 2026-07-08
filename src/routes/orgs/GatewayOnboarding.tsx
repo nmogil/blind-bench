@@ -282,6 +282,13 @@ export function GatewayOnboarding() {
         <h2 id="paths-heading" className="text-lg font-semibold">
           Two ways to feed logs in
         </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Both paths below are gateway adapters — they get your existing
+          Cloudflare AI Gateway logs into Blind Bench. No gateway? You can skip
+          this entirely and POST Blind Bench's native JSON schema straight from
+          your app: open a project's <strong className="text-foreground">Ingest</strong>{" "}
+          tab for the endpoint, token, and a copyable <code>curl</code> example.
+        </p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <Card>
             <CardHeader>
