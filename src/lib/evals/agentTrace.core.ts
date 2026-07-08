@@ -231,6 +231,227 @@ export function normalizeJeevesClogRun(
   };
 }
 
+/**
+ * Blind Bench's own public ingest schema: `eval-record` v1. One record = one
+ * model interaction (the request messages plus the model's output). Mirrors the
+ * shape a customer's harness can emit directly (no OTLP/OTel envelope), and
+ * normalizes into the same `AgentRunTrace` spine everything else flows through.
+ */
+export interface EvalRecordV1 {
+  version: "1";
+  id?: string;
+  timestamp?: string;
+  model?: string;
+  provider?: string;
+  input: { messages: { role: string; content: string }[] };
+  output?: {
+    content?: string;
+    tool_calls?: { id?: string; name: string; arguments: Record<string, unknown> }[];
+    tool_results?: { tool_call_id: string; name?: string; result?: unknown }[];
+  };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    cost_usd?: number;
+    duration_ms?: number;
+  };
+  product?: string;
+  module?: string;
+  environment?: string;
+  harness?: { name?: string; version?: string; sdk?: string };
+  metadata?: Record<string, unknown>;
+  privacy_class?: PrivacyClass;
+}
+
+const PRIVACY_CLASSES: readonly string[] = ["public", "internal", "confidential", "pii", "phi"];
+const asPrivacyClass = (v: unknown): PrivacyClass | undefined =>
+  typeof v === "string" && PRIVACY_CLASSES.includes(v) ? (v as PrivacyClass) : undefined;
+/** More sensitive of two classes (by PRIVACY_CLASSES order); explicit may raise, never lower. */
+const maxPrivacyClass = (a: PrivacyClass, b: PrivacyClass): PrivacyClass =>
+  PRIVACY_CLASSES.indexOf(a) >= PRIVACY_CLASSES.indexOf(b) ? a : b;
+const MAX_EVAL_RECORD_MESSAGES = 2000;
+
+/**
+ * Normalize a public `eval-record` v1 payload into an `AgentRunTrace`. Structure
+ * and redaction MIRROR `normalizeJeevesClogRun` (same `normalizeStep` helper,
+ * same privacy computation) — the only difference is the source schema shape.
+ */
+export function normalizeEvalRecordV1(
+  raw: unknown,
+  options: { privacyMode?: PrivacyMode } = {},
+): AgentRunTrace {
+  // ponytail: hand-rolled validation; move to zod at the convex boundary if error ergonomics matter
+  const root = asRecord(raw);
+  if (!root) throw new Error("eval-record v1: root must be an object");
+  if (root.version !== "1") throw new Error('eval-record v1: version must be "1"');
+  const input = asRecord(root.input);
+  const messagesRaw = input?.messages;
+  if (!Array.isArray(messagesRaw) || messagesRaw.length === 0) {
+    throw new Error("eval-record v1: input.messages must be a non-empty array");
+  }
+  // ponytail: per-record cap bounds per-request storage writes; raise if real
+  // traces legitimately exceed it (the handler also caps records + total steps).
+  if (messagesRaw.length > MAX_EVAL_RECORD_MESSAGES) {
+    throw new Error(`eval-record v1: input.messages exceeds ${MAX_EVAL_RECORD_MESSAGES}`);
+  }
+  const messages: Message[] = messagesRaw.map((m, i) => {
+    const o = asRecord(m);
+    if (typeof o?.role !== "string" || typeof o?.content !== "string") {
+      throw new Error(`eval-record v1: input.messages[${i}] must have string role and content`);
+    }
+    return { role: o.role, content: o.content };
+  });
+
+  // Validate optional output fields when present so malformed data is rejected
+  // (counted `invalid` by the caller) rather than silently coerced on normalize.
+  const outputRec = asRecord(root.output);
+  if (outputRec) {
+    if (outputRec.content !== undefined && typeof outputRec.content !== "string") {
+      throw new Error("eval-record v1: output.content must be a string");
+    }
+    if (outputRec.tool_calls !== undefined) {
+      if (!Array.isArray(outputRec.tool_calls)) {
+        throw new Error("eval-record v1: output.tool_calls must be an array");
+      }
+      outputRec.tool_calls.forEach((tc, i) => {
+        const o = asRecord(tc);
+        if (typeof o?.name !== "string" || asRecord(o?.arguments) === undefined) {
+          throw new Error(
+            `eval-record v1: output.tool_calls[${i}] must have string name and object arguments`,
+          );
+        }
+      });
+    }
+    if (outputRec.tool_results !== undefined) {
+      if (!Array.isArray(outputRec.tool_results)) {
+        throw new Error("eval-record v1: output.tool_results must be an array");
+      }
+      outputRec.tool_results.forEach((tr, i) => {
+        const o = asRecord(tr);
+        if (typeof o?.tool_call_id !== "string") {
+          throw new Error(`eval-record v1: output.tool_results[${i}] must have string tool_call_id`);
+        }
+      });
+    }
+  }
+
+  const privacyMode = options.privacyMode ?? "blind_view";
+  const id = str(root.id);
+  const provider = str(root.provider);
+  const model = str(root.model);
+  const timestamp = str(root.timestamp);
+  const output = asRecord(root.output);
+  const usage = asRecord(root.usage);
+  const harnessRaw = asRecord(root.harness);
+  const harnessName = str(harnessRaw?.name);
+
+  const steps: AgentTraceStep[] = [];
+  for (const message of messages) {
+    steps.push({ type: "message", index: steps.length, timestamp, message });
+  }
+  const outputContent = str(output?.content);
+  if (outputContent !== undefined) {
+    steps.push({
+      type: "message",
+      index: steps.length,
+      timestamp,
+      message: { role: "assistant", content: outputContent },
+    });
+  }
+  const toolCalls = Array.isArray(output?.tool_calls) ? output!.tool_calls : [];
+  for (const tc of toolCalls) {
+    const t = asRecord(tc) ?? {};
+    steps.push(
+      normalizeStep(
+        { type: "tool_call", id: t.id, name: t.name, arguments: t.arguments },
+        steps.length,
+        privacyMode,
+      ),
+    );
+  }
+  const toolResults = Array.isArray(output?.tool_results) ? output!.tool_results : [];
+  for (const tr of toolResults) {
+    const t = asRecord(tr) ?? {};
+    steps.push(
+      normalizeStep(
+        { type: "tool_result", tool_call_id: t.tool_call_id, name: t.name, result: t.result },
+        steps.length,
+        privacyMode,
+      ),
+    );
+  }
+
+  // Hash ALL public content fields so two id-less records differing in any of
+  // them derive distinct trace ids (contract promise), not just message/output.
+  const traceSeed = {
+    model,
+    provider,
+    timestamp,
+    messages,
+    output: root.output,
+    usage: root.usage,
+    product: str(root.product),
+    module: str(root.module),
+    environment: str(root.environment),
+    harness: root.harness,
+    metadata: root.metadata,
+    privacy_class: root.privacy_class,
+  };
+  const inTok = num(usage?.input_tokens);
+  const outTok = num(usage?.output_tokens);
+  const totalTokens =
+    num(usage?.total_tokens) ??
+    (inTok !== undefined && outTok !== undefined ? inTok + outTok : undefined);
+
+  const source_ids: Record<string, unknown> = {};
+  if (id !== undefined) source_ids.record_id = id;
+  if (provider !== undefined) source_ids.provider = provider;
+
+  const redactionNotes = steps.some((s) => stableStringify(s).includes("[REDACTED]"))
+    ? ["sensitive tool/state fields redacted for blind/reviewer views"]
+    : [];
+  const computedClass: PrivacyClass = steps.some(
+    (s) => "privacy_class" in s && s.privacy_class === "pii",
+  )
+    ? "pii"
+    : "internal";
+  // Explicit privacy_class (emitter governance signal) may RAISE sensitivity but
+  // never lower the class the redaction heuristic computed — no silent downgrade.
+  const explicitClass = asPrivacyClass(root.privacy_class);
+  const effectiveClass = explicitClass
+    ? maxPrivacyClass(explicitClass, computedClass)
+    : computedClass;
+
+  return {
+    // Namespace native trace ids (`native-`) so a client-supplied `id` can never
+    // collide with another source's parent trace (e.g. OTLP's `otlp-<id>`), which
+    // dedups by (projectId, traceId) across sources. run_id stays the raw id so
+    // source-scoped import dedup and re-POST idempotency are unaffected.
+    trace_id: id !== undefined ? `native-${id}` : `native-${hash(traceSeed)}`,
+    source: "agent_harness",
+    harness: harnessName
+      ? { name: harnessName, version: str(harnessRaw?.version), sdk: str(harnessRaw?.sdk) }
+      : { name: provider ?? "eval-record", sdk: "eval-record" },
+    product: str(root.product) ?? provider ?? "eval-record",
+    module: str(root.module),
+    environment: str(root.environment),
+    model,
+    run_id: id,
+    source_ids,
+    messages: [],
+    steps,
+    final_answer: outputContent,
+    usage: {
+      cost_usd: num(usage?.cost_usd),
+      duration_ms: num(usage?.duration_ms),
+      total_tokens: totalTokens,
+    },
+    privacy: { class: effectiveClass, redaction_notes: redactionNotes },
+    metadata: asRecord(root.metadata) ?? {},
+  };
+}
+
 export interface ScorerVisibleAgentRun {
   trace_id: string;
   harness: AgentRunTrace["harness"];

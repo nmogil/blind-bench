@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyWebhook } from "./lib/polarSignature";
 import { otlpIngestHandler } from "./otlpIngest";
+import { nativeIngestHandler } from "./nativeIngest";
 
 const http = httpRouter();
 
@@ -167,6 +168,27 @@ http.route({
 });
 http.route({
   path: "/otlp/v1/traces",
+  method: "OPTIONS",
+  handler: httpAction(async () => {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-blindbench-ingest-token",
+      },
+    });
+  }),
+});
+
+// --- Native `eval-record` v1 JSON trace ingest (per-project token auth) ---
+http.route({
+  path: "/ingest/v1/traces",
+  method: "POST",
+  handler: nativeIngestHandler,
+});
+http.route({
+  path: "/ingest/v1/traces",
   method: "OPTIONS",
   handler: httpAction(async () => {
     return new Response(null, {

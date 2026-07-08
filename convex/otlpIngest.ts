@@ -15,15 +15,15 @@ import { mapOtlpToTraces } from "./lib/otelGenAI";
 import { storeTraceSteps } from "./agentTraces";
 import type { AgentRunTrace } from "./lib/agentTrace";
 
-const MAX_BYTES = 8 * 1024 * 1024;
+export const MAX_BYTES = 8 * 1024 * 1024;
 
-const json = (body: unknown, status: number): Response =>
+export const json = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
   });
 
-const readToken = (req: Request): string | undefined => {
+export const readToken = (req: Request): string | undefined => {
   const auth = req.headers.get("authorization");
   if (auth?.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
   return req.headers.get("x-blindbench-ingest-token")?.trim() || undefined;
@@ -55,11 +55,19 @@ export const touchIngestToken = internalMutation({
   },
 });
 
-/** Dedup + insert an otlp traceImport for provenance/raw retention. */
-export const insertOtlpImport = internalMutation({
+/** The token-authed ingest sources that share this import-row path (#263). */
+export const ingestSourceValidator = v.union(v.literal("otlp"), v.literal("native"));
+
+/**
+ * Dedup + insert a traceImport for provenance/raw retention. Shared by both the
+ * OTLP and native ingest endpoints — `source` is passed by the caller so the
+ * dedup key `(source, sourceTraceId)` stays correct per endpoint.
+ */
+export const insertIngestImport = internalMutation({
   args: {
     projectId: v.id("projects"),
     importedById: v.id("users"),
+    source: ingestSourceValidator,
     sourceTraceId: v.string(),
     rawPayloadStorageId: v.optional(v.id("_storage")),
   },
@@ -70,14 +78,14 @@ export const insertOtlpImport = internalMutation({
     const existing = await ctx.db
       .query("traceImports")
       .withIndex("by_source_trace", (q) =>
-        q.eq("source", "otlp").eq("sourceTraceId", args.sourceTraceId),
+        q.eq("source", args.source).eq("sourceTraceId", args.sourceTraceId),
       )
       .filter((q) => q.eq(q.field("projectId"), args.projectId))
       .first();
     if (existing) return { importId: existing._id, deduped: true };
     const importId = await ctx.db.insert("traceImports", {
       projectId: args.projectId,
-      source: "otlp",
+      source: args.source,
       sourceTraceId: args.sourceTraceId,
       importedById: args.importedById,
       rawPayloadStorageId: args.rawPayloadStorageId,
@@ -115,9 +123,10 @@ export const otlpIngestHandler = httpAction(async (ctx, req) => {
   let deduped = 0;
   for (const trace of traces as AgentRunTrace[]) {
     const sourceTraceId = trace.run_id ?? trace.trace_id;
-    const imp = await ctx.runMutation(internal.otlpIngest.insertOtlpImport, {
+    const imp = await ctx.runMutation(internal.otlpIngest.insertIngestImport, {
       projectId: resolved.projectId,
       importedById: resolved.createdById,
+      source: "otlp",
       sourceTraceId,
       rawPayloadStorageId: rawStorageId,
     });

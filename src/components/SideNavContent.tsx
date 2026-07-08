@@ -99,7 +99,7 @@ export function SideNavContent({
         onClick={onNavigate}
       >
         <Plug aria-hidden="true" className="h-4 w-4 shrink-0" />
-        Gateway onboarding
+        Ingest &amp; onboarding
       </NavLink>
       <NavLink
         to={`/orgs/${org.slug}/gateway-import`}

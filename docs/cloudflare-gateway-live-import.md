@@ -4,6 +4,10 @@ Import production prompt traffic from a customer-owned Cloudflare AI Gateway
 into Blind Bench as deduplicated trace imports, so it can become a measurable
 eval set.
 
+> **Contract of record:** this gateway import is an *adapter*. The durable public
+> ingest contract is the native `eval-record` v1 schema in
+> [`native-ingest.md`](./native-ingest.md); gateway logs normalize into it.
+
 **Blind Bench makes no calls to Cloudflare.** The customer exports logs from
 their own gateway and pastes/uploads them. This keeps the data boundary
 one-directional and avoids holding any Cloudflare credentials.

@@ -640,6 +640,8 @@ const schema = defineSchema({
       v.literal("claude_code"),
       // #263: OTLP Gen-AI span push (Cloudflare AI Gateway + any OTel source).
       v.literal("otlp"),
+      // Native `eval-record` v1 JSON push — Blind Bench's own public ingest schema.
+      v.literal("native"),
     ),
     // Provider's stable trace identifier when available — manual_paste imports
     // don't have one. Combined with `source` it forms the dedup key.

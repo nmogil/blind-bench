@@ -1,5 +1,12 @@
 # Cloudflare AI Gateway — user onboarding guide
 
+> **This is the Cloudflare gateway *adapter* path.** The durable public contract
+> for getting model interactions into Blind Bench is the native `eval-record` v1
+> schema — see [`native-ingest.md`](./native-ingest.md). This gateway import
+> normalizes gateway logs *into* that same schema; it is one of several adapters,
+> not the source of truth. **If you don't have a Cloudflare AI Gateway, skip this
+> doc and POST native JSON** per [`native-ingest.md`](./native-ingest.md).
+
 End-to-end checklist for a Blind Bench user to take a Cloudflare AI Gateway from
 "logs exist somewhere" to "I have a baseline scorecard and a shortlist of rows
 worth training on." It stitches together the pieces that already ship:
