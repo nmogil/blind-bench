@@ -17,6 +17,7 @@
     "dataset:demo": "npx tsx src/lib/evals/trainingDataset.ts",
     "verify:training-export": "npx tsx scripts/training-export-verify.ts",
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
+    "fixtures:agent-traces": "npx tsx scripts/agent-trace-fixtures.ts",
     "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
     "preflight:gateway": "npx tsx scripts/cloudflare-gateway-preflight.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts",
