@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "build:deploy": "node scripts/vercel-build.mjs",
     "preview": "vite preview",
+    "export:evaluation-rows": "npx tsx scripts/evaluation-row-export.ts",
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "test:ct": "playwright test -c playwright-ct.config.ts",
