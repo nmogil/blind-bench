@@ -266,6 +266,15 @@ const evalCaseRowValidator = v.object({
   messages: v.array(v.object({ role: v.string(), content: v.string() })),
   outputText: v.optional(v.string()),
   scorerIds: v.array(v.string()),
+  scorerConfig: v.optional(
+    v.record(
+      v.string(),
+      v.record(
+        v.string(),
+        v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+      ),
+    ),
+  ),
   requestMissing: v.boolean(),
   responseMissing: v.boolean(),
   model: v.optional(v.string()),
@@ -339,6 +348,10 @@ export const materializeImportedTraces = action({
     );
 
     const { alreadyMaterialized } = candidates;
+    const scorerConfig = await ctx.runQuery(
+      internal.scorecards.loadProjectScorecardConfig,
+      { projectId: args.projectId },
+    );
     let missingPayload = candidates.missingPayload;
     let failed = 0;
     const rows: (typeof evalCaseRowValidator)["type"][] = [];
@@ -352,7 +365,7 @@ export const materializeImportedTraces = action({
         }
         const raw = JSON.parse(await blob.text());
         const trace = normalizeGatewayLog(raw);
-        const fields = materializeEvalCase(trace, raw);
+        const fields = materializeEvalCase(trace, raw, scorerConfig);
         rows.push({ importId: candidate.importId, ...fields });
       } catch {
         // Management-safe: count only, never echo trace content.

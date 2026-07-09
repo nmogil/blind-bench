@@ -684,6 +684,17 @@ const schema = defineSchema({
     // Deterministic scorer ids assigned at materialization (see
     // convex/traceAdapters/materializeEvalCase.ts).
     scorerIds: v.array(v.string()),
+    // Optional per-scorer config snapshot assigned at materialization. Contains
+    // operator-entered phrases/thresholds only, never trace content.
+    scorerConfig: v.optional(
+      v.record(
+        v.string(),
+        v.record(
+          v.string(),
+          v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+        ),
+      ),
+    ),
     requestMissing: v.boolean(),
     responseMissing: v.boolean(),
     model: v.optional(v.string()),
@@ -697,6 +708,24 @@ const schema = defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_trace_import", ["traceImportId"]),
+
+  // #261: per-project deterministic scorecard assignment for materialized
+  // production-log eval cases. Config is intentionally management-safe: scorer
+  // keys plus operator-entered phrases/thresholds only. Trace messages/output
+  // never live here.
+  projectScorecardConfigs: defineTable({
+    projectId: v.id("projects"),
+    scorerIds: v.array(v.string()),
+    scorerConfig: v.record(
+      v.string(),
+      v.record(
+        v.string(),
+        v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+      ),
+    ),
+    updatedById: v.id("users"),
+    updatedAt: v.number(),
+  }).index("by_project", ["projectId"]),
 
   // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
   // Deliberately tiny — metadata + usage rollups only, NO step content — so it
