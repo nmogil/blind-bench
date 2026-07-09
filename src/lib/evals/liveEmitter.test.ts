@@ -5,6 +5,7 @@ import {
   emitterFromEnv,
   interactionToRecord,
   type EmitterConfig,
+  type FlushResult,
   type ModelInteraction,
 } from "./liveEmitter";
 
@@ -171,6 +172,44 @@ describe("graceful degradation", () => {
     e.enqueueInteraction(interaction);
     await e.flush();
     expect(fetchImpl).toHaveBeenCalledTimes(3); // 1 + 2 retries
+  });
+
+  it("close() waits for an in-flight auto-flush before resolving", async () => {
+    // Exactly maxBatchSize records: the auto-flush drains the whole queue, so a
+    // close() that only re-flushed would see nothing pending and resolve early.
+    const bodies: Array<{ records: unknown[] }> = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const fetchImpl = vi.fn(async (_url: string, init?: { body?: string }) => {
+      await gate; // hold the POST open like a slow network
+      bodies.push(JSON.parse(init?.body ?? "{}"));
+      return { ok: true, status: 200, json: async () => ({}) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const e = createEmitter(baseCfg({ maxBatchSize: 2, fetchImpl }));
+    e.enqueueInteraction(interaction);
+    e.enqueueInteraction(interaction); // triggers fire-and-forget auto-flush
+
+    let closed: FlushResult | null = null;
+    const closing = e.close().then((res) => (closed = res));
+    await Promise.resolve(); // give close() a chance to (wrongly) resolve early
+    expect(closed).toBeNull(); // must still be waiting on the in-flight POST
+
+    release();
+    await closing;
+    expect(bodies.reduce((n, b) => n + b.records.length, 0)).toBe(2);
+    expect(closed).toMatchObject({ ok: true, sent: 2 });
+    expect(e.status().sent).toBe(2);
+  });
+
+  it("close() reports a failed in-flight auto-flush in its result", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("network down");
+    }) as unknown as typeof fetch;
+    const e = createEmitter(baseCfg({ maxBatchSize: 1, maxRetries: 0, fetchImpl }));
+    e.enqueueInteraction(interaction); // auto-flush fires and will fail
+    const res = await e.close();
+    expect(res.ok).toBe(false);
+    expect(res.dropped).toBe(1);
   });
 
   it("close() drains remaining records", async () => {

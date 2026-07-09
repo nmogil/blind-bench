@@ -134,6 +134,7 @@ class NoopEmitter implements EvalEmitter {
 class LiveEmitter implements EvalEmitter {
   readonly enabled = true;
   private queue: EvalRecordV1[] = [];
+  private inFlight: Promise<FlushResult> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private counts = { enqueued: 0, sent: 0, dropped: 0, failedBatches: 0 };
   private readonly maxBatchSize: number;
@@ -166,7 +167,19 @@ class LiveEmitter implements EvalEmitter {
 
   async flush(): Promise<FlushResult> {
     this.clearTimer();
-    // Drain atomically so overlapping flushes never send the same record twice.
+    // Serialize behind any in-flight flush so records send in order and a
+    // fire-and-forget auto-flush can never be orphaned by close().
+    const prev = this.inFlight ?? Promise.resolve(NOOP_FLUSH);
+    const run = prev.then(() => this.drainAndSend());
+    this.inFlight = run;
+    try {
+      return await run;
+    } finally {
+      if (this.inFlight === run) this.inFlight = null;
+    }
+  }
+
+  private async drainAndSend(): Promise<FlushResult> {
     const drained = this.queue.splice(0, this.queue.length);
     if (drained.length === 0) return { ...NOOP_FLUSH };
 
@@ -194,7 +207,17 @@ class LiveEmitter implements EvalEmitter {
 
   async close(): Promise<FlushResult> {
     this.clearTimer();
-    return this.flush();
+    // Fold the in-flight flush into the result so a caller checking `ok`
+    // sees failures from the auto-flush close() had to wait for.
+    const prev = this.inFlight ? await this.inFlight : { ...NOOP_FLUSH };
+    const rest = await this.flush();
+    return {
+      ok: prev.ok && rest.ok,
+      sent: prev.sent + rest.sent,
+      dropped: prev.dropped + rest.dropped,
+      batches: prev.batches + rest.batches,
+      error: prev.error ?? rest.error,
+    };
   }
 
   status(): EmitterStatus {
