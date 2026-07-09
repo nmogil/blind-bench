@@ -10,6 +10,7 @@
     "build:deploy": "node scripts/vercel-build.mjs",
     "readiness:customer-testing": "npx tsx scripts/customer-testing-readiness.ts",
     "preview": "vite preview",
+    "export:evaluation-rows": "npx tsx scripts/evaluation-row-export.ts",
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "test:ct": "playwright test -c playwright-ct.config.ts",
