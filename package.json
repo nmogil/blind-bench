@@ -17,8 +17,7 @@
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
     "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts",
-    "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts",
-    "verify:training-export": "npx tsx scripts/training-export-verify.ts"
+    "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",
