@@ -82,6 +82,16 @@ describe("M31 dogfood — full flywheel on real trajectories", () => {
       projectId: ids.projectId, source: "trajectory", format: "dpo",
     });
     expect(dpo.rowCount).toBeGreaterThanOrEqual(1);
+    // The Fireworks handoff manifest is emitted alongside the JSONL.
+    expect(dpo.manifest).toMatchObject({
+      schema: "blindbench.training-export",
+      version: 1,
+      source: "trajectory",
+      format: "dpo",
+      fireworks: { compatible: true, row_shape: "prompt/chosen/rejected" },
+    });
+    expect(dpo.manifest.row_count).toBe(dpo.rowCount);
+    expect(dpo.manifest.reviewers).toBeGreaterThanOrEqual(1);
     const dpoJsonl = await t.run(async (ctx) => {
       const row = await ctx.db.query("trainingExports").order("desc").first();
       const blob = row ? await ctx.storage.get(row.storageId) : null;
@@ -104,6 +114,10 @@ describe("M31 dogfood — full flywheel on real trajectories", () => {
       projectId: ids.projectId, source: "trajectory", format: "sft",
     });
     expect(sft.rowCount).toBeGreaterThanOrEqual(1);
+    expect(sft.manifest).toMatchObject({
+      format: "sft",
+      fireworks: { row_shape: "messages[]" },
+    });
 
     // Surface the real artifact so a dogfood run shows what shipped.
     // eslint-disable-next-line no-console

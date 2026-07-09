@@ -156,13 +156,25 @@ export function TraceImport() {
       </form>
 
       {result && (
-        <ImportResultCard result={result} tracesHref={`${base}/projects/${projectId}/traces`} />
+        <ImportResultCard
+          result={result}
+          tracesHref={`${base}/projects/${projectId}/traces`}
+          exportHref={`${base}/projects/${projectId}/export`}
+        />
       )}
     </div>
   );
 }
 
-function ImportResultCard({ result, tracesHref }: { result: ImportResult; tracesHref: string }) {
+function ImportResultCard({
+  result,
+  tracesHref,
+  exportHref,
+}: {
+  result: ImportResult;
+  tracesHref: string;
+  exportHref: string;
+}) {
   const s = result.summary;
   const stats = [
     { label: "Steps", value: s.steps },
@@ -202,11 +214,14 @@ function ImportResultCard({ result, tracesHref }: { result: ImportResult; traces
             Window: {s.earliest ?? "?"} → {s.latest ?? "?"}
           </p>
         )}
-        <p className="pt-1">
+        <div className="flex flex-col gap-1 pt-1">
           <Link to={tracesHref} className="text-primary hover:underline">
-            Review imported traces →
+            1. Review imported traces (comment + verdict) →
           </Link>
-        </p>
+          <Link to={exportHref} className="text-primary hover:underline">
+            2. Export an SFT / DPO dataset + manifest →
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
