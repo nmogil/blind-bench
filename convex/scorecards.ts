@@ -64,11 +64,9 @@ function clientProjectConfig(config: ProjectScorecardConfig) {
 export const projectConfig = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await requireProjectRole(ctx, args.projectId, [
-      "owner",
-      "editor",
-      "evaluator",
-    ]);
+    // Owner/editor only: scorer config carries the grading rubric and
+    // customer-specific leakage markers, which blind reviewers must not see.
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
     const row = await ctx.db
       .query("projectScorecardConfigs")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
