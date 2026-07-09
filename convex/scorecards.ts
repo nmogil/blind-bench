@@ -8,6 +8,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireOrgRole, requireProjectRole } from "./lib/auth";
+import { SCORECARD_SCORER_CATALOG } from "./lib/scorecardScoring";
 import {
   defaultProjectScorecardConfig,
   sanitizeProjectScorecardConfig,
@@ -17,7 +18,6 @@ import {
   foldScorecardResults,
   type ScorecardResultRow,
 } from "./lib/scorecardAggregation";
-import { SCORECARD_SCORER_CATALOG } from "./lib/scorecardScoring";
 
 // ===========================================================================
 // #259: Per-org scorecard runs.
