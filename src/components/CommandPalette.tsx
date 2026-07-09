@@ -82,7 +82,7 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search prompts, versions, actions..." />
+      <CommandInput placeholder="Search projects, versions, actions..." />
       <CommandList>
         <CommandEmpty>
           <div className="py-6 text-center text-sm">
@@ -103,7 +103,7 @@ export function CommandPalette() {
         <CommandGroup heading="Actions">
           <CommandItem onSelect={() => go(basePath)}>
             <FolderOpen className="mr-2 h-4 w-4" />
-            Go to prompts
+            Go to projects
             <CommandShortcut>G P</CommandShortcut>
           </CommandItem>
           {projectPath && canBrowseProject && (

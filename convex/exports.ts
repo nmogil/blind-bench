@@ -24,6 +24,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
 import { readMessages } from "./lib/messages";
 import {
+  buildExportManifest,
   gateRows,
   toJsonl,
   renderStep,
@@ -31,6 +32,8 @@ import {
   moreSensitive,
   type ClassifiedRow,
   type ExportFormat,
+  type ExportManifest,
+  type ExportSourceStats,
   type PrivacyClass,
   type StepMeta,
 } from "./lib/trainingExport";
@@ -59,9 +62,14 @@ const metaOf = (s: Doc<"agentTraceSteps">): StepMeta => ({
 
 export const gatherOutputPrefRows = internalQuery({
   args: { projectId: v.id("projects"), format: FORMAT },
-  handler: async (ctx, args): Promise<ClassifiedRow[]> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ rows: ClassifiedRow[]; stats: ExportSourceStats }> => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
     const rows: ClassifiedRow[] = [];
+    let sourceUnits = 0;
+    const reviewerIds = new Set<string>();
     const runs = await ctx.db
       .query("promptRuns")
       .withIndex("by_project_and_status", (q) =>
@@ -113,6 +121,7 @@ export const gatherOutputPrefRows = internalQuery({
       const promptText = messages.map((m) => `${m.role}: ${m.content}`).join("\n");
       const evaluatorCount = new Set(prefs.map((p) => p.userId)).size;
 
+      const before = rows.length;
       if (args.format === "dpo") {
         let made = 0;
         for (const b of best) {
@@ -146,8 +155,12 @@ export const gatherOutputPrefRows = internalQuery({
           });
         }
       }
+      if (rows.length > before) {
+        sourceUnits++;
+        for (const p of prefs) reviewerIds.add(p.userId);
+      }
     }
-    return rows;
+    return { rows, stats: { sourceUnits, reviewers: reviewerIds.size } };
   },
 });
 
@@ -169,7 +182,10 @@ interface TrajectoryPlanRow {
 
 export const gatherTrajectoryPlan = internalQuery({
   args: { projectId: v.id("projects"), format: FORMAT },
-  handler: async (ctx, args): Promise<TrajectoryPlanRow[]> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ plan: TrajectoryPlanRow[]; stats: ExportSourceStats }> => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
     const stepsOf = (traceId: Id<"agentTraces">) =>
       ctx.db
@@ -178,6 +194,7 @@ export const gatherTrajectoryPlan = internalQuery({
         .collect();
 
     const plan: TrajectoryPlanRow[] = [];
+    const reviewerIds = new Set<string>();
 
     if (args.format === "dpo") {
       const matchups = await ctx.db
@@ -204,6 +221,7 @@ export const gatherTrajectoryPlan = internalQuery({
           chosen: { meta: metaOf(chosen), storageId: chosen.fullBodyStorageId },
           rejected: { meta: metaOf(rejected), storageId: rejected.fullBodyStorageId },
         });
+        if (m.userId) reviewerIds.add(m.userId);
       }
     } else if (args.format === "sft") {
       const traces = await ctx.db
@@ -226,9 +244,10 @@ export const gatherTrajectoryPlan = internalQuery({
             .map((s) => ({ meta: metaOf(s), storageId: s.fullBodyStorageId })),
           finalAnswer: tr.finalAnswerStorageId,
         });
+        for (const vd of verdicts) if (vd.rating === "best") reviewerIds.add(vd.userId);
       }
     }
-    return plan;
+    return { plan, stats: { sourceUnits: plan.length, reviewers: reviewerIds.size } };
   },
 });
 
@@ -242,6 +261,7 @@ export const recordExport = internalMutation({
     storageId: v.id("_storage"),
     rowCount: v.number(),
     excludedCount: v.number(),
+    manifest: v.string(),
     createdById: v.id("users"),
     createdAt: v.number(),
   },
@@ -264,6 +284,8 @@ export const listExports = query({
       format: r.format,
       rowCount: r.rowCount,
       excludedCount: r.excludedCount,
+      // Parsed ExportManifest, or null for exports created before #288.
+      manifest: r.manifest ? (JSON.parse(r.manifest) as ExportManifest) : null,
       createdAt: r.createdAt,
       expired: Date.now() - r.createdAt > DOWNLOAD_TTL_MS,
     }));
@@ -283,7 +305,12 @@ export const generateExport = action({
   handler: async (
     ctx,
     args,
-  ): Promise<{ exportId: Id<"trainingExports">; rowCount: number; excludedCount: number }> => {
+  ): Promise<{
+    exportId: Id<"trainingExports">;
+    rowCount: number;
+    excludedCount: number;
+    manifest: ExportManifest;
+  }> => {
     if (args.format === "annotated") {
       throw new Error("Annotated export isn’t available yet — use DPO or SFT.");
     }
@@ -292,23 +319,37 @@ export const generateExport = action({
     });
 
     let classified: ClassifiedRow[];
+    let stats: ExportSourceStats;
     if (args.source === "output_preference") {
-      classified = await ctx.runQuery(internal.exports.gatherOutputPrefRows, {
+      const res = await ctx.runQuery(internal.exports.gatherOutputPrefRows, {
         projectId: args.projectId,
         format: args.format,
       });
+      classified = res.rows;
+      stats = res.stats;
     } else {
-      const plan = await ctx.runQuery(internal.exports.gatherTrajectoryPlan, {
+      const res = await ctx.runQuery(internal.exports.gatherTrajectoryPlan, {
         projectId: args.projectId,
         format: args.format,
       });
-      classified = await hydrateTrajectory(ctx, plan, args.format);
+      classified = await hydrateTrajectory(ctx, res.plan, args.format);
+      stats = res.stats;
     }
 
     const { included, excluded } = gateRows(classified, {
       allowSensitive: args.allowSensitive,
     });
     const jsonl = toJsonl(args.format as ExportFormat, included);
+    const createdAt = Date.now();
+    const manifest = buildExportManifest({
+      source: args.source,
+      format: args.format as ExportFormat,
+      included,
+      excluded,
+      allowSensitive: args.allowSensitive ?? false,
+      stats,
+      generatedAt: createdAt,
+    });
 
     const storageId = await ctx.storage.store(
       new Blob([jsonl], { type: "application/jsonl" }),
@@ -320,10 +361,16 @@ export const generateExport = action({
       storageId,
       rowCount: included.length,
       excludedCount: excluded.length,
+      manifest: JSON.stringify(manifest),
       createdById: userId,
-      createdAt: Date.now(),
+      createdAt,
     });
-    return { exportId, rowCount: included.length, excludedCount: excluded.length };
+    return {
+      exportId,
+      rowCount: included.length,
+      excludedCount: excluded.length,
+      manifest,
+    };
   },
 });
 

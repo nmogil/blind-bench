@@ -78,6 +78,93 @@ export const HARD_FAIL_SCORERS = new Set([
   "read_only_no_destructive_tool",
 ]);
 
+export const SCORECARD_SCORER_CATALOG = [
+  {
+    id: "required_clarification",
+    label: "Required clarification",
+    description: "Checks that the model asks a clarifying question when the case needs one.",
+    hardFail: false,
+    configFields: [
+      { key: "keywords", label: "Clarification cues", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "must_assertions",
+    label: "Must-include assertions",
+    description: "Checks for required phrases or assertions in the final answer.",
+    hardFail: false,
+    configFields: [
+      { key: "keywords", label: "Required phrases", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "no_hallucinated_data",
+    label: "No hallucinated data",
+    description: "Hard-fails when configured forbidden or fabricated phrases appear.",
+    hardFail: true,
+    configFields: [
+      { key: "phrases", label: "Forbidden phrases", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "no_cross_context_leakage",
+    label: "No cross-context leakage",
+    description: "Hard-fails when configured tenant/customer leakage markers appear.",
+    hardFail: true,
+    configFields: [
+      { key: "forbidden", label: "Leakage markers", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "read_only_no_destructive_tool",
+    label: "No destructive tools",
+    description: "Hard-fails if a captured output used a configured destructive tool name.",
+    hardFail: true,
+    configFields: [
+      { key: "forbiddenTools", label: "Forbidden tool names", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "correct_escalation",
+    label: "Correct escalation",
+    description: "Checks escalation tool usage when an eval case has an expected escalation label.",
+    hardFail: false,
+    configFields: [
+      { key: "escalationTools", label: "Escalation tool names", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "groundedness",
+    label: "Grounded figures",
+    description: "Checks that dollar figures in the answer are grounded in configured evidence.",
+    hardFail: false,
+    configFields: [
+      { key: "evidence", label: "Allowed evidence snippets", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "tone_customer_fit",
+    label: "Customer-fit tone",
+    description: "Checks for dismissive phrasing and optional required tone cues.",
+    hardFail: false,
+    configFields: [
+      { key: "banned", label: "Banned tone phrases", type: "stringList" as const },
+      { key: "require", label: "Required tone cues", type: "stringList" as const },
+    ],
+  },
+  {
+    id: "cost_latency_threshold",
+    label: "Cost / latency threshold",
+    description: "Checks captured cost, latency, and token metrics when present.",
+    hardFail: false,
+    configFields: [
+      { key: "maxCostUsd", label: "Max cost USD", type: "number" as const },
+      { key: "maxLatencyMs", label: "Max latency ms", type: "number" as const },
+      { key: "maxTokens", label: "Max tokens", type: "number" as const },
+    ],
+  },
+];
+
 // --- deterministic scorers (ported 1:1) --------------------------------------
 
 const requiredClarification: Factory = (config) => (_c, output) => {

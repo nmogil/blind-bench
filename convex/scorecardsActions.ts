@@ -48,7 +48,7 @@ export const runScorecard = internalAction({
           continue;
         }
         const verdict = scoreCase(
-          { scorerIds: c.scorerIds },
+          { scorerIds: c.scorerIds, scorerConfig: c.scorerConfig },
           { text: c.outputText },
         );
         results.push({

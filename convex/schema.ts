@@ -684,6 +684,17 @@ const schema = defineSchema({
     // Deterministic scorer ids assigned at materialization (see
     // convex/traceAdapters/materializeEvalCase.ts).
     scorerIds: v.array(v.string()),
+    // Optional per-scorer config snapshot assigned at materialization. Contains
+    // operator-entered phrases/thresholds only, never trace content.
+    scorerConfig: v.optional(
+      v.record(
+        v.string(),
+        v.record(
+          v.string(),
+          v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+        ),
+      ),
+    ),
     requestMissing: v.boolean(),
     responseMissing: v.boolean(),
     model: v.optional(v.string()),
@@ -697,6 +708,24 @@ const schema = defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_trace_import", ["traceImportId"]),
+
+  // #261: per-project deterministic scorecard assignment for materialized
+  // production-log eval cases. Config is intentionally management-safe: scorer
+  // keys plus operator-entered phrases/thresholds only. Trace messages/output
+  // never live here.
+  projectScorecardConfigs: defineTable({
+    projectId: v.id("projects"),
+    scorerIds: v.array(v.string()),
+    scorerConfig: v.record(
+      v.string(),
+      v.record(
+        v.string(),
+        v.union(v.string(), v.number(), v.boolean(), v.array(v.string())),
+      ),
+    ),
+    updatedById: v.id("users"),
+    updatedAt: v.number(),
+  }).index("by_project", ["projectId"]),
 
   // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
   // Deliberately tiny — metadata + usage rollups only, NO step content — so it
@@ -910,6 +939,9 @@ const schema = defineSchema({
     storageId: v.id("_storage"),
     rowCount: v.number(),
     excludedCount: v.number(),
+    // #288: JSON-serialized ExportManifest (Fireworks handoff report). Optional
+    // for back-compat with exports created before the manifest existed.
+    manifest: v.optional(v.string()),
     createdById: v.id("users"),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),
@@ -1362,8 +1394,9 @@ const schema = defineSchema({
     .index("by_subscription", ["polarSubscriptionId"]),
 
   // Append-only credit ledger. Remaining credits = sum of `creditDelta` for an
-  // org. Purchases add positive deltas; refunds/revocations add negative ones.
-  // Carries Polar IDs for idempotency and audit — never trace/test-case data.
+  // org. Purchases/trials add positive deltas; refunds/revocations and eval
+  // consumption add negative ones. Carries Polar IDs and product-run IDs for
+  // idempotency and audit — never trace/test-case content.
   billingLedger: defineTable({
     organizationId: v.id("organizations"),
     creditDelta: v.number(),
@@ -1372,12 +1405,16 @@ const schema = defineSchema({
     polarOrderId: v.optional(v.string()),
     polarSubscriptionId: v.optional(v.string()),
     polarEventId: v.optional(v.string()),
+    promptRunId: v.optional(v.id("promptRuns")),
+    scorecardRunId: v.optional(v.id("scorecardRuns")),
     createdAt: v.number(),
   })
     .index("by_org", ["organizationId"])
     .index("by_order", ["polarOrderId"])
     .index("by_subscription", ["polarSubscriptionId"])
-    .index("by_event", ["polarEventId"]),
+    .index("by_event", ["polarEventId"])
+    .index("by_prompt_run", ["promptRunId"])
+    .index("by_scorecard_run", ["scorecardRunId"]),
 
   // Idempotency + audit log of every webhook delivery we accepted. Keyed by the
   // Standard Webhooks `webhook-id`; a repeat delivery is a no-op.

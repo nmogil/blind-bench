@@ -88,8 +88,8 @@ export function Onboarding() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Create your workspace</CardTitle>
             <p className="text-sm text-muted-foreground">
-              A workspace holds your team's prompts, API keys, and members.
-              You can rename it later.
+              A workspace holds agent runs, prompts, ingest tokens, model keys,
+              trial eval credits, and the people who review them.
             </p>
           </CardHeader>
           <CardContent>

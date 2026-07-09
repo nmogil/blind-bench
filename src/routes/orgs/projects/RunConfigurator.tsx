@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import {
   AlertCircle,
   ChevronDown,
+  CreditCard,
   ChevronRight,
   ExternalLink,
   FlaskConical,
@@ -150,6 +151,7 @@ export function RunConfigurator() {
   const testCases = useQuery(api.testCases.list, { projectId });
   const variables = useQuery(api.variables.list, { projectId });
   const keyStatus = useQuery(api.openRouterKeys.hasKey, { orgId });
+  const creditStatus = useQuery(api.billing.getCreditStatus, { orgId });
   const { models: catalogModels } = useModelCatalog();
 
   // --- Mutations ---
@@ -470,6 +472,9 @@ export function RunConfigurator() {
     ? summaryRows.reduce((sum, r) => sum + (r.cost ?? 0), 0)
     : null;
   const totalRuns = summaryRows.length;
+  const evalCreditCost = creditStatus?.evalRunCost ?? 1;
+  const totalCreditCost = totalRuns * evalCreditCost;
+  const creditsRemaining = creditStatus?.remainingCredits ?? null;
 
   // ---------------------------------------------------------------------------
   // Step 4: Validation
@@ -487,6 +492,12 @@ export function RunConfigurator() {
         return `Select a model for slot ${missingModel.label}.`;
     } else {
       if (!selectedModel) return "Select a model to run.";
+    }
+    if (
+      creditStatus !== undefined &&
+      totalCreditCost > creditStatus.remainingCredits
+    ) {
+      return "Add eval credits in Billing before starting these runs.";
     }
     return null;
   })();
@@ -1249,6 +1260,24 @@ export function RunConfigurator() {
               Select versions, test cases, and configure a model to see the
               run summary.
             </p>
+          )}
+
+          {summaryRows.length > 0 && creditsRemaining !== null && (
+            <div
+              className={cn(
+                "mt-3 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs",
+                totalCreditCost > creditsRemaining
+                  ? "border-amber-500/50 bg-amber-500/5 text-amber-700 dark:text-amber-300"
+                  : "border-border bg-muted/30 text-muted-foreground",
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <CreditCard aria-hidden="true" className="h-3.5 w-3.5" />
+                {totalCreditCost.toLocaleString()} eval credit
+                {totalCreditCost === 1 ? "" : "s"} for this batch
+              </span>
+              <span>{creditsRemaining.toLocaleString()} remaining</span>
+            </div>
           )}
 
           {/* Run button */}

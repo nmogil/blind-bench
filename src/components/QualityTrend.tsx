@@ -19,7 +19,7 @@ export function QualityTrend({ projectId }: QualityTrendProps) {
     return (
       <div className="rounded-lg border border-dashed p-3">
         <p className="text-xs text-muted-foreground">
-          Run prompts and collect feedback to see quality trends.
+          Run evaluations and collect feedback to see quality trends.
         </p>
       </div>
     );

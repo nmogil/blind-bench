@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildExportManifest,
   gateRows,
   toJsonl,
   type ClassifiedRow,
@@ -94,5 +95,72 @@ describe("#53 JSONL serializers produce valid, parseable output", () => {
     expect(JSON.parse(lines[1]!).metadata).toEqual({ preference: "best" });
     // valid JSONL: every line parses
     for (const l of lines) expect(() => JSON.parse(l)).not.toThrow();
+  });
+});
+
+describe("#288 export manifest (Fireworks handoff report)", () => {
+  test("carries schema/version, source/format, counts, gate, and provenance", () => {
+    const rows: ClassifiedRow[] = [
+      { row: dpo(), privacyClass: "internal" },
+      { row: dpo({ chosen: "same", rejected: "same" }), privacyClass: "public" }, // degenerate
+      { row: dpo(), privacyClass: "pii" }, // prod_sensitive (default-deny)
+    ];
+    const { included, excluded } = gateRows(rows);
+    const manifest = buildExportManifest({
+      source: "output_preference",
+      format: "dpo",
+      included,
+      excluded,
+      allowSensitive: false,
+      stats: { sourceUnits: 3, reviewers: 2 },
+      generatedAt: 1_700_000_000_000,
+    });
+
+    expect(manifest.schema).toBe("blindbench.training-export");
+    expect(manifest.version).toBe(1);
+    expect(manifest).toMatchObject({ source: "output_preference", format: "dpo" });
+    expect(manifest.row_count).toBe(included.length);
+    expect(manifest.excluded_count).toBe(excluded.length);
+    expect(manifest.excluded_by_reason).toMatchObject({ degenerate: 1, prod_sensitive: 1 });
+    expect(manifest.sensitivity_gate).toEqual({
+      allow_sensitive: false,
+      default_deny_classes: ["confidential", "pii", "phi"],
+    });
+    expect(manifest.source_units).toBe(3);
+    expect(manifest.reviewers).toBe(2);
+    expect(manifest.fireworks).toEqual({ compatible: true, row_shape: "prompt/chosen/rejected" });
+    // never echo raw counts of ids — provenance is aggregate only
+    expect(manifest.notes.join(" ")).toContain("anonymized by construction");
+  });
+
+  test("dpo with zero comparable pairs gets an explicit 'no pairs' note, not a silent empty", () => {
+    const { included, excluded } = gateRows([
+      { row: dpo({ chosen: "same", rejected: "same" }), privacyClass: "public" },
+    ]);
+    const manifest = buildExportManifest({
+      source: "trajectory",
+      format: "dpo",
+      included,
+      excluded,
+      allowSensitive: false,
+      stats: { sourceUnits: 0, reviewers: 0 },
+      generatedAt: 0,
+    });
+    expect(manifest.row_count).toBe(0);
+    expect(manifest.notes.some((n) => n.includes("No comparable preference pairs"))).toBe(true);
+  });
+
+  test("sft manifest documents the Fireworks chat row shape", () => {
+    const manifest = buildExportManifest({
+      source: "trajectory",
+      format: "sft",
+      included: [{ kind: "sft", messages: [{ role: "user", content: "hi" }, { role: "assistant", content: "ok" }] }],
+      excluded: [],
+      allowSensitive: false,
+      stats: { sourceUnits: 1, reviewers: 1 },
+      generatedAt: 0,
+    });
+    expect(manifest.fireworks.row_shape).toBe("messages[]");
+    expect(manifest.notes.some((n) => n.includes("messages"))).toBe(true);
   });
 });

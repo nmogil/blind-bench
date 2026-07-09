@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalizeGatewayLog } from "./cloudflareAiGateway";
 import {
-  DEFAULT_PRODUCTION_LOG_SCORER_IDS,
   materializeEvalCase,
   readProduct,
 } from "./materializeEvalCase";
+import { DEFAULT_PRODUCTION_LOG_SCORER_IDS } from "../lib/scorecardConfig";
 import { aggregateScores, scoreCase } from "../lib/scorecardScoring";
 
 // Pure converter tests — no `_generated`, no convex runtime.
@@ -69,6 +69,24 @@ describe("materializeEvalCase", () => {
     // Returned array is a copy — mutating it must not affect the constant.
     fields.scorerIds.push("mutated");
     expect(DEFAULT_PRODUCTION_LOG_SCORER_IDS).not.toContain("mutated");
+  });
+
+  it("snapshots configured scorer assignment during materialization", () => {
+    const fields = materializeEvalCase(normalizeGatewayLog(chat), chat, {
+      scorerIds: ["no_hallucinated_data", "cost_latency_threshold"],
+      scorerConfig: {
+        no_hallucinated_data: { phrases: ["ssn 123"] },
+        cost_latency_threshold: { maxLatencyMs: 2500 },
+      },
+    });
+    expect(fields.scorerIds).toEqual([
+      "no_hallucinated_data",
+      "cost_latency_threshold",
+    ]);
+    expect(fields.scorerConfig).toEqual({
+      no_hallucinated_data: { phrases: ["ssn 123"] },
+      cost_latency_threshold: { maxLatencyMs: 2500 },
+    });
   });
 
   it("falls back to product 'unknown' and carries redaction flags", () => {

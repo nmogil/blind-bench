@@ -32,6 +32,8 @@ const friendlyMessages: Record<string, string> = {
     "OpenRouter rejected your API key. Check it in org settings.",
   "10 runs in flight":
     "10 runs are in flight. Wait for one to finish.",
+  "Out of eval credits":
+    "This workspace is out of eval credits. Add credits in Billing, then try again.",
   "API key cannot be empty":
     "API key cannot be empty.",
   "Encryption not configured":

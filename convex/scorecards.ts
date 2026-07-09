@@ -7,11 +7,18 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { requireOrgRole } from "./lib/auth";
+import { requireOrgRole, requireProjectRole } from "./lib/auth";
+import { SCORECARD_SCORER_CATALOG } from "./lib/scorecardScoring";
+import {
+  defaultProjectScorecardConfig,
+  sanitizeProjectScorecardConfig,
+  type ProjectScorecardConfig,
+} from "./lib/scorecardConfig";
 import {
   foldScorecardResults,
   type ScorecardResultRow,
 } from "./lib/scorecardAggregation";
+import { consumeEvalCredit } from "./lib/billingCredits";
 
 // ===========================================================================
 // #259: Per-org scorecard runs.
@@ -28,6 +35,94 @@ const summaryValidator = v.object({
   hardFailed: v.number(),
   meanScore: v.number(),
   skippedNoOutput: v.number(),
+});
+
+const scorerConfigValueValidator = v.union(
+  v.string(),
+  v.number(),
+  v.boolean(),
+  v.array(v.string()),
+);
+
+const scorerConfigValidator = v.record(
+  v.string(),
+  v.record(v.string(), scorerConfigValueValidator),
+);
+
+const projectScorecardConfigArgs = v.object({
+  scorerIds: v.array(v.string()),
+  scorerConfig: scorerConfigValidator,
+});
+
+function clientProjectConfig(config: ProjectScorecardConfig) {
+  return {
+    catalog: SCORECARD_SCORER_CATALOG,
+    scorerIds: config.scorerIds,
+    scorerConfig: config.scorerConfig,
+  };
+}
+
+export const projectConfig = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    // Owner/editor only: scorer config carries the grading rubric and
+    // customer-specific leakage markers, which blind reviewers must not see.
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    const row = await ctx.db
+      .query("projectScorecardConfigs")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .first();
+    return clientProjectConfig(
+      sanitizeProjectScorecardConfig(
+        row
+          ? { scorerIds: row.scorerIds, scorerConfig: row.scorerConfig }
+          : defaultProjectScorecardConfig(),
+      ),
+    );
+  },
+});
+
+export const saveProjectConfig = mutation({
+  args: {
+    projectId: v.id("projects"),
+    config: projectScorecardConfigArgs,
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireProjectRole(ctx, args.projectId, [
+      "owner",
+      "editor",
+    ]);
+    const config = sanitizeProjectScorecardConfig(args.config);
+    const existing = await ctx.db
+      .query("projectScorecardConfigs")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .first();
+    const fields = {
+      projectId: args.projectId,
+      scorerIds: config.scorerIds,
+      scorerConfig: config.scorerConfig,
+      updatedById: userId,
+      updatedAt: Date.now(),
+    };
+    if (existing) await ctx.db.patch(existing._id, fields);
+    else await ctx.db.insert("projectScorecardConfigs", fields);
+    return clientProjectConfig(config);
+  },
+});
+
+export const loadProjectScorecardConfig = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<ProjectScorecardConfig> => {
+    const row = await ctx.db
+      .query("projectScorecardConfigs")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .first();
+    return sanitizeProjectScorecardConfig(
+      row
+        ? { scorerIds: row.scorerIds, scorerConfig: row.scorerConfig }
+        : defaultProjectScorecardConfig(),
+    );
+  },
 });
 
 /**
@@ -56,6 +151,10 @@ export const start = mutation({
       status: "pending",
       triggeredById: userId,
       startedAt: Date.now(),
+    });
+    await consumeEvalCredit(ctx, args.orgId, {
+      kind: "scorecard_run",
+      scorecardRunId: runId,
     });
     await ctx.scheduler.runAfter(0, internal.scorecardsActions.runScorecard, {
       runId,
@@ -118,6 +217,7 @@ type ScorecardCaseRow = {
   caseId: Id<"evalCases">;
   product: string;
   scorerIds: string[];
+  scorerConfig?: ProjectScorecardConfig["scorerConfig"];
   outputText?: string;
 };
 
@@ -148,6 +248,7 @@ export const loadOrgEvalCases = internalQuery({
           caseId: r._id,
           product: r.product,
           scorerIds: r.scorerIds,
+          scorerConfig: r.scorerConfig,
           outputText: r.outputText,
         });
       }

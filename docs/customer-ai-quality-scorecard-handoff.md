@@ -100,6 +100,17 @@ npx tsx src/lib/evals/cli.ts --pack demo/smoke-pass
 - Separate hard-fail safety/privacy issues from softer quality issues.
 - Avoid claiming fine-tuning is ready unless the data is reviewed and approved.
 
+## Project scorecard assignment
+
+For imported Gateway traces, configure deterministic scorecard assignment before materializing rows on the Gateway Import page:
+
+1. Select the project.
+2. Choose the scorer set in **Scorecard assignment**.
+3. Add optional management-safe phrase lists or numeric thresholds for the selected scorers.
+4. Save, then materialize imported traces into eval cases.
+
+The assignment is stamped onto each new eval case at materialization time. Existing eval cases keep their scorer snapshot so later config changes do not rewrite historical scorecard results. The config stores scorer keys, phrase lists, and thresholds only — never trace messages or model output.
+
 ## Pilot payment handoff
 
 The first customer pilot can be paid manually; Polar self-serve billing is not required for first value delivery.

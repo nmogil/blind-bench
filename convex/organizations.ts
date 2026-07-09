@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireAuth, requireOrgRole } from "./lib/auth";
+import { ensureTrialCreditGrant } from "./lib/billingCredits";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/;
 
@@ -39,6 +40,8 @@ export const createOrg = mutation({
       userId,
       role: "owner",
     });
+
+    await ensureTrialCreditGrant(ctx, orgId);
 
     await ctx.scheduler.runAfter(0, internal.analyticsActions.track, {
       event: "org created",

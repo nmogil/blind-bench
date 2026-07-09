@@ -2,6 +2,7 @@ import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
+import { ensureTrialCreditGrant } from "./lib/billingCredits";
 import { genMessageId } from "./lib/messages";
 import {
   SAMPLE_ANNOTATIONS,
@@ -175,6 +176,7 @@ export async function createPersonalOrg(
     userId,
     role: "owner",
   });
+  await ensureTrialCreditGrant(ctx, orgId);
 
   return { orgId, slug };
 }

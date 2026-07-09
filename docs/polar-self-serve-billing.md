@@ -12,11 +12,15 @@ entitlements — not per-user credits.
   copy. Stable package keys: `starter`, `team`, `scale`, `enterprise`.
 - **Credits** — a fungible per-eval unit tracked in the append-only
   `billingLedger`. **Remaining credits = sum of `creditDelta` for the org.** A
-  package purchase adds a positive entry; a refund/revoke adds a negative one.
+  package purchase or trial adds a positive entry; a refund/revoke or started
+  evaluation adds a negative one.
+- **Consumption unit** — v1 charges **1 eval credit** when Blind Bench starts a
+  prompt run or an org scorecard run. Output fan-out, deterministic scorer
+  count, and trace imports are not separate credit multipliers yet.
 - **Trial** — every workspace starts with a small free grant (`TRIAL` in
   `billingPlans.ts`): 50 eval credits, 2 reviewer seats, 10 trace imports. No
-  card required. (Trial credits are represented in config; seed them into the
-  ledger when you wire trial provisioning — the foundation does not auto-seed.)
+  card required. The grant is seeded idempotently into `billingLedger` when the
+  workspace is created (`reason: trial_grant`).
 - **Manual enterprise** — the `enterprise` package has `manualEnterprise: true`:
   no self-serve product, the checkout button is replaced by "Contact sales".
   Provision it by inserting an `active` `billingEntitlements` row + a ledger
@@ -30,10 +34,12 @@ entitlements — not per-user credits.
 ## Data boundary (payment state vs. trace data)
 
 Payment state lives **only** in four tables: `billingCustomers`,
-`billingEntitlements`, `billingLedger`, `polarWebhookEvents`. None of them
-reference or store trace / test-case / eval content. The webhook handler
+`billingEntitlements`, `billingLedger`, `polarWebhookEvents`. Ledger rows may
+carry product-run ids (`promptRunId` / `scorecardRunId`) solely as idempotency
+keys for credit consumption, but they never store trace / test-case / prompt /
+output content and billing queries do not expose those ids. The webhook handler
 (`convex/http.ts`) extracts **only** scalar billing fields (event id/type,
-external customer id, package key, Polar order/subscription/customer ids) via
+external customer id, package key/product id, Polar order/subscription/customer ids) via
 `sanitizePolarEvent` before anything is persisted — the raw payload is never
 logged or stored, so no customer trace data can leak through billing events.
 Metadata we send to Polar at checkout is limited to `orgId`, `packageKey`, and
@@ -82,7 +88,10 @@ production products are created (see Cutover).
 The handler verifies `webhook-id` / `webhook-timestamp` / `webhook-signature`
 (HMAC-SHA256, 5-minute replay window) and is **idempotent**: by `webhook-id`
 (re-delivery is a no-op) and by Polar order id (a duplicate order never
-double-credits).
+double-credits). If an order arrives without checkout metadata, the grant path
+falls back from `data.product_id` to the configured `POLAR_PRODUCT_*` package
+mapping; unknown products are acknowledged and ignored so Polar does not retry a
+bad event forever.
 
 ## Local testing
 

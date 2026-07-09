@@ -17,7 +17,9 @@ export function OrgHome() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">{org.name}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Your prompts</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Agent-review projects and prompt workspaces
+      </p>
 
       {inFlight && inFlight.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -87,20 +89,20 @@ export function OrgHome() {
             className="space-y-2"
             role="status"
             aria-live="polite"
-            aria-label="Loading prompts"
+            aria-label="Loading projects"
           >
             {[1, 2, 3, 4, 5].map((i) => (
               <Skeleton key={i} className="h-14 w-full" />
             ))}
-            <span className="sr-only">Loading prompts…</span>
+            <span className="sr-only">Loading projects…</span>
           </div>
         ) : projects.length === 0 ? (
           <EmptyState
             icon={FolderOpen}
-            heading="No prompts yet"
-            description="A prompt holds all its versions, test cases, and run history. Create one to get started."
+            heading="No agent-review projects yet"
+            description="Create a workspace for an agent prompt, test cases, runs, blind reviews, and the verdicts you route back."
             action={{
-              label: "Create prompt",
+              label: "Create project",
               onClick: openNewProjectDialog,
             }}
           />

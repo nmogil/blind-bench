@@ -42,7 +42,13 @@ async function seedBillingEnv() {
 function orderPaidBody(
   orgId: string,
   orderId: string,
-  opts: { customerId?: string; subscriptionId?: string; dropMetaOrgId?: boolean } = {},
+  opts: {
+    customerId?: string;
+    subscriptionId?: string;
+    dropMetaOrgId?: boolean;
+    dropMetaPackageKey?: boolean;
+    productId?: string;
+  } = {},
 ) {
   const customerId = opts.customerId ?? "cus_polar_1";
   const subscriptionId = opts.subscriptionId ?? "sub_polar_1";
@@ -52,6 +58,7 @@ function orderPaidBody(
     environment: "sandbox",
   };
   if (opts.dropMetaOrgId) delete metadata.orgId;
+  if (opts.dropMetaPackageKey) delete metadata.packageKey;
   return {
     type: "order.paid",
     data: {
@@ -62,7 +69,7 @@ function orderPaidBody(
       currency: "usd",
       total_amount: 19900,
       customer_id: customerId,
-      product_id: "prod_team_x",
+      product_id: opts.productId ?? "prod_team_x",
       subscription_id: subscriptionId,
       checkout_id: "chk_1",
       metadata,
@@ -213,7 +220,55 @@ describe("/polar/webhook end-to-end (real Polar event shapes)", () => {
     expect(ledger[0]!.creditDelta).toBe(2500);
   });
 
-  test("c. bad signature → 401 and no ledger row", async () => {
+  test("c. metadata-less order.paid grants via known product_id", async () => {
+    const prevTeamProduct = process.env.POLAR_PRODUCT_TEAM;
+    process.env.POLAR_PRODUCT_TEAM = "prod_team_x";
+    try {
+      const { t, ids } = await seedBillingEnv();
+      const body = orderPaidBody(ids.orgId, "ord_product_3", {
+        dropMetaPackageKey: true,
+        productId: "prod_team_x",
+      });
+
+      const res = await postSigned(t, "evt_paid_3", body);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.result.action).toBe("granted");
+      expect(json.result.packageKey).toBe("team");
+
+      const ledger = await ledgerFor(t, ids.orgId);
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0]!.creditDelta).toBe(2500);
+    } finally {
+      if (prevTeamProduct === undefined) delete process.env.POLAR_PRODUCT_TEAM;
+      else process.env.POLAR_PRODUCT_TEAM = prevTeamProduct;
+    }
+  });
+
+  test("d. metadata-less order.paid with unknown product_id is ignored", async () => {
+    const prevTeamProduct = process.env.POLAR_PRODUCT_TEAM;
+    process.env.POLAR_PRODUCT_TEAM = "prod_team_x";
+    try {
+      const { t, ids } = await seedBillingEnv();
+      const body = orderPaidBody(ids.orgId, "ord_product_unknown_4", {
+        dropMetaPackageKey: true,
+        productId: "prod_unknown",
+      });
+
+      const res = await postSigned(t, "evt_paid_4", body);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.result.action).toBe("ignored_unknown_package");
+
+      const ledger = await ledgerFor(t, ids.orgId);
+      expect(ledger).toHaveLength(0);
+    } finally {
+      if (prevTeamProduct === undefined) delete process.env.POLAR_PRODUCT_TEAM;
+      else process.env.POLAR_PRODUCT_TEAM = prevTeamProduct;
+    }
+  });
+
+  test("e. bad signature → 401 and no ledger row", async () => {
     const { t, ids } = await seedBillingEnv();
     const body = orderPaidBody(ids.orgId, "ord_bad_3");
     const raw = JSON.stringify(body);

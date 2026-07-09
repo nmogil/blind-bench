@@ -6,17 +6,26 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "launch:customer-test-packet": "npx tsx scripts/customer-test-launch-packet.ts",
     "build:deploy": "node scripts/vercel-build.mjs",
+    "readiness:customer-testing": "npx tsx scripts/customer-testing-readiness.ts",
     "preview": "vite preview",
+    "export:evaluation-rows": "npx tsx scripts/evaluation-row-export.ts",
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "test:ct": "playwright test -c playwright-ct.config.ts",
+    "preflight:claude-code": "npx tsx scripts/claude-code-session-preflight.ts",
     "scorecard:demo": "npx tsx src/lib/evals/scorecard.ts",
+    "preflight:otlp": "npx tsx scripts/otlp-trace-preflight.ts",
     "dataset:demo": "npx tsx src/lib/evals/trainingDataset.ts",
+    "verify:training-export": "npx tsx scripts/training-export-verify.ts",
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
+    "fixtures:agent-traces": "npx tsx scripts/agent-trace-fixtures.ts",
     "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
+    "preflight:gateway": "npx tsx scripts/cloudflare-gateway-preflight.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts",
-    "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts"
+    "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts",
+    "selfcheck:emitter": "npx tsx src/lib/evals/liveEmitterSelfcheck.ts"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",

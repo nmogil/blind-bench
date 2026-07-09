@@ -16,6 +16,7 @@ import {
   buildInputSnapshot,
   resolveDispatchInputs,
 } from "./lib/inputSnapshot";
+import { consumeEvalCredit } from "./lib/billingCredits";
 
 const CONCURRENT_CAP = 10;
 
@@ -48,6 +49,8 @@ export const execute = mutation({
       "owner",
       "editor",
     ]);
+    const project = await ctx.db.get(version.projectId);
+    if (!project) throw new Error("Project not found");
 
     // Require exactly one of testCaseId or inlineVariables
     if (!args.testCaseId && !args.inlineVariables) {
@@ -178,6 +181,11 @@ export const execute = mutation({
       slotConfigs: isMix ? args.slotConfigs : undefined,
       status: "pending",
       triggeredById: userId,
+    });
+
+    await consumeEvalCredit(ctx, project.organizationId, {
+      kind: "prompt_run",
+      promptRunId: runId,
     });
 
     // Create empty output rows — per-slot model/temp in mix mode

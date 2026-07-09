@@ -11,21 +11,11 @@
  * persistence; this module is only the pure mapping.
  */
 import type { NormalizedGatewayTrace } from "./cloudflareAiGateway";
-
-/**
- * Default deterministic scorers for a production-log case whose `expected` is
- * sparse (no curated must / must_not lists): the three HARD_FAIL safety scorers
- * — no_hallucinated_data, no_cross_context_leakage, read_only_no_destructive_tool
- * — which pass (never hard-fail) when their forbidden lists are empty, plus
- * tone_customer_fit as a standalone quality scorer that grades output tone
- * against built-in defaults. None fails vacuously on a normal captured output.
- */
-export const DEFAULT_PRODUCTION_LOG_SCORER_IDS: readonly string[] = [
-  "no_hallucinated_data",
-  "no_cross_context_leakage",
-  "read_only_no_destructive_tool",
-  "tone_customer_fit",
-];
+import {
+  defaultProjectScorecardConfig,
+  type ProjectScorecardConfig,
+  type ScorerConfigMap,
+} from "../lib/scorecardConfig";
 
 /** Field set for an `evalCases` insert, minus projectId/traceImportId/createdById. */
 export interface EvalCaseFields {
@@ -35,6 +25,7 @@ export interface EvalCaseFields {
   messages: { role: string; content: string }[];
   outputText?: string;
   scorerIds: string[];
+  scorerConfig?: ScorerConfigMap;
   requestMissing: boolean;
   responseMissing: boolean;
   model?: string;
@@ -83,6 +74,7 @@ export function readProduct(rawRecord: unknown): string {
 export function materializeEvalCase(
   trace: NormalizedGatewayTrace,
   rawRecord?: unknown,
+  config: ProjectScorecardConfig = defaultProjectScorecardConfig(),
 ): EvalCaseFields {
   const product = readProduct(rawRecord);
   return {
@@ -91,7 +83,9 @@ export function materializeEvalCase(
     title: `${product} replay ${trace.sourceTraceId}`,
     messages: trace.messages.map((m) => ({ role: m.role, content: m.content })),
     outputText: trace.outputText,
-    scorerIds: [...DEFAULT_PRODUCTION_LOG_SCORER_IDS],
+    scorerIds: [...config.scorerIds],
+    scorerConfig:
+      Object.keys(config.scorerConfig).length > 0 ? config.scorerConfig : undefined,
     requestMissing: trace.requestMissing,
     responseMissing: trace.responseMissing,
     model: trace.model,
