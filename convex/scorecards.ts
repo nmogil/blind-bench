@@ -9,14 +9,14 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireOrgRole, requireProjectRole } from "./lib/auth";
 import {
-  foldScorecardResults,
-  type ScorecardResultRow,
-} from "./lib/scorecardAggregation";
-import {
   defaultProjectScorecardConfig,
   sanitizeProjectScorecardConfig,
   type ProjectScorecardConfig,
 } from "./lib/scorecardConfig";
+import {
+  foldScorecardResults,
+  type ScorecardResultRow,
+} from "./lib/scorecardAggregation";
 import { SCORECARD_SCORER_CATALOG } from "./lib/scorecardScoring";
 
 // ===========================================================================
