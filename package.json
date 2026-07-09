@@ -16,6 +16,7 @@
     "dataset:demo": "npx tsx src/lib/evals/trainingDataset.ts",
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
     "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
+    "preflight:gateway": "npx tsx scripts/cloudflare-gateway-preflight.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts",
     "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts",
     "selfcheck:emitter": "npx tsx src/lib/evals/liveEmitterSelfcheck.ts"
