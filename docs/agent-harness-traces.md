@@ -128,5 +128,7 @@ The eval case stores messages and scorer-visible tool/policy context while keepi
 - Live capture exists via the native ingest endpoint (`/ingest/v1/traces`, see
   [`native-ingest.md`](./native-ingest.md)) and OTLP; there is still no
   auto-instrumentation baked into the Jeeves agents themselves — the harness must
-  emit records to the endpoint.
+  emit records to the endpoint. A thin reference emitter that does the batching
+  for a running harness lives in [`live-emitter.md`](./live-emitter.md)
+  (`src/lib/evals/liveEmitter.ts`).
 - No customer production data committed to the repo.

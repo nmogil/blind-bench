@@ -250,6 +250,10 @@ A bare array (`[ {…}, {…} ]`) is accepted identically.
 
 ## Related
 
+- [`live-emitter.md`](./live-emitter.md) — a thin **client-side reference
+  emitter** (`src/lib/evals/liveEmitter.ts`) that batches a running harness's
+  model/tool interactions to this endpoint. Async, env-gated (off by default),
+  graceful if the backend is down.
 - [`gateway-onboarding.md`](./gateway-onboarding.md) — the Cloudflare AI Gateway
   **adapter** path (export/upload logs to backfill), end to end.
 - [`cloudflare-gateway-live-import.md`](./cloudflare-gateway-live-import.md) — the
