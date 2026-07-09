@@ -12,11 +12,11 @@
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "test:ct": "playwright test -c playwright-ct.config.ts",
     "scorecard:demo": "npx tsx src/lib/evals/scorecard.ts",
+    "preflight:otlp": "npx tsx scripts/otlp-trace-preflight.ts",
     "dataset:demo": "npx tsx src/lib/evals/trainingDataset.ts",
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
     "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts",
-    "preflight:otlp": "npx tsx scripts/otlp-trace-preflight.ts",
     "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts"
   },
   "dependencies": {
