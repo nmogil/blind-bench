@@ -11,6 +11,7 @@
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
     "test:ct": "playwright test -c playwright-ct.config.ts",
+    "preflight:claude-code": "npx tsx scripts/claude-code-session-preflight.ts",
     "scorecard:demo": "npx tsx src/lib/evals/scorecard.ts",
     "dataset:demo": "npx tsx src/lib/evals/trainingDataset.ts",
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
