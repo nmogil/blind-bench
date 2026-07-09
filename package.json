@@ -16,6 +16,7 @@
     "compare:demo": "npx tsx src/lib/evals/modelComparison.ts",
     "compare:endpoints": "npx tsx src/lib/evals/compareEndpoints.ts",
     "prototype:fireworks-gateway": "npx tsx src/lib/evals/fireworksGatewayPrototype.ts",
+    "preflight:otlp": "npx tsx scripts/otlp-trace-preflight.ts",
     "smoke:fireworks-gateway": "npx tsx scripts/fireworks-gateway-smoke.ts",
     "preflight:otlp": "npx tsx scripts/otlp-trace-preflight.ts"
   },
