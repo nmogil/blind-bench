@@ -910,6 +910,9 @@ const schema = defineSchema({
     storageId: v.id("_storage"),
     rowCount: v.number(),
     excludedCount: v.number(),
+    // #288: JSON-serialized ExportManifest (Fireworks handoff report). Optional
+    // for back-compat with exports created before the manifest existed.
+    manifest: v.optional(v.string()),
     createdById: v.id("users"),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),

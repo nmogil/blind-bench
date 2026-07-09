@@ -14,6 +14,7 @@ import { Database, ShieldAlert, Download } from "lucide-react";
 
 type ExportResult = FunctionReturnType<typeof api.exports.generateExport>;
 type ExportRow = FunctionReturnType<typeof api.exports.listExports>[number];
+type Manifest = ExportResult["manifest"];
 
 type Source = "trajectory" | "output_preference";
 type Format = "dpo" | "sft";
@@ -94,7 +95,9 @@ export function ExportTraining() {
           <h1 className="text-2xl font-bold">Export training data</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Turn blind evaluations into DPO / SFT fine-tuning datasets.
+          Turn blind evaluations into DPO / SFT fine-tuning datasets. Each export
+          ships a manifest/report you can hand to Fireworks — counts, exclusions,
+          sensitivity gate, and schema/version.
         </p>
       </header>
 
@@ -233,7 +236,7 @@ function ExportSummaryCard({
         <CardHeader>
           <CardTitle className="text-base">No exportable rows yet</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
             No exportable rows for this source/format yet — e.g. trajectory DPO
             needs decided A/B matchups; output-preference DPO needs best+weak
@@ -246,6 +249,7 @@ function ExportSummaryCard({
               if you have consent to include them.
             </p>
           )}
+          <ManifestReport manifest={result.manifest} />
         </CardContent>
       </Card>
     );
@@ -278,6 +282,8 @@ function ExportSummaryCard({
           link expires 1 hour after generation.
         </p>
 
+        <ManifestReport manifest={result.manifest} />
+
         {downloadError && (
           <p className="text-sm text-destructive" role="alert">
             {downloadError}
@@ -290,6 +296,79 @@ function ExportSummaryCard({
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The Fireworks-handoff manifest/report shown under an export. Counts, the
+ * sensitivity gate, schema/version, and human-readable notes on DPO comparability
+ * and exclusions — enough to trust the export as a fine-tuning dataset. Raw JSON
+ * is available in the collapsible for a full handoff.
+ */
+function ManifestReport({ manifest }: { manifest: Manifest }) {
+  if (!manifest) return null;
+  const reasons = Object.entries(manifest.excluded_by_reason) as Array<[
+    string,
+    number,
+  ]>;
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/30 p-3 text-sm">
+      <p className="flex items-center gap-2 font-medium">
+        <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+          Fireworks-compatible
+        </span>
+        <span className="text-xs font-normal text-muted-foreground">
+          {manifest.schema} v{manifest.version} · rows shaped {manifest.fireworks.row_shape}
+        </span>
+      </p>
+
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <dt className="text-xs text-muted-foreground">Source units</dt>
+          <dd className="tabular-nums">{manifest.source_units}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Reviewers</dt>
+          <dd className="tabular-nums">{manifest.reviewers}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Rows</dt>
+          <dd className="tabular-nums">{manifest.row_count}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Excluded</dt>
+          <dd className="tabular-nums">{manifest.excluded_count}</dd>
+        </div>
+      </dl>
+
+      {reasons.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {reasons.map(([reason, count]) => (
+            <span
+              key={reason}
+              className="inline-flex items-center rounded border px-1.5 py-0.5 text-xs text-muted-foreground"
+            >
+              {reason}: <span className="ml-1 tabular-nums">{count}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {manifest.notes.length > 0 && (
+        <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+          {manifest.notes.map((note: string, i: number) => (
+            <li key={i}>{note}</li>
+          ))}
+        </ul>
+      )}
+
+      <details className="text-xs">
+        <summary className="cursor-pointer text-muted-foreground">Raw manifest JSON</summary>
+        <pre className="mt-2 overflow-x-auto rounded bg-background p-2 font-mono text-[11px]">
+          {JSON.stringify(manifest, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }
 

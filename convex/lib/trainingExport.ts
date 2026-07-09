@@ -196,6 +196,110 @@ export function moreSensitive(a: PrivacyClass, b: PrivacyClass): PrivacyClass {
   return CLASS_RANK[a] >= CLASS_RANK[b] ? a : b;
 }
 
+// --- export manifest (Fireworks handoff report) ------------------------------
+
+/**
+ * Aggregate provenance for an export — how much reviewed signal fed it. Counts
+ * only: raw trace/run/user ids are intentionally NOT carried into the manifest
+ * (exports are anonymized by construction).
+ */
+export interface ExportSourceStats {
+  /** Source units that yielded ≥1 candidate row: runs (output-pref), decided matchups / best traces (trajectory). */
+  sourceUnits: number;
+  /** Distinct reviewers whose verdicts/preferences/matchups fed this export. */
+  reviewers: number;
+}
+
+/**
+ * The manifest/report emitted alongside every export. Enough metadata for a
+ * Fireworks fine-tuning handoff: source kind, format, counts, exclusion breakdown,
+ * the sensitivity gate state, a schema/version stamp, and human-readable notes on
+ * DPO comparability and exclusions. Persisted with the export and shown in-app;
+ * no raw prompt/output text and no trace ids.
+ */
+export interface ExportManifest {
+  schema: "blindbench.training-export";
+  version: 1;
+  generated_at: number;
+  source: "trajectory" | "output_preference";
+  format: ExportFormat;
+  row_count: number;
+  excluded_count: number;
+  excluded_by_reason: Partial<Record<ExcludedRow["reason"], number>>;
+  sensitivity_gate: {
+    allow_sensitive: boolean;
+    default_deny_classes: PrivacyClass[];
+  };
+  source_units: number;
+  reviewers: number;
+  fireworks: { compatible: boolean; row_shape: string };
+  notes: string[];
+}
+
+export function buildExportManifest(input: {
+  source: "trajectory" | "output_preference";
+  format: ExportFormat;
+  included: ExportRow[];
+  excluded: ExcludedRow[];
+  allowSensitive: boolean;
+  stats: ExportSourceStats;
+  generatedAt: number;
+}): ExportManifest {
+  const { source, format, included, excluded, allowSensitive, stats, generatedAt } = input;
+
+  const byReason: Partial<Record<ExcludedRow["reason"], number>> = {};
+  for (const e of excluded) byReason[e.reason] = (byReason[e.reason] ?? 0) + 1;
+
+  const notes: string[] = [];
+  if (format === "dpo") {
+    notes.push(
+      "DPO rows are emitted only for comparable chosen/rejected pairs; a pair whose chosen and rejected text are identical carries no preference signal and is excluded (degenerate) rather than written.",
+    );
+    if (included.length === 0)
+      notes.push(
+        "No comparable preference pairs were found, so no DPO rows were written. Decide more A/B matchups (trajectories) or add best+weak ratings on the same run (prompt outputs).",
+      );
+  }
+  if (format === "sft") {
+    notes.push(
+      "SFT rows use the OpenAI/Fireworks chat shape { messages: [{ role, content }] }; only best-rated outputs/trajectories are included.",
+    );
+  }
+  if ((byReason.prod_sensitive ?? 0) > 0 && !allowSensitive)
+    notes.push(
+      `${byReason.prod_sensitive} row(s) excluded as prod-sensitive (confidential/PII/PHI). Re-run with explicit consent to include them.`,
+    );
+  if ((byReason.pii_leak ?? 0) > 0)
+    notes.push(
+      `${byReason.pii_leak} row(s) excluded by the PII/secret leak scan even though their privacy class was allowed.`,
+    );
+  notes.push(
+    "Source trace/run ids are omitted by design — exports are anonymized by construction; source_units and reviewers are aggregate counts only.",
+  );
+
+  return {
+    schema: "blindbench.training-export",
+    version: 1,
+    generated_at: generatedAt,
+    source,
+    format,
+    row_count: included.length,
+    excluded_count: excluded.length,
+    excluded_by_reason: byReason,
+    sensitivity_gate: {
+      allow_sensitive: allowSensitive,
+      default_deny_classes: [...SENSITIVE_CLASSES],
+    },
+    source_units: stats.sourceUnits,
+    reviewers: stats.reviewers,
+    fireworks: {
+      compatible: true,
+      row_shape: format === "sft" ? "messages[]" : "prompt/chosen/rejected",
+    },
+    notes,
+  };
+}
+
 const jsonl = (objs: unknown[]): string => objs.map((o) => JSON.stringify(o)).join("\n");
 
 /** Serialize gated rows to JSONL for the given format. Rows must match `format`. */
