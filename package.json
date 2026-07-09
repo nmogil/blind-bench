@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:deploy": "node scripts/vercel-build.mjs",
+    "readiness:customer-testing": "npx tsx scripts/customer-testing-readiness.ts",
     "preview": "vite preview",
     "test:evals": "vitest run src/lib/evals/",
     "test:convex": "vitest run --config convex/vitest.config.ts",
