@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useEffect, useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { Link } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useOrg } from "@/contexts/OrgContext";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -185,6 +187,10 @@ export function GatewayImport() {
       {summary && <ImportSummaryCard summary={summary} />}
 
       {projectId && (
+        <ScorecardConfigCard projectId={projectId as Id<"projects">} />
+      )}
+
+      {projectId && (
         <MaterializationCard
           projectId={projectId as Id<"projects">}
           scorecardHref={`${base}/scorecard`}
@@ -292,6 +298,203 @@ function ImportSummaryCard({ summary }: { summary: ImportSummary }) {
             (previously imported duplicates keep their original metadata)
           </p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type ScorecardProjectConfig = NonNullable<
+  FunctionReturnType<typeof api.scorecards.projectConfig>
+>;
+type ScorecardConfigValue = string | number | boolean | string[];
+type ScorecardConfigMap = Record<string, Record<string, ScorecardConfigValue>>;
+
+function splitList(value: string): string[] {
+  return value
+    .split(/\r?\n|,/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function listValue(value: ScorecardConfigValue | undefined): string {
+  return Array.isArray(value) ? value.join("\n") : "";
+}
+
+function ScorecardConfigCard({ projectId }: { projectId: Id<"projects"> }) {
+  const remote = useQuery(api.scorecards.projectConfig, { projectId });
+  const saveConfig = useMutation(api.scorecards.saveProjectConfig);
+  const [scorerIds, setScorerIds] = useState<string[]>([]);
+  const [scorerConfig, setScorerConfig] = useState<ScorecardConfigMap>({});
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!remote) return;
+    setScorerIds(remote.scorerIds);
+    setScorerConfig(remote.scorerConfig as ScorecardConfigMap);
+    setMessage("");
+    setError("");
+  }, [remote]);
+
+  if (!remote) {
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base">Scorecard assignment</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Loading scorer configuration…
+        </CardContent>
+      </Card>
+    );
+  }
+
+  function toggleScorer(id: string) {
+    setScorerIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function setField(
+    scorerId: string,
+    fieldKey: string,
+    value: ScorecardConfigValue | undefined,
+  ) {
+    setScorerConfig((prev) => {
+      const next: ScorecardConfigMap = { ...prev };
+      const scorer = { ...(next[scorerId] ?? {}) };
+      if (
+        value === undefined ||
+        (Array.isArray(value) && value.length === 0) ||
+        value === ""
+      ) {
+        delete scorer[fieldKey];
+      } else {
+        scorer[fieldKey] = value;
+      }
+      if (Object.keys(scorer).length === 0) delete next[scorerId];
+      else next[scorerId] = scorer;
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const res = await saveConfig({
+        projectId,
+        config: { scorerIds, scorerConfig },
+      });
+      setScorerIds(res.scorerIds);
+      setScorerConfig(res.scorerConfig as ScorecardConfigMap);
+      setMessage("Saved. New materialized eval cases will use this assignment.");
+    } catch (err) {
+      setError(
+        friendlyError(
+          err,
+          "Could not save scorecard assignment. Check the fields and try again.",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const enabled = new Set(scorerIds);
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle className="text-base">Scorecard assignment</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <p className="text-muted-foreground">
+          Choose which deterministic checks are stamped onto new eval cases when
+          imported traces are materialized. Existing cases keep their snapshot.
+        </p>
+        <div className="space-y-3">
+          {remote.catalog.map((scorer: ScorecardProjectConfig["catalog"][number]) => {
+            const checked = enabled.has(scorer.id);
+            return (
+              <div key={scorer.id} className="rounded-lg border p-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleScorer(scorer.id)}
+                    aria-label={`Enable ${scorer.label}`}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{scorer.label}</p>
+                      {scorer.hardFail && (
+                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                          Hard fail
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {scorer.description}
+                    </p>
+                  </div>
+                </div>
+
+                {checked && scorer.configFields.length > 0 && (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {scorer.configFields.map((field) => {
+                      const current = scorerConfig[scorer.id]?.[field.key];
+                      return (
+                        <div key={field.key} className="space-y-1">
+                          <Label className="text-xs">{field.label}</Label>
+                          {field.type === "number" ? (
+                            <Input
+                              inputMode="decimal"
+                              value={typeof current === "number" ? String(current) : ""}
+                              placeholder="Optional"
+                              onChange={(e) => {
+                                const raw = e.target.value.trim();
+                                setField(
+                                  scorer.id,
+                                  field.key,
+                                  raw === "" ? undefined : Number(raw),
+                                );
+                              }}
+                            />
+                          ) : (
+                            <Textarea
+                              rows={3}
+                              value={listValue(current)}
+                              placeholder="One phrase per line"
+                              onChange={(e) =>
+                                setField(
+                                  scorer.id,
+                                  field.key,
+                                  splitList(e.target.value),
+                                )
+                              }
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        {message && <p className="text-xs text-muted-foreground">{message}</p>}
+        <Button type="button" onClick={handleSave} disabled={busy}>
+          {busy ? "Saving…" : "Save scorecard assignment"}
+        </Button>
       </CardContent>
     </Card>
   );
