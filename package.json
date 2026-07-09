@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "launch:customer-test-packet": "npx tsx scripts/customer-test-launch-packet.ts",
     "build:deploy": "node scripts/vercel-build.mjs",
     "readiness:customer-testing": "npx tsx scripts/customer-testing-readiness.ts",
     "preview": "vite preview",
