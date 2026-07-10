@@ -68,7 +68,11 @@ export async function main(argv: string[]): Promise<number> {
     }
   }
 
-  const report = buildCustomerTestingReadinessReport({ approvals, outDir: args.outDir });
+  const report = buildCustomerTestingReadinessReport({
+    approvals,
+    outDir: args.outDir,
+    generatedAt: new Date().toISOString(),
+  });
   writeCustomerTestingReadinessReport(report);
   process.stdout.write(args.json ? formatCustomerTestingReadinessJson(report) : formatCustomerTestingReadinessMarkdown(report));
   return report.status === "ready_for_customer_testing" ? 0 : 1;

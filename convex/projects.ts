@@ -8,6 +8,7 @@ import {
 } from "./lib/auth";
 import { safeDeleteTestCaseBlob } from "./lib/storageCleanup";
 import { genMessageId } from "./lib/messages";
+import { ensureReviewSessionsForReviewer } from "./lib/traceReviewSessions";
 import {
   createPersonalOrg,
   findUserOwnedOrg,
@@ -236,7 +237,40 @@ export const createWithPrompt = mutation({
   },
 });
 
-// ===== M29.4: Welcome-screen entrypoints =====
+// ===== Welcome-screen entrypoints =====
+
+/**
+ * Ingestion-first welcome path. Creates a personal workspace and an empty
+ * project without manufacturing a prompt version, then routes the user to the
+ * completed-run import surface.
+ */
+export const createForImport = mutation({
+  args: { name: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const { org, orgId } = await ensurePersonalOrgFor(ctx, userId);
+    const name = args.name?.trim() || "Agent evaluations";
+    const projectId = await ctx.db.insert("projects", {
+      organizationId: orgId,
+      name,
+      createdById: userId,
+    });
+    await ctx.db.insert("projectCollaborators", {
+      projectId,
+      userId,
+      role: "owner",
+      invitedById: userId,
+      invitedAt: Date.now(),
+      acceptedAt: Date.now(),
+    });
+    await ctx.scheduler.runAfter(0, internal.analyticsActions.track, {
+      event: "welcome create for import",
+      distinctId: userId as string,
+      properties: { project_id: projectId as string, org_id: orgId as string },
+    });
+    return { orgSlug: org.slug, projectId };
+  },
+});
 
 const WELCOME_VARIABLE_REGEX = /\{\{(\w+)\}\}/g;
 
@@ -576,6 +610,9 @@ export const inviteCollaborator = mutation({
       invitedAt: Date.now(),
       acceptedAt: Date.now(), // Instant invite for M1
     });
+    if (args.role === "evaluator") {
+      await ensureReviewSessionsForReviewer(ctx, args.projectId, args.userId);
+    }
   },
 });
 
@@ -615,6 +652,9 @@ export const updateCollaboratorRole = mutation({
     }
 
     await ctx.db.patch(collab._id, { role: args.role });
+    if (args.role === "evaluator") {
+      await ensureReviewSessionsForReviewer(ctx, args.projectId, args.userId);
+    }
   },
 });
 

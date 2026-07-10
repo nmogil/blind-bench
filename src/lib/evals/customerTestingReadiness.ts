@@ -45,8 +45,6 @@ export interface CustomerTestingReadinessReport {
   };
 }
 
-const GENERATED_AT = "2026-01-01T00:00:00Z";
-
 export const REQUIRED_CUSTOMER_TESTING_DOCS = [
   "docs/tenancy-consent-data-isolation.md",
   "docs/cloudflare-gateway-live-import.md",
@@ -102,6 +100,7 @@ export function buildCustomerTestingReadinessReport(options: {
   if (gatesApproved !== gates.length) caveats.push("explicit_approvals_missing_or_incomplete");
   if (options.approvals === undefined) caveats.push("no_local_approvals_file_supplied");
   caveats.push("do_not_import_customer_or_operator_logs_until_status_is_ready");
+  caveats.push("ready_status_is_not_evidence_of_customer_consent");
 
   const status: CustomerTestingReadinessStatus =
     docsPresent === requiredDocs.length && gatesApproved === gates.length
@@ -109,7 +108,7 @@ export function buildCustomerTestingReadinessReport(options: {
       : "blocked_until_approved";
 
   return {
-    generated_at: options.generatedAt ?? GENERATED_AT,
+    generated_at: options.generatedAt ?? new Date().toISOString(),
     status,
     required_docs: requiredDocs,
     gates,
@@ -160,6 +159,7 @@ export function formatCustomerTestingReadinessMarkdown(report: CustomerTestingRe
     ...report.caveats.map((caveat) => `- \`${caveat}\``),
     "",
     "This report intentionally omits customer trace content, approval notes, credential values, and raw logs.",
+    "A ready status records only the supplied repo-side checklist; it is not evidence that a customer granted consent.",
     "",
   ];
   return lines.join("\n");

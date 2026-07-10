@@ -9,6 +9,10 @@ const SOURCE_VALIDATOR = v.union(
   v.literal("manual_paste"),
   v.literal("cloudflare_ai_gateway"),
   v.literal("claude_code"),
+  v.literal("pi"),
+  v.literal("csv"),
+  v.literal("otlp"),
+  v.literal("native"),
 );
 
 /**

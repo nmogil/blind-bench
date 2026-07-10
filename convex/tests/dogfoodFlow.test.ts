@@ -35,7 +35,7 @@ async function seed(t: ReturnType<typeof convexTest>) {
 }
 
 describe("M31 dogfood — full flywheel on real trajectories", () => {
-  test("ingest → blind review → A/B → real DPO + SFT export", async () => {
+  test("ingest → opaque blind review → honest DPO exclusion + SFT export", async () => {
     const t = convexTest(schema);
     const { ids, asOwner, asBlind } = await seed(t);
 
@@ -49,21 +49,28 @@ describe("M31 dogfood — full flywheel on real trajectories", () => {
 
     // 2. BLIND REVIEW — a reviewer discovers them (no provenance), reads steps,
     //    comments on a step, and rates the trajectory.
-    const list = await asBlind.query(api.agentTraces.listReviewableTraces, {});
-    expect(list).toHaveLength(3);
-    const steps = await asBlind.query(api.agentTraces.listSteps, {
-      agentTraceId: traces.opus!,
+    const list = await asBlind.query(api.agentTraceReviewSessions.listMine, {});
+    const traceSessions = list.filter((session) => session.kind === "trace");
+    expect(traceSessions).toHaveLength(3);
+    expect(JSON.stringify(traceSessions)).not.toContain("agentTraceId");
+    const firstToken = traceSessions[0]?.token;
+    const secondToken = traceSessions[1]?.token;
+    if (!firstToken || !secondToken) throw new Error("Missing opaque review sessions");
+    const steps = await asBlind.query(api.agentTraceReviewSessions.listSteps, {
+      token: firstToken,
       paginationOpts: { numItems: 50, cursor: null },
     });
     expect(steps.page.length).toBeGreaterThan(0);
-    await asBlind.mutation(api.agentTraceReview.addComment, {
-      agentTraceId: traces.opus!,
-      target: { kind: "step", stepIndex: steps.page[1]!.stepIndex },
+    const commentStep = steps.page[1];
+    if (!commentStep) throw new Error("Missing comment step");
+    await asBlind.mutation(api.agentTraceReviewSessions.addComment, {
+      token: firstToken,
+      target: { kind: "step", stepIndex: commentStep.stepIndex },
       comment: "Reasonable first move.",
       label: "praise",
     });
-    await asBlind.mutation(api.agentTraceReview.setVerdict, { agentTraceId: traces.haiku!, rating: "best" });
-    await asBlind.mutation(api.agentTraceReview.setVerdict, { agentTraceId: traces.opus!, rating: "acceptable" });
+    await asBlind.mutation(api.agentTraceReviewSessions.setVerdict, { token: firstToken, rating: "best" });
+    await asBlind.mutation(api.agentTraceReviewSessions.setVerdict, { token: secondToken, rating: "acceptable" });
 
     // 3. A/B MATCHUP — the DPO-shaped signal: winner's next action vs loser's.
     // Real divergence is at step 4 (steps 0-3 are an identical prefix — user
@@ -75,39 +82,22 @@ describe("M31 dogfood — full flywheel on real trajectories", () => {
       leftBlindLabel: "A",
       rightBlindLabel: "B",
     });
-    await asBlind.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: ["accuracy"] });
+    const persistedMatchup = await t.run(async (ctx) => await ctx.db.get(matchupId));
+    expect(persistedMatchup?.comparabilityStatus).toBe("invalid");
 
-    // 4. EXPORT — the flywheel payoff: a real DPO pair falls out of the matchup.
+    // 4. EXPORT — the real Harbor pair is honestly excluded because its
+    // normalized prefixes differ. The old flow overclaimed this as DPO-ready.
     const dpo = await asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId, source: "trajectory", format: "dpo",
     });
-    expect(dpo.rowCount).toBeGreaterThanOrEqual(1);
-    // The Fireworks handoff manifest is emitted alongside the JSONL.
+    expect(dpo.rowCount).toBe(0);
     expect(dpo.manifest).toMatchObject({
       schema: "blindbench.training-export",
       version: 1,
       source: "trajectory",
       format: "dpo",
-      fireworks: { compatible: true, row_shape: "prompt/chosen/rejected" },
+      excluded_by_reason: { non_comparable_prefix: 1 },
     });
-    expect(dpo.manifest.row_count).toBe(dpo.rowCount);
-    expect(dpo.manifest.reviewers).toBeGreaterThanOrEqual(1);
-    const dpoJsonl = await t.run(async (ctx) => {
-      const row = await ctx.db.query("trainingExports").order("desc").first();
-      const blob = row ? await ctx.storage.get(row.storageId) : null;
-      return blob ? await blob.text() : "";
-    });
-    const pair = JSON.parse(dpoJsonl.split("\n")[0]!);
-    // The DPO pair carries real content: a prompt (shared prefix), and distinct
-    // chosen (winner) vs rejected (loser) next actions.
-    expect(pair).toHaveProperty("prompt");
-    expect(pair).toHaveProperty("chosen");
-    expect(pair).toHaveProperty("rejected");
-    expect(pair.chosen).not.toBe(pair.rejected);
-    expect(typeof pair.prompt).toBe("string");
-    expect(pair.prompt.length).toBeGreaterThan(0);
-    // No provider/harness provenance leaks into the training data.
-    expect(dpoJsonl).not.toContain("claude-opus");
 
     // SFT from the best-verdict trajectory.
     const sft = await asOwner.action(api.exports.generateExport, {
@@ -119,14 +109,7 @@ describe("M31 dogfood — full flywheel on real trajectories", () => {
       fireworks: { row_shape: "messages[]" },
     });
 
-    // Surface the real artifact so a dogfood run shows what shipped.
-    // eslint-disable-next-line no-console
-    console.log(
-      `\n[dogfood] DPO pair from real Harbor A/B (Opus✓ vs Sonnet✗):\n` +
-        `  prompt : ${String(pair.prompt).slice(0, 90).replace(/\n/g, " ")}…\n` +
-        `  chosen : ${String(pair.chosen).slice(0, 90).replace(/\n/g, " ")}…\n` +
-        `  reject : ${String(pair.rejected).slice(0, 90).replace(/\n/g, " ")}…\n` +
-        `  → dpo rows=${dpo.rowCount} excluded=${dpo.excludedCount}, sft rows=${sft.rowCount}`,
-    );
+    expect(dpo.excludedCount).toBe(1);
+    expect(sft.rowCount).toBeGreaterThanOrEqual(1);
   });
 });

@@ -53,18 +53,28 @@ function hasBlockedSubstring(value: string, blocked: string[]): boolean {
   return blocked.some((s) => s.length > 0 && value.includes(s));
 }
 
-function validateMessagesRow(value: unknown): string | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return "row_not_object";
+function validateMessagesRow(value: unknown): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ["row_not_object"];
   const row = value as Record<string, unknown>;
-  if (!Array.isArray(row.messages)) return "messages_missing";
-  if (row.messages.length === 0) return "messages_empty";
+  if (!Array.isArray(row.messages)) return ["messages_missing"];
+  if (row.messages.length === 0) return ["messages_empty"];
+  const errors: string[] = [];
   for (const message of row.messages) {
-    if (!message || typeof message !== "object" || Array.isArray(message)) return "message_not_object";
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      errors.push("message_not_object");
+      continue;
+    }
     const m = message as Record<string, unknown>;
-    if (typeof m.role !== "string" || m.role.length === 0) return "message_role_invalid";
-    if (typeof m.content !== "string" || m.content.length === 0) return "message_content_empty";
+    if (typeof m.role !== "string" || m.role.length === 0) errors.push("message_role_invalid");
+    else if (!["system", "user", "assistant"].includes(m.role)) errors.push("message_role_unsupported");
+    if (typeof m.content !== "string" || m.content.length === 0) errors.push("message_content_empty");
   }
-  return null;
+  const finalMessage = row.messages[row.messages.length - 1];
+  if (!finalMessage || typeof finalMessage !== "object" || Array.isArray(finalMessage)
+      || (finalMessage as Record<string, unknown>).role !== "assistant") {
+    errors.push("final_message_not_assistant");
+  }
+  return [...new Set(errors)];
 }
 
 function readText(path: string, readFile?: ReadFile): string {
@@ -123,8 +133,8 @@ export function verifyTrainingExportArtifacts(
         errors.push(`${split}:line_${i + 1}:invalid_json`);
         return;
       }
-      const shapeError = validateMessagesRow(parsed);
-      if (shapeError) errors.push(`${split}:line_${i + 1}:${shapeError}`);
+      const shapeErrors = validateMessagesRow(parsed);
+      for (const shapeError of shapeErrors) errors.push(`${split}:line_${i + 1}:${shapeError}`);
       if (hasBlockedSubstring(line, blocked)) errors.push(`${split}:line_${i + 1}:blocked_substring_present`);
       rowHashes[split].push(sha256hex(stableStringify(parsed)));
     });
@@ -138,7 +148,7 @@ export function verifyTrainingExportArtifacts(
       }
     }
   } else if (manifest) {
-    caveats.push("Manifest has no split_counts object.");
+    errors.push("manifest_split_counts_missing");
   }
 
   if (manifest?.row_entries) {
@@ -161,7 +171,10 @@ export function verifyTrainingExportArtifacts(
       errors.push("manifest_dataset_hash_mismatch");
     }
   } else if (manifest) {
-    caveats.push("Manifest has no row_entries object; row-level hashes were not checked.");
+    errors.push("manifest_row_entries_missing");
+  }
+  if (manifest && typeof manifest.dataset_hash !== "string") {
+    errors.push("manifest_dataset_hash_missing");
   }
 
   const excludedCount = Array.isArray(manifest?.excluded) ? manifest!.excluded!.length : 0;

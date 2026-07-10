@@ -17,6 +17,9 @@ describe("customer test launch packet", () => {
     expect(packet.status).toBe("ready_to_review");
     expect(packet.customer_label).toBe("customer-test-01");
     expect(packet.customer_label_is_approval_evidence).toBe(false);
+    expect(packet.live_logs_approved).toBe(false);
+    expect(packet.generated_at).not.toBe("2026-01-01T00:00:00Z");
+    expect(formatCustomerTestLaunchPacketMarkdown(packet)).toContain("does not approve live-log import");
     expect(packet.counts.source_docs_present).toBe(CUSTOMER_TEST_LAUNCH_SOURCE_DOCS.length);
     expect(packet.go_no_go_checklist.some((item) => item.requiredBeforeLiveLogs)).toBe(true);
   });

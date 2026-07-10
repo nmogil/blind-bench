@@ -1,14 +1,14 @@
 # Blind Bench — Positioning One-Pager
 
-*v1 · 2026-07-08 · Decision of record (Noah): agent-first framing. Working history
-and persona detail live in [[Blind Bench - Positioning]]; where they conflict,
-this one-pager wins.*
+*v2 · 2026-07-10 · Decision of record: ingestion-first, execution-neutral human review. Working history and persona detail live in [[Blind Bench - Positioning]]; where they conflict, this one-pager wins.*
 
 ---
 
 ## One-liner
 
-**Blind Bench is the blind human-review layer for AI agents.**
+**Bring your traces. Blind Bench turns them into defensible human judgment.**
+
+Blind Bench is the blind human-review layer for AI agents and model outputs; it does not run the agent for you.
 
 Your domain experts review agent trajectories — and plain model outputs — without
 knowing which version, model, or harness produced them. Their judgment becomes
@@ -48,17 +48,12 @@ randomized, blinded human tests) is the one no platform ships.
 
 ## What Blind Bench is not
 
-Not an observability platform, not an LLM-judge vendor, not a labeling
-workforce, not a crowd arena. Keep Braintrust, LangSmith, Langfuse, your
-gateway, your judges. Blind Bench sits above them as the judgment layer they
-feed into.
+Not an observability platform, not an LLM-judge vendor, not a labeling workforce, not a crowd arena, and not a hosted agent runtime or sandbox orchestrator. Keep Pi, Claude Code, Braintrust, LangSmith, Langfuse, your gateway, CI, and your judges. They execute or observe; Blind Bench sits above them as the judgment layer they feed into. The original prompt playground remains available for focused experiments, but it is secondary.
 
 ## How agent data gets in
 
 One versioned public contract — `eval-record` v1, plain JSON over HTTPS — with
-adapters meeting data where it lives: agent harnesses (Claude Code today, more
-to follow), OpenTelemetry / AI-gateway push, log import, and thin customer-side
-exporters from existing trace platforms. Per-project tokens, counts-only
+adapters meeting data where it lives: mapped CSV for flat interactions, Pi and Claude Code session JSONL for coding trajectories, OpenTelemetry / AI-gateway push and file upload, and thin customer-side exporters from existing trace platforms. Per-project tokens, counts-only
 responses, BYOK throughout: Blind Bench never holds your model, gateway, or
 platform credentials.
 

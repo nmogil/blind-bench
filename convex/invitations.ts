@@ -55,6 +55,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth, requireOrgRole, requireProjectRole } from "./lib/auth";
 import { generateToken } from "./lib/crypto";
+import { ensureReviewSessionsForReviewer } from "./lib/traceReviewSessions";
 
 const ORG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROJECT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -728,6 +729,9 @@ async function acceptProjectInvite(
     invitedAt: invite.invitedAt,
     acceptedAt: Date.now(),
   });
+  if (projectRole === "evaluator" && (invite.blindMode ?? true)) {
+    await ensureReviewSessionsForReviewer(ctx, projectId, userId);
+  }
 }
 
 async function acceptCycleInvite(
@@ -760,6 +764,12 @@ async function acceptCycleInvite(
       invitedAt: invite.invitedAt,
       acceptedAt: now,
     });
+  }
+  const isBlindEvaluator = existingCollab
+    ? existingCollab.role === "evaluator" && existingCollab.blindMode !== false
+    : (invite.blindMode ?? true);
+  if (isBlindEvaluator) {
+    await ensureReviewSessionsForReviewer(ctx, cycle.projectId, userId);
   }
 
   // Per-cycle workflow status (NOT a membership ring). Tracks the

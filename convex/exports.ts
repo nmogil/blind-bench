@@ -31,6 +31,7 @@ import {
   renderTranscript,
   moreSensitive,
   type ClassifiedRow,
+  type ExcludedRow,
   type ExportFormat,
   type ExportManifest,
   type ExportSourceStats,
@@ -173,6 +174,7 @@ interface StepRef {
 interface TrajectoryPlanRow {
   privacyClass: PrivacyClass;
   metadata: Record<string, unknown>;
+  excludeReason?: ExcludedRow["reason"];
   prefix?: StepRef[];
   chosen?: StepRef;
   rejected?: StepRef;
@@ -202,26 +204,67 @@ export const gatherTrajectoryPlan = internalQuery({
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
       for (const m of matchups) {
-        if (m.winner !== "left" && m.winner !== "right") continue;
-        const winnerId = m.winner === "left" ? m.leftTraceId : m.rightTraceId;
-        const loserId = m.winner === "left" ? m.rightTraceId : m.leftTraceId;
-        const [wt, lt] = [await ctx.db.get(winnerId), await ctx.db.get(loserId)];
-        if (!wt || !lt) continue;
-        const wSteps = await stepsOf(winnerId);
-        const lSteps = await stepsOf(loserId);
-        const chosen = wSteps.find((s) => s.stepIndex === m.divergenceStepIndex);
-        const rejected = lSteps.find((s) => s.stepIndex === m.divergenceStepIndex);
+        const [leftTrace, rightTrace] = await Promise.all([
+          ctx.db.get(m.leftTraceId),
+          ctx.db.get(m.rightTraceId),
+        ]);
+        if (!leftTrace || !rightTrace) continue;
+        const privacyClass = moreSensitive(leftTrace.privacyClass, rightTrace.privacyClass);
+        if (m.comparabilityStatus !== "valid") {
+          plan.push({
+            privacyClass,
+            metadata: {},
+            excludeReason: "non_comparable_prefix",
+          });
+          continue;
+        }
+        const decisions = await ctx.db
+          .query("agentTraceMatchupDecisions")
+          .withIndex("by_matchup", (q) => q.eq("matchupId", m._id))
+          .collect();
+        for (const decision of decisions) reviewerIds.add(decision.userId);
+        const directional = decisions.filter(
+          (decision) => decision.winner === "left" || decision.winner === "right",
+        );
+        if (decisions.some((decision) => decision.winner === "tie" || decision.winner === "skip")) {
+          plan.push({ privacyClass, metadata: {}, excludeReason: "no_preference" });
+          continue;
+        }
+        if (directional.length === 0) continue;
+        const winner = directional[0]?.winner;
+        if (!winner || directional.some((decision) => decision.winner !== winner)) {
+          plan.push({
+            privacyClass,
+            metadata: { reviewer_count: directional.length },
+            excludeReason: "review_disagreement",
+          });
+          continue;
+        }
+        const winnerId = winner === "left" ? m.leftTraceId : m.rightTraceId;
+        const loserId = winner === "left" ? m.rightTraceId : m.leftTraceId;
+        const winnerTrace = winner === "left" ? leftTrace : rightTrace;
+        const loserTrace = winner === "left" ? rightTrace : leftTrace;
+        const [winnerSteps, loserSteps] = await Promise.all([
+          stepsOf(winnerId),
+          stepsOf(loserId),
+        ]);
+        const chosen = winnerSteps.find((step) => step.stepIndex === m.divergenceStepIndex);
+        const rejected = loserSteps.find((step) => step.stepIndex === m.divergenceStepIndex);
         if (!chosen || !rejected) continue;
+        const reasonTags = [...new Set(directional.flatMap((decision) => decision.reasonTags))];
         plan.push({
-          privacyClass: moreSensitive(wt.privacyClass, lt.privacyClass),
-          metadata: { reason_tags: m.reasonTags },
-          prefix: wSteps
-            .filter((s) => s.stepIndex < m.divergenceStepIndex)
-            .map((s) => ({ meta: metaOf(s), storageId: s.fullBodyStorageId })),
+          privacyClass: moreSensitive(winnerTrace.privacyClass, loserTrace.privacyClass),
+          metadata: {
+            reason_tags: reasonTags,
+            reviewer_count: directional.length,
+            prefix_hash_verified: true,
+          },
+          prefix: winnerSteps
+            .filter((step) => step.stepIndex < m.divergenceStepIndex)
+            .map((step) => ({ meta: metaOf(step), storageId: step.fullBodyStorageId })),
           chosen: { meta: metaOf(chosen), storageId: chosen.fullBodyStorageId },
           rejected: { meta: metaOf(rejected), storageId: rejected.fullBodyStorageId },
         });
-        if (m.userId) reviewerIds.add(m.userId);
       }
     } else if (args.format === "sft") {
       const traces = await ctx.db
@@ -235,12 +278,21 @@ export const gatherTrajectoryPlan = internalQuery({
           .withIndex("by_trace", (q) => q.eq("agentTraceId", tr._id))
           .collect();
         if (!verdicts.some((vd) => vd.rating === "best")) continue;
+        if (verdicts.some((vd) => vd.rating === "weak")) {
+          plan.push({
+            privacyClass: tr.privacyClass,
+            metadata: {},
+            excludeReason: "review_disagreement",
+          });
+          for (const verdict of verdicts) reviewerIds.add(verdict.userId);
+          continue;
+        }
         const steps = await stepsOf(tr._id);
         plan.push({
           privacyClass: tr.privacyClass,
           metadata: { verdict: "best" },
           messages: steps
-            .filter((s) => s.kind === "message")
+            .filter((s) => s.kind === "message" && ["system", "user", "assistant"].includes(s.role ?? ""))
             .map((s) => ({ meta: metaOf(s), storageId: s.fullBodyStorageId })),
           finalAnswer: tr.finalAnswerStorageId,
         });
@@ -319,6 +371,7 @@ export const generateExport = action({
     });
 
     let classified: ClassifiedRow[];
+    let sourceExcluded: ExcludedRow[] = [];
     let stats: ExportSourceStats;
     if (args.source === "output_preference") {
       const res = await ctx.runQuery(internal.exports.gatherOutputPrefRows, {
@@ -332,13 +385,17 @@ export const generateExport = action({
         projectId: args.projectId,
         format: args.format,
       });
-      classified = await hydrateTrajectory(ctx, res.plan, args.format);
+      const hydrated = await hydrateTrajectory(ctx, res.plan, args.format);
+      classified = hydrated.rows;
+      sourceExcluded = hydrated.excluded;
       stats = res.stats;
     }
 
-    const { included, excluded } = gateRows(classified, {
+    const gated = gateRows(classified, {
       allowSensitive: args.allowSensitive,
     });
+    const included = gated.included;
+    const excluded = [...sourceExcluded, ...gated.excluded];
     const jsonl = toJsonl(args.format as ExportFormat, included);
     const createdAt = Date.now();
     const manifest = buildExportManifest({
@@ -379,7 +436,7 @@ async function hydrateTrajectory(
   ctx: { storage: { get: (id: Id<"_storage">) => Promise<Blob | null> } },
   plan: TrajectoryPlanRow[],
   format: "dpo" | "sft" | "annotated",
-): Promise<ClassifiedRow[]> {
+): Promise<{ rows: ClassifiedRow[]; excluded: ExcludedRow[] }> {
   const cache = new Map<string, unknown>();
   const read = async (id?: Id<"_storage">): Promise<unknown> => {
     if (!id) return undefined;
@@ -398,7 +455,12 @@ async function hydrateTrajectory(
   };
 
   const out: ClassifiedRow[] = [];
+  const excluded: ExcludedRow[] = [];
   for (const r of plan) {
+    if (r.excludeReason !== undefined) {
+      excluded.push({ reason: r.excludeReason, privacyClass: r.privacyClass });
+      continue;
+    }
     if (format === "dpo" && r.chosen && r.rejected) {
       const prefix = await Promise.all(
         (r.prefix ?? []).map(async (s) => ({ meta: s.meta, body: await read(s.storageId) })),
@@ -417,11 +479,17 @@ async function hydrateTrajectory(
         })),
       );
       const finalBody = (await read(r.finalAnswer)) as Record<string, unknown> | undefined;
-      if (finalBody?.text) msgs.push({ role: "assistant", content: String(finalBody.text) });
+      if (finalBody?.text) {
+        const finalText = String(finalBody.text);
+        const last = msgs[msgs.length - 1];
+        if (last?.role !== "assistant" || last.content !== finalText) {
+          msgs.push({ role: "assistant", content: finalText });
+        }
+      }
       out.push({ privacyClass: r.privacyClass, row: { kind: "sft", messages: msgs, metadata: r.metadata } });
     }
   }
-  return out;
+  return { rows: out, excluded };
 }
 
 // Actions have no ctx.db; resolve the owner/editor caller via an internal query.

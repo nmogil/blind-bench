@@ -614,6 +614,35 @@ This milestone is **not done** if any acceptance criterion is "mostly passing": 
 
 ---
 
+## M33 — Ingestion-First Pivot (2026-07)
+
+**Goal**: make completed-run ingestion the primary product flow while retaining the prompt playground as a secondary tool. This milestone supersedes the deferred M32 hosted-runtime direction; issues #320–#332 remain closed as historical context, not deleted.
+
+### Product boundary
+
+- Blind Bench owns import, normalization receipts, opaque blind review, independent judgments, and regression/training/evidence exports.
+- Customer harnesses, Pi, Claude Code, CI systems, gateways, and observability platforms own execution.
+- No Blind Bench-owned sandbox provisioning, arbitrary harness execution, runtime credentials, compute billing, or cleanup.
+
+### Deliverables
+
+1. One authenticated **Import runs** surface for mapped CSV, OTLP/HTTP GenAI JSON, Pi v3 session JSONL, and Claude Code session JSONL.
+2. Storage-backed raw provenance, bounded parsing, counts-only summaries, and idempotent retries for every adapter.
+3. Ingestion-first welcome, new-project, project navigation, and actionable trace empty states; playground remains reachable but secondary.
+4. Opaque trace-review session URLs, token-scoped reviewer APIs, and independent per-reviewer matchup decisions.
+5. SHA-256 shared-prefix comparability checks and default-deny DPO export with explicit disagreement/tie/skip/mismatch exclusions.
+6. Honest preflight/readiness gates, browser component coverage, and a canonical import → review → reuse integration test.
+
+### Testable demo
+
+> Upload a synthetic CSV, OTLP payload, Pi session, or Claude Code session → receive a safe import receipt → open a second-principal opaque review link → submit a verdict/comment or matchup decision → reveal provenance only to an authorized owner → export the judgment, with non-comparable DPO rows explicitly excluded.
+
+### Out of scope
+
+Hosted Pi SDK execution, Daytona/Modal/E2B orchestration, runtime profile editors, arbitrary-code BYOK, and runtime compute billing. Reconsider only if repeated paid-pilot evidence shows customers need Blind Bench to generate runs rather than judge them.
+
+---
+
 ## Out of scope for v1 (restated)
 
 These carry forward from [[Blind Bench - Architecture#v1 Scope & Deferred]] so this doc is self-contained:
@@ -639,7 +668,7 @@ These carry forward from [[Blind Bench - Architecture#v1 Scope & Deferred]] so t
 - **M4 (non-negotiable)**: every authorization check on the runs/versions/feedback functions must have a test proving an Evaluator is rejected and an Editor/Owner is allowed. Plus a test that `getOutputsForEvaluator` returns only the expected fields.
 - M5: optimizer output validation — every failure mode from [[Blind Bench - Optimizer Meta-Prompt#5 Failure modes and action-level validation]] has a test that feeds in a crafted bad output and asserts the request fails with the right error message.
 
-**No E2E framework in v1.** Playwright and similar are deferred.
+**Browser verification (M33).** Playwright component tests are required for import and blind-review surfaces. The canonical deployed import → second-principal review → reuse journey remains a required release gate; until authenticated deployed E2E credentials and branch protection are configured, production customer readiness must remain explicitly blocked rather than inferred from unit tests.
 
 **Adversarial check at M4**: sit down with devtools open and try to break blind eval. Check every rule in [[Blind Bench - UX Spec#10 Blind eval security rules]] manually. If you find a leak, the milestone is not done.
 

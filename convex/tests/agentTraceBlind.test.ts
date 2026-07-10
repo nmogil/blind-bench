@@ -85,8 +85,11 @@ describe("#266 blind projection — no provenance leaks to evaluators", () => {
     });
 
     const opts = { paginationOpts: { numItems: 50, cursor: null } };
-    const blindSteps = await asBlind.query(api.agentTraces.listSteps, { agentTraceId, ...opts });
-    const blindTrace = await asBlind.query(api.agentTraces.getTrace, { agentTraceId });
+    const sessions = await asBlind.query(api.agentTraceReviewSessions.listMine, {});
+    const token = sessions[0]?.token;
+    if (!token) throw new Error("Missing opaque review session");
+    const blindSteps = await asBlind.query(api.agentTraceReviewSessions.listSteps, { token, ...opts });
+    const blindTrace = await asBlind.query(api.agentTraceReviewSessions.getTrace, { token });
 
     // Metadata + inline scalars carry no identifiers. (Bodies are opaque URLs;
     // their redacted content is asserted separately below.)
@@ -95,9 +98,10 @@ describe("#266 blind projection — no provenance leaks to evaluators", () => {
       expect(blindMeta).not.toContain(needle);
     }
     // Positive projection checks.
-    expect(blindTrace?.harnessName).toBeUndefined();
-    expect(blindTrace?.model).toBeUndefined();
-    expect(blindTrace?.traceId).toBeUndefined();
+    expect(blindTrace).not.toHaveProperty("harnessName");
+    expect(blindTrace).not.toHaveProperty("model");
+    expect(blindTrace).not.toHaveProperty("traceId");
+    expect(blindTrace).not.toHaveProperty("_id");
     const bashStep = blindSteps.page.find((s) => s.kind === "tool_call");
     expect(bashStep?.toolName).toBe("run_command"); // aliased
     expect(bashStep?.toolCallId).toBe("call-1"); // opaque positional

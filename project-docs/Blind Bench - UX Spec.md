@@ -67,7 +67,9 @@ Six opinionated constraints that everything below has to respect.
 /orgs/:orgSlug/settings                         → org general settings
 /orgs/:orgSlug/settings/members                 → org member + role management
 /orgs/:orgSlug/settings/openrouter-key          → BYOK: set / rotate / check status
-/orgs/:orgSlug/projects/:projectId              → project home: current version, recent runs, pending optimizations
+/orgs/:orgSlug/projects/:projectId              → project home: imported runs and review activity
+/orgs/:orgSlug/projects/:projectId/import       → primary import surface: CSV, OTLP JSON, Pi JSONL, Claude Code JSONL
+/orgs/:orgSlug/projects/:projectId/traces       → completed trajectory list and owner reveal/detail
 /orgs/:orgSlug/projects/:projectId/versions     → version history / timeline
 /orgs/:orgSlug/projects/:projectId/versions/:versionId → version editor (system + user template + variables chips + attachments + config + Run)
 /orgs/:orgSlug/projects/:projectId/variables    → project variable manager
@@ -118,7 +120,7 @@ The application shell (top bar + side nav + main content) differs by role.
 Within a project, a secondary nav appears as tabs at the top of the main content area:
 
 ```
-Editor  Versions  Runs  Test Cases  Variables  Meta Context  Compare  Settings
+Import runs  Traces  Review  Playground  Versions  Runs  Test Cases  Export  Settings
 ```
 
 ### Evaluator shell
@@ -168,14 +170,15 @@ Each screen entry has: **route**, **roles**, **purpose**, **layout**, **primary 
 - **States**: Loading, Error (token expired / invalid).
 - **Transitions out**: Same as sign-in success.
 
-### 4.4 First-run welcome (M29.4)
+### 4.4 First-run welcome (M33)
 - **Route**: `/welcome`.
 - **Roles**: Authenticated, zero owned projects.
-- **Purpose**: One question, two paths into a real, mutable project.
-- **Layout**: Centered card on the same Grainient backdrop as `/auth/sign-in` for a continuous post-auth handoff. Headline ("What are you working on?"), two-tab control: "I have a prompt" (textarea + system/user role toggle + "Create project") and "Show me an example" (one paragraph + "Load example project").
-- **Primary actions**: `projects.createFromPaste` (paste path) or `projects.cloneStarter` (example path). Both lazily create a personal workspace if the user doesn't already own one.
+- **Purpose**: Start from completed AI behavior without requiring Blind Bench to execute it.
+- **Layout**: Centered card headed "Bring in completed AI runs". The default tab is **Import runs**, naming CSV, OpenTelemetry, Pi, and Claude Code. **Prompt playground** and **Example** remain adjacent secondary tabs.
+- **Primary action**: create the personal workspace/project and transition directly to `/orgs/:orgSlug/projects/:projectId/import`.
+- **Secondary actions**: create a project from pasted prompt content or clone the starter example.
 - **States**: Idle, Submitting (per path), Error.
-- **Transitions out**: `/orgs/:orgSlug/projects/:projectId/versions/:versionId` — directly into the editor with the user's content already saved.
+- **Product boundary copy**: the import path states that Blind Bench normalizes evidence and never runs the customer's harness.
 
 ### 4.4b Org bootstrap (legacy)
 - **Route**: `/onboarding`. Reachable only as a fallback when the welcome screen errors and there's no membership to land on.
@@ -222,13 +225,19 @@ Each screen entry has: **route**, **roles**, **purpose**, **layout**, **primary 
 ### 4.9 Project home
 - **Route**: `/orgs/:orgSlug/projects/:projectId`.
 - **Roles**: Owner, Editor.
-- **Purpose**: The project dashboard. Summarize state, point at next actions.
-- **Layout**: Project title + secondary nav at the top. Main content is a 2/3 + 1/3 split:
-  - **Left (2/3)**: "Current version" card (version number, status pill, diff-stat vs parent, "Edit" button); below it, "Recent runs" list (5 most recent runs with timestamp, test case name, model, status pill, 3 blind-label mini-previews).
-  - **Right (1/3)**: Collaborators list (avatars with role badges), pending optimization requests count with link, meta-context completeness ("3 of 3 questions answered"), BYOK status ("Key set" / "No key — set one").
-- **Primary actions**: Edit current version, view recent run, request optimization (if feedback exists).
-- **Secondary actions**: View all versions, view all runs, invite collaborator.
-- **States**: Populated, Empty (new project with no versions — shows a "Draft your first prompt" CTA that jumps to the version editor).
+- **Purpose**: Summarize imported trajectories and review activity, then point at the next import/review/reuse action.
+- **Primary actions**: Import completed runs, open review queue, reuse judgments.
+- **Secondary actions**: Open the prompt playground, manage collaborators, inspect historical prompt versions/runs.
+- **States**: Populated; Empty with actionable "Import completed runs" copy linking to the import surface.
+
+### 4.9b Import completed runs (M33)
+- **Route**: `/orgs/:orgSlug/projects/:projectId/import`.
+- **Roles**: Owner, Editor.
+- **Purpose**: Normalize completed behavior from customer-owned runtimes into the common trajectory spine.
+- **Layout**: Source chooser for mapped CSV, OpenTelemetry GenAI JSON, Pi session JSONL, and Claude Code session JSONL; bounded file picker; CSV field mapping; counts-only completeness receipt; governance warning.
+- **Primary action**: Import runs.
+- **States**: Empty, file selected, mapping required, importing, completed receipt, blocked validation/error.
+- **Safety**: never echo raw row/transcript content in receipts or logs; retain raw provenance access-controlled and storage-backed; idempotent retries; non-GenAI OTLP spans are ignored and counted.
 
 ### 4.10 Version list / history
 - **Route**: `/orgs/:orgSlug/projects/:projectId/versions`.

@@ -20,6 +20,7 @@ export interface CustomerTestLaunchPacket {
   status: CustomerTestLaunchPacketStatus;
   customer_label: string;
   customer_label_is_approval_evidence: false;
+  live_logs_approved: false;
   source_docs: LaunchPacketSourceDoc[];
   counts: {
     source_docs: number;
@@ -41,7 +42,6 @@ export interface CustomerTestLaunchPacket {
   };
 }
 
-const GENERATED_AT = "2026-01-01T00:00:00Z";
 const DEFAULT_OUT_DIR = join("artifacts", "customer-test-launch-packet");
 
 export const CUSTOMER_TEST_LAUNCH_SOURCE_DOCS: Array<{ path: string; purpose: string }> = [
@@ -99,10 +99,11 @@ export function buildCustomerTestLaunchPacket(options: {
   ];
 
   return {
-    generated_at: options.generatedAt ?? GENERATED_AT,
+    generated_at: options.generatedAt ?? new Date().toISOString(),
     status,
     customer_label: customerLabel,
     customer_label_is_approval_evidence: false,
+    live_logs_approved: false,
     source_docs: sourceDocs,
     counts: {
       source_docs: sourceDocs.length,
@@ -160,6 +161,8 @@ export function formatCustomerTestLaunchPacketMarkdown(packet: CustomerTestLaunc
     "",
     `Generated at: ${packet.generated_at}`,
     `Status: \`${packet.status}\``,
+    "",
+    "**This packet status only means the source documents are present for review. It does not approve live-log import or prove customer consent.**",
     "",
     "## Objective",
     "",

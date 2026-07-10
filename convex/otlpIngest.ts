@@ -101,7 +101,7 @@ export const otlpIngestHandler = httpAction(async (ctx, req) => {
   if (!resolved) return json({ error: "Invalid or revoked ingest token" }, 401);
 
   const body = await req.text();
-  if (body.length > MAX_BYTES) return json({ error: "Payload too large" }, 413);
+  if (new TextEncoder().encode(body).byteLength > MAX_BYTES) return json({ error: "Payload too large" }, 413);
   let payload: unknown;
   try {
     payload = JSON.parse(body);

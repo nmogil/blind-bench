@@ -32,9 +32,10 @@ export function NewProjectDialog({
   const createWithPrompt = useMutation(api.projects.createWithPrompt);
 
   const [step, setStep] = useState<"info" | "prompt">("info");
+  const [projectMode, setProjectMode] = useState<"import" | "playground">("import");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [seedSample, setSeedSample] = useState(true);
+  const [seedSample, setSeedSample] = useState(false);
   const [promptText, setPromptText] = useState("");
   const [varDefaults, setVarDefaults] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -47,9 +48,10 @@ export function NewProjectDialog({
 
   function resetState() {
     setStep("info");
+    setProjectMode("import");
     setName("");
     setDescription("");
-    setSeedSample(true);
+    setSeedSample(false);
     setPromptText("");
     setVarDefaults({});
     setError("");
@@ -64,13 +66,15 @@ export function NewProjectDialog({
         orgId,
         name: name.trim(),
         description: description.trim() || undefined,
-        seedSample: seedSample || undefined,
+        seedSample: projectMode === "playground" && seedSample ? true : undefined,
       });
       onOpenChange(false);
       resetState();
-      navigate(`/orgs/${org.slug}/projects/${projectId}`);
+      navigate(
+        `/orgs/${org.slug}/projects/${projectId}/${projectMode === "import" ? "import" : "versions"}`,
+      );
     } catch (err) {
-      setError(friendlyError(err, "Failed to create prompt."));
+      setError(friendlyError(err, "Failed to create the project."));
     } finally {
       setSaving(false);
     }
@@ -108,7 +112,7 @@ export function NewProjectDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {step === "info" ? "New prompt" : "Paste your prompt"}
+            {step === "info" ? "New project" : "Paste your prompt"}
           </DialogTitle>
         </DialogHeader>
 
@@ -133,19 +137,38 @@ export function NewProjectDialog({
                 placeholder="What this prompt is about"
               />
             </div>
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={seedSample}
-                  onCheckedChange={(checked) => setSeedSample(!!checked)}
-                />
-                <span className="text-sm">Start with a sample prompt</span>
-              </label>
-              <p className="mt-1 ml-6 text-xs text-muted-foreground">
-                Includes a sample prompt, variable, and test case so you can try
-                the full workflow immediately.
-              </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => { setProjectMode("import"); setSeedSample(false); }}
+                className={`rounded-lg border p-3 text-left text-sm ${projectMode === "import" ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}
+              >
+                <span className="font-medium">Import completed runs</span>
+                <span className="mt-1 block text-xs text-muted-foreground">CSV, OpenTelemetry, Pi, or Claude Code.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setProjectMode("playground"); setSeedSample(true); }}
+                className={`rounded-lg border p-3 text-left text-sm ${projectMode === "playground" ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}
+              >
+                <span className="font-medium">Prompt playground</span>
+                <span className="mt-1 block text-xs text-muted-foreground">Draft and run prompts inside Blind Bench.</span>
+              </button>
             </div>
+            {projectMode === "playground" && (
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={seedSample}
+                    onCheckedChange={(checked) => setSeedSample(!!checked)}
+                  />
+                  <span className="text-sm">Start with a sample prompt</span>
+                </label>
+                <p className="mt-1 ml-6 text-xs text-muted-foreground">
+                  Includes a sample prompt, variable, and test case.
+                </p>
+              </div>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex justify-between">
               <Button
@@ -156,19 +179,22 @@ export function NewProjectDialog({
                 Cancel
               </Button>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={saving || !name.trim()}
-                  onClick={() => { setSeedSample(false); setStep("prompt"); }}
-                >
-                  Paste a prompt instead
-                </Button>
-                <Button
-                  disabled={saving || !name.trim()}
-                  onClick={handleCreateBlank}
-                >
-                  {saving ? "Creating..." : "Create"}
+                {projectMode === "playground" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving || !name.trim()}
+                    onClick={() => { setSeedSample(false); setStep("prompt"); }}
+                  >
+                    Paste a prompt instead
+                  </Button>
+                )}
+                <Button disabled={saving || !name.trim()} onClick={handleCreateBlank}>
+                  {saving
+                    ? "Creating..."
+                    : projectMode === "import"
+                      ? "Create and import"
+                      : "Create playground"}
                 </Button>
               </div>
             </div>

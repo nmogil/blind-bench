@@ -70,7 +70,15 @@ export interface ClassifiedRow {
 }
 
 export interface ExcludedRow {
-  reason: "prod_sensitive" | "pii_leak" | "empty" | "degenerate";
+  reason:
+    | "prod_sensitive"
+    | "pii_leak"
+    | "empty"
+    | "degenerate"
+    | "non_comparable_prefix"
+    | "review_disagreement"
+    | "no_preference"
+    | "invalid_sft_shape";
   privacyClass: PrivacyClass;
 }
 
@@ -124,6 +132,14 @@ export function gateRows(
   for (const { row, privacyClass } of rows) {
     if (isEmptyRow(row)) {
       excluded.push({ reason: "empty", privacyClass });
+      continue;
+    }
+    if (
+      row.kind === "sft" &&
+      (row.messages.some((message) => !["system", "user", "assistant"].includes(message.role)) ||
+        row.messages[row.messages.length - 1]?.role !== "assistant")
+    ) {
+      excluded.push({ reason: "invalid_sft_shape", privacyClass });
       continue;
     }
     if (SENSITIVE_CLASSES.has(privacyClass) && !opts.allowSensitive) {
@@ -253,7 +269,7 @@ export function buildExportManifest(input: {
   const notes: string[] = [];
   if (format === "dpo") {
     notes.push(
-      "DPO rows are emitted only for comparable chosen/rejected pairs; a pair whose chosen and rejected text are identical carries no preference signal and is excluded (degenerate) rather than written.",
+      "Trajectory DPO rows require a persisted SHA-256 shared-prefix proof and an unambiguous directional reviewer decision. Prefix mismatches, reviewer disagreement, ties/skips, and identical chosen/rejected text are excluded with explicit reasons.",
     );
     if (included.length === 0)
       notes.push(
@@ -262,8 +278,11 @@ export function buildExportManifest(input: {
   }
   if (format === "sft") {
     notes.push(
-      "SFT rows use the OpenAI/Fireworks chat shape { messages: [{ role, content }] }; only best-rated outputs/trajectories are included.",
+      "SFT rows use the OpenAI/Fireworks chat shape { messages: [{ role, content }] }; roles are limited to system/user/assistant, the final turn is assistant, and only unambiguously best-rated outputs/trajectories are included.",
     );
+    if ((byReason.invalid_sft_shape ?? 0) > 0) {
+      notes.push(`${byReason.invalid_sft_shape} row(s) excluded because the chat roles or final assistant turn were invalid.`);
+    }
   }
   if ((byReason.prod_sensitive ?? 0) > 0 && !allowSensitive)
     notes.push(
@@ -272,6 +291,18 @@ export function buildExportManifest(input: {
   if ((byReason.pii_leak ?? 0) > 0)
     notes.push(
       `${byReason.pii_leak} row(s) excluded by the PII/secret leak scan even though their privacy class was allowed.`,
+    );
+  if ((byReason.non_comparable_prefix ?? 0) > 0)
+    notes.push(
+      `${byReason.non_comparable_prefix} trajectory matchup(s) excluded because the chosen/rejected prefixes did not share the same persisted hash.`,
+    );
+  if ((byReason.review_disagreement ?? 0) > 0)
+    notes.push(
+      `${byReason.review_disagreement} trajectory matchup(s) excluded because reviewers selected different winners.`,
+    );
+  if ((byReason.no_preference ?? 0) > 0)
+    notes.push(
+      `${byReason.no_preference} trajectory matchup(s) excluded because reviewers only tied or skipped the pair.`,
     );
   notes.push(
     "Source trace/run ids are omitted by design — exports are anonymized by construction; source_units and reviewers are aggregate counts only.",

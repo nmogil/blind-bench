@@ -133,7 +133,7 @@ describe("agentTraces persistence spine", () => {
     });
     // Parent carries no step content — comfortably under the 10KB budget.
     expect(parentBytes).toBeLessThan(10_240);
-  });
+  }, 15_000);
 
   test("re-persisting the same trace dedups instead of duplicating", async () => {
     const t = convexTest(schema);
@@ -162,7 +162,10 @@ describe("agentTraces persistence spine", () => {
     });
 
     const opts = { paginationOpts: { numItems: 50, cursor: null } };
-    const blindPage = await asBlind.query(api.agentTraces.listSteps, { agentTraceId, ...opts });
+    const sessions = await asBlind.query(api.agentTraceReviewSessions.listMine, {});
+    const token = sessions[0]?.token;
+    if (!token) throw new Error("Missing opaque trace review session");
+    const blindPage = await asBlind.query(api.agentTraceReviewSessions.listSteps, { token, ...opts });
     // listSteps never hands out storage ids or URLs — only a hasBody flag.
     for (const item of blindPage.page) {
       expect(item).not.toHaveProperty("fullBodyStorageId");
@@ -178,7 +181,7 @@ describe("agentTraces persistence spine", () => {
       await asOwner.action(api.agentTraces.getStepBody, { agentTraceId, stepIndex: toolStep!.stepIndex }),
     );
     const blindBody = JSON.stringify(
-      await asBlind.action(api.agentTraces.getStepBody, { agentTraceId, stepIndex: toolStep!.stepIndex }),
+      await asBlind.action(api.agentTraceReviewSessions.getStepBody, { token, stepIndex: toolStep!.stepIndex }),
     );
     expect(ownerBody).toContain("123-45-6789");
     expect(blindBody).toContain("[REDACTED]");

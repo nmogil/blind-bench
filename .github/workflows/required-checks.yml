@@ -1,0 +1,45 @@
+name: Required checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: required-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate offline Convex type stubs
+        run: node scripts/generate-convex-stubs.mjs
+      - run: npm run build
+      - run: npm run test:evals
+      - run: npm run test:convex
+
+  browser-components:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate offline Convex type stubs
+        run: node scripts/generate-convex-stubs.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ct

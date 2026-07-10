@@ -23,6 +23,8 @@ describe("customer testing readiness", () => {
     expect(report.counts.docs_present).toBe(report.counts.required_docs);
     expect(report.counts.gates_approved).toBe(0);
     expect(report.caveats).toContain("no_local_approvals_file_supplied");
+    expect(Date.parse(report.generated_at)).not.toBeNaN();
+    expect(report.generated_at).not.toBe("2026-01-01T00:00:00Z");
   });
 
   test("passes when required docs exist and every gate is approved", () => {

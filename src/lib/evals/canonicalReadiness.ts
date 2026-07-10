@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { main as scorecardMain } from "./scorecard";
 import { main as comparisonMain } from "./modelComparison";
 import { main as trainingDatasetMain } from "./trainingDataset";
+import { verifyTrainingExportArtifacts } from "./trainingExportVerifier";
 
 export type ReadinessStatus = "pass" | "fail";
 
@@ -124,15 +125,17 @@ function requiredArtifactCheck(
   label: string,
   artifacts: string[],
   summary: Record<string, string | number | boolean | null>,
+  blockingErrors: string[] = [],
 ): ReadinessCheck {
   const missing = artifacts.filter((p) => !existsSync(p));
+  const errors = [...missing.map((p) => `Missing artifact: ${p}`), ...blockingErrors];
   return {
     id,
     label,
-    status: missing.length ? "fail" : "pass",
+    status: errors.length ? "fail" : "pass",
     artifacts,
     summary,
-    ...(missing.length ? { errors: missing.map((p) => `Missing artifact: ${p}`) } : {}),
+    ...(errors.length ? { errors } : {}),
   };
 }
 
@@ -144,12 +147,12 @@ export async function runCanonicalDemoReadiness(
   opts: { outDir?: string; generated_at?: string } = {},
 ): Promise<CanonicalDemoReadinessReport> {
   const outDir = opts.outDir ?? "artifacts";
-  const generated_at = opts.generated_at ?? new Date(0).toISOString();
+  const generated_at = opts.generated_at ?? new Date().toISOString();
   mkdirSync(outDir, { recursive: true });
 
-  await scorecardMain([]);
-  await comparisonMain([]);
-  await trainingDatasetMain([generated_at]);
+  const scorecardExit = await scorecardMain([]);
+  const comparisonExit = await comparisonMain([]);
+  const trainingDatasetExit = await trainingDatasetMain([generated_at]);
 
   const scorecardPath = join(outDir, "ai-quality-scorecard.json");
   const comparisonPath = join(outDir, "model-comparison.json");
@@ -171,6 +174,7 @@ export async function runCanonicalDemoReadiness(
     dataset_hash: string;
   }>(manifestPath);
 
+  const trainingVerification = verifyTrainingExportArtifacts({ artifactDir: outDir });
   const checks: ReadinessCheck[] = [
     requiredArtifactCheck(
       "scorecard_demo",
@@ -183,6 +187,11 @@ export async function runCanonicalDemoReadiness(
         hard_failed_cases: scorecard.safety_privacy.hard_failed_cases,
         fine_tuning_status: scorecard.fine_tuning_readiness.status,
       },
+      [
+        ...(scorecardExit !== 0 ? [`Scorecard gate exited ${scorecardExit}.`] : []),
+        ...(scorecard.safety_privacy.hard_failed_cases > 0 ? ["Scorecard contains blocking safety/privacy hard failures."] : []),
+        ...(scorecard.fine_tuning_readiness.status !== "ready" ? [`Fine-tuning gate: ${scorecard.fine_tuning_readiness.status}`] : []),
+      ],
     ),
     requiredArtifactCheck(
       "model_comparison_demo",
@@ -194,6 +203,11 @@ export async function runCanonicalDemoReadiness(
         blocking: comparison.recommendation.blocking,
         hard_fail_regressions: comparison.safety_privacy.hard_fail_regressions.length,
       },
+      [
+        ...(comparisonExit !== 0 ? [`Model comparison gate exited ${comparisonExit}.`] : []),
+        ...(comparison.recommendation.blocking ? ["Model comparison recommendation is blocking."] : []),
+        ...(comparison.safety_privacy.hard_fail_regressions.length > 0 ? ["Model comparison contains safety/privacy hard-fail regressions."] : []),
+      ],
     ),
     requiredArtifactCheck(
       "training_dataset_demo",
@@ -210,7 +224,12 @@ export async function runCanonicalDemoReadiness(
         test_rows: manifest.split_counts.test,
         excluded_rows: manifest.excluded.length,
         dataset_hash_prefix: manifest.dataset_hash.slice(0, 16),
+        verifier_status: trainingVerification.readiness,
       },
+      [
+        ...(trainingDatasetExit !== 0 ? [`Training dataset compiler exited ${trainingDatasetExit}.`] : []),
+        ...trainingVerification.errors.map((error) => `Training export verifier: ${error}`),
+      ],
     ),
   ];
 

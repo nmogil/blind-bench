@@ -52,6 +52,7 @@ const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/Versio
 const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
 const ExportTraining = lazy(() => import("./routes/orgs/projects/ExportTraining").then(m => ({ default: m.ExportTraining })));
 const IngestEndpoint = lazy(() => import("./routes/orgs/projects/IngestEndpoint").then(m => ({ default: m.IngestEndpoint })));
+const ImportRuns = lazy(() => import("./routes/orgs/projects/ImportRuns").then(m => ({ default: m.ImportRuns })));
 const TraceList = lazy(() => import("./routes/traces/TraceList").then(m => ({ default: m.TraceList })));
 const TraceViewer = lazy(() => import("./routes/traces/TraceViewer").then(m => ({ default: m.TraceViewer })));
 const TraceMatchup = lazy(() => import("./routes/traces/TraceMatchup").then(m => ({ default: m.TraceMatchup })));
@@ -94,7 +95,8 @@ export function App() {
             <Route path="settings/openrouter-key" element={<OpenRouterKey />} />
             <Route path="settings/billing" element={<Billing />} />
             <Route path="projects/:projectId" element={<ProjectLayout />}>
-              <Route index element={<Navigate to="versions" replace />} />
+              <Route index element={<Navigate to="import" replace />} />
+              <Route path="import" element={<ImportRuns />} />
               <Route path="variables" element={<Variables />} />
               <Route path="test-cases" element={<TestCases />} />
               <Route
@@ -146,8 +148,8 @@ export function App() {
           <Route path="/eval" element={<EvalLayout />}>
             <Route index element={<InvitesInbox />} />
             <Route path="traces" element={<TraceReviewList />} />
-            <Route path="traces/:agentTraceId" element={<TraceReview />} />
-            <Route path="matchups/:matchupId" element={<TraceMatchupReview />} />
+            <Route path="traces/:reviewToken" element={<TraceReview />} />
+            <Route path="matchups/:reviewToken" element={<TraceMatchupReview />} />
           </Route>
           <Route path="/denied" element={<Denied />} />
           <Route path="*" element={<NotFound />} />

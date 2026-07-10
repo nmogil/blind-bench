@@ -42,6 +42,10 @@ An image file stored in Convex file storage and wired into a run for vision mode
 
 Never stored as URLs — always resolved via `ctx.storage.getUrl()` at read time. At dispatch, blobs are inlined as base64 `data:` URLs in OpenRouter's `image_url` content blocks (mimic of OpenAI multimodal format). See [[Blind Bench - Architecture#File Storage & DB Size]].
 
+### Completed run
+
+AI behavior executed outside Blind Bench and supplied for judgment. A completed run may be a flat prompt/output interaction or a multi-step agent trajectory. CSV, OTLP, native `eval-record` JSON, Pi session JSONL, and Claude Code session JSONL are adapter inputs; all normalize into the common trace spine.
+
 ### Blind Mode
 
 A per-invite, per-collaborator boolean flag (`projectCollaborators.blindMode`, `invitations.blindMode`) that gates whether a [[#Reviewer]] sees the prompt or only blinded [[#Output]]s. Introduced in M26. Only meaningful when `role === "evaluator"`; ignored for [[#Owner (role)]] / [[#Editor (role)]] / org roles.
@@ -90,6 +94,10 @@ A [[#Collaborator]] who can only see blinded [[#Output]]s (labeled A/B/C with no
 ### Fan-out
 
 The pattern of executing a single [[#Run]] as three parallel OpenRouter calls, producing three [[#Output]]s with blind labels `A`/`B`/`C`. Configured via `runCount` on the `runs.execute` mutation. The primitive behind A/B/C blind evaluation. See [[Blind Bench - Architecture#How a run actually executes in Convex]].
+
+### Import receipt
+
+A counts-only, content-safe summary returned after an import. It reports imported, deduplicated, ignored, invalid, missing-body, model/harness completeness, and caveat counts as applicable; it never echoes raw prompts, outputs, tool bodies, credentials, or transcript lines.
 
 ### Image variable
 
@@ -176,6 +184,10 @@ The `evaluator` literal is retained in code (`projectCollaborators.role`, `cycle
 ### Rollback
 
 Creating a new [[#Version]] at the head of the sequence by copying the content of an earlier version. The new version has `parentVersionId` pointing to the current head and `sourceVersionId` pointing to the copied version. Preserves both sequence and rollback origin without branching. See [[Blind Bench - Architecture#Key Design Decisions]].
+
+### Runtime-neutral
+
+The product boundary in which Blind Bench does not execute arbitrary customer harnesses, provision sandboxes, hold runtime credentials, or own compute cleanup/billing. External systems produce [[#Completed run|completed runs]]; Blind Bench imports, blinds, reviews, and exports judgment. The prompt playground is a secondary exception for focused prompt experiments, not the canonical agent flow.
 
 ### Run
 

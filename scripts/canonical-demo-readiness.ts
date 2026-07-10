@@ -5,7 +5,7 @@ const invokedDirectly =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (invokedDirectly) {
-  runCanonicalDemoReadiness()
+  runCanonicalDemoReadiness({ generated_at: new Date().toISOString() })
     .then((report) => {
       process.stdout.write(
         `Wrote artifacts/canonical-demo-readiness.{md,json} — status: ${report.status}.\n`,

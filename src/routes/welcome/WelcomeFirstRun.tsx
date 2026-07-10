@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { useReducedMotion, motion } from "motion/react";
-import { ArrowRight, FileText, Sparkles } from "lucide-react";
+import { ArrowRight, FileText, Sparkles, Upload } from "lucide-react";
 
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -25,15 +25,14 @@ type PasteRole = "system" | "user";
 export function WelcomeFirstRun() {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
+  const createForImport = useMutation(api.projects.createForImport);
   const createFromPaste = useMutation(api.projects.createFromPaste);
   const cloneStarter = useMutation(api.projects.cloneStarter);
 
   const [content, setContent] = useState("");
   const [pasteRole, setPasteRole] = useState<PasteRole>("system");
   const [submitting, setSubmitting] = useState(false);
-  const [pendingPath, setPendingPath] = useState<"paste" | "clone" | null>(
-    null,
-  );
+  const [pendingPath, setPendingPath] = useState<"import" | "paste" | "clone" | null>(null);
   const [error, setError] = useState("");
 
   function landIn(orgSlug: string, projectId: string, versionId: string | null) {
@@ -44,6 +43,23 @@ export function WelcomeFirstRun() {
       );
     } else {
       navigate(`/orgs/${orgSlug}/projects/${projectId}`, { replace: true });
+    }
+  }
+
+  async function handleImport() {
+    if (submitting) return;
+    setSubmitting(true);
+    setPendingPath("import");
+    setError("");
+    try {
+      const res = await createForImport({});
+      navigate(`/orgs/${res.orgSlug}/projects/${res.projectId}/import`, {
+        replace: true,
+      });
+    } catch (err) {
+      setError(friendlyError(err, "Couldn't create your import workspace."));
+      setSubmitting(false);
+      setPendingPath(null);
     }
   }
 
@@ -123,24 +139,47 @@ export function WelcomeFirstRun() {
         <div className="rounded-xl border border-white/10 bg-background/90 p-8 shadow-2xl backdrop-blur-xl">
           <div className="space-y-1.5 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">
-              What are you working on?
+              Bring in completed AI runs
             </h1>
             <p className="text-sm text-muted-foreground">
-              Bring in an agent prompt now, or load the example blind-review loop.
+              Upload traces from the systems you already run, then send them for blind expert review.
             </p>
           </div>
 
-          <Tabs defaultValue="paste" className="mt-6">
-            <TabsList className="grid w-full grid-cols-2">
+          <Tabs defaultValue="import" className="mt-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="import" className="gap-2">
+                <Upload className="h-3.5 w-3.5" />
+                Import runs
+              </TabsTrigger>
               <TabsTrigger value="paste" className="gap-2">
                 <FileText className="h-3.5 w-3.5" />
-                I have an agent prompt
+                Prompt playground
               </TabsTrigger>
               <TabsTrigger value="example" className="gap-2">
                 <Sparkles className="h-3.5 w-3.5" />
-                Show me an example
+                Example
               </TabsTrigger>
             </TabsList>
+
+            <TabsPanel value="import" className="space-y-4 pt-4">
+              <div className="space-y-3 rounded-md border bg-muted/30 p-4 text-xs">
+                <p className="font-medium">Start with real behavior, not another runtime</p>
+                <p className="text-muted-foreground">
+                  Upload mapped CSV, OpenTelemetry GenAI JSON, or a saved Pi or Claude Code session. Blind Bench normalizes the evidence and never runs your harness.
+                </p>
+                <div className="flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                  <span className="rounded border bg-background px-2 py-1">CSV</span>
+                  <span className="rounded border bg-background px-2 py-1">OpenTelemetry</span>
+                  <span className="rounded border bg-background px-2 py-1">Pi</span>
+                  <span className="rounded border bg-background px-2 py-1">Claude Code</span>
+                </div>
+              </div>
+              <Button onClick={handleImport} className="w-full" disabled={submitting}>
+                {pendingPath === "import" ? "Creating workspace…" : "Import completed runs"}
+                {pendingPath !== "import" && <ArrowRight className="ml-1.5 h-3.5 w-3.5" />}
+              </Button>
+            </TabsPanel>
 
             <TabsPanel value="paste" className="space-y-4 pt-4">
               <form onSubmit={handlePaste} className="space-y-3">
@@ -205,8 +244,7 @@ export function WelcomeFirstRun() {
               <div className="space-y-2 rounded-md border bg-muted/30 p-4 text-xs">
                 <p className="font-medium">Blind-review walkthrough</p>
                 <p className="text-muted-foreground">
-                  A complete example: run a candidate, review outputs blind,
-                  capture feedback, and route the verdict into the next version.
+                  A mutable sample of the original prompt playground. Use it to explore prompt/model output review without making it your core workflow.
                 </p>
               </div>
               <Button

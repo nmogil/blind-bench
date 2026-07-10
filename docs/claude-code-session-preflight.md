@@ -5,6 +5,10 @@ Use this local preflight before uploading an internal Claude Code session transc
 ```bash
 npm run preflight:claude-code -- /path/to/session.jsonl
 npm run preflight:claude-code -- /path/to/session.jsonl --json
+# Machine-readable stdout without npm's command banner:
+npm run --silent preflight:claude-code -- /path/to/session.jsonl --json
+# Equivalent direct invocation:
+npx tsx scripts/claude-code-session-preflight.ts /path/to/session.jsonl --json
 ```
 
 The preflight is intentionally local-only:

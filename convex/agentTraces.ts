@@ -30,6 +30,7 @@ import type { AgentRunTrace } from "./lib/agentTrace";
 import { redactValue } from "./lib/agentTrace";
 import { splitStep } from "./lib/agentTraceStorage";
 import { blindStepView, blindTraceView } from "./lib/blindProjection";
+import { ensureTraceSessionsForProjectReviewers } from "./lib/traceReviewSessions";
 
 const STEP_INSERT_CHUNK = 100;
 
@@ -51,6 +52,7 @@ const stepKindValidator = v.union(
 
 const stepInsertValidator = v.object({
   stepIndex: v.number(),
+  prefixHash: v.string(),
   kind: stepKindValidator,
   role: v.optional(v.string()),
   toolName: v.optional(v.string()),
@@ -74,7 +76,34 @@ const storeJson = (
 ): Promise<Id<"_storage">> =>
   ctx.storage.store(new Blob([JSON.stringify(body)], { type: "application/json" }));
 
+const stableStringify = (value: unknown): string => {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(",")}}`;
+};
+
+const sha256 = async (value: string): Promise<string> => {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
 // --- mutations (auth + dedup + writes, transactional) -----------------------
+
+/** Cheap authorization gate for actions before parsing or touching storage. */
+export const authorizePersist = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    return null;
+  },
+});
 
 /**
  * Insert the parent row (status "pending"). Auth + dedup by (projectId,
@@ -211,11 +240,14 @@ export const finalizeTrace = internalMutation({
     finalAnswerBlindStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
+    const trace = await ctx.db.get(args.agentTraceId);
+    if (!trace) throw new Error("Trace not found while finalizing import.");
     await ctx.db.patch(args.agentTraceId, {
       status: "ready",
       finalAnswerStorageId: args.finalAnswerStorageId,
       finalAnswerBlindStorageId: args.finalAnswerBlindStorageId,
     });
+    await ensureTraceSessionsForProjectReviewers(ctx, args.agentTraceId, trace.projectId);
   },
 });
 
@@ -262,6 +294,7 @@ export const persistTrace = action({
     ctx,
     args,
   ): Promise<{ agentTraceId: Id<"agentTraces">; deduped: boolean; stepCount: number }> => {
+    await ctx.runQuery(internal.agentTraces.authorizePersist, { projectId: args.projectId });
     const trace = args.trace as AgentRunTrace;
     const stepCount = trace.steps.length;
 
@@ -307,13 +340,15 @@ export async function storeTraceSteps(
 ): Promise<void> {
   try {
     const rows: Array<Record<string, unknown>> = [];
+    let prefixHash = await sha256("");
     for (const step of trace.steps) {
       const { row, fullBody, blindBody } = splitStep(step);
       const fullBodyStorageId =
         fullBody === undefined ? undefined : await storeJson(ctx, fullBody);
       const blindBodyStorageId =
         blindBody === undefined ? undefined : await storeJson(ctx, blindBody);
-      rows.push({ ...row, fullBodyStorageId, blindBodyStorageId });
+      rows.push({ ...row, prefixHash, fullBodyStorageId, blindBodyStorageId });
+      prefixHash = await sha256(`${prefixHash}:${stableStringify(step)}`);
     }
     for (let i = 0; i < rows.length; i += STEP_INSERT_CHUNK) {
       await ctx.runMutation(internal.agentTraces.insertSteps, {
@@ -358,6 +393,7 @@ export const getTrace = query({
     if (!trace) return null;
     await requireProjectRole(ctx, trace.projectId, ["owner", "editor", "evaluator"]);
     const blind = await isBlindReviewer(ctx, trace.projectId);
+    if (blind) throw new Error("Use an opaque review session to access this trajectory.");
     const project = await ctx.db.get(trace.projectId);
     const finalAnswerId = blind
       ? trace.finalAnswerBlindStorageId
@@ -401,6 +437,7 @@ export const resolveBodyStorage = internalQuery({
     if (!trace) return { storageId: null };
     await requireProjectRole(ctx, trace.projectId, ["owner", "editor", "evaluator"]);
     const blind = await isBlindReviewer(ctx, trace.projectId);
+    if (blind) throw new Error("Use an opaque review session to access trajectory bodies.");
     if (args.stepIndex === undefined) {
       const id = blind ? trace.finalAnswerBlindStorageId : trace.finalAnswerStorageId;
       return { storageId: id ?? null };
@@ -454,6 +491,7 @@ export const listTraces = query({
   handler: async (ctx, args) => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor", "evaluator"]);
     const blind = await isBlindReviewer(ctx, args.projectId);
+    if (blind) throw new Error("Use the opaque review-session inbox.");
     const rows = await ctx.db
       .query("agentTraces")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -497,6 +535,7 @@ export const listReviewableTraces = query({
     }> = [];
     for (const c of collabs) {
       const blind = await isBlindReviewer(ctx, c.projectId);
+      if (blind) continue;
       const project = await ctx.db.get(c.projectId);
       const traces = await ctx.db
         .query("agentTraces")
@@ -537,6 +576,7 @@ export const listSteps = query({
     if (!trace) throw new Error("Trace not found");
     await requireProjectRole(ctx, trace.projectId, ["owner", "editor", "evaluator"]);
     const blind = await isBlindReviewer(ctx, trace.projectId);
+    if (blind) throw new Error("Use an opaque review session to page trajectory steps.");
 
     const result = await ctx.db
       .query("agentTraceSteps")

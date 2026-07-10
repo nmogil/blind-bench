@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  DEFAULT_MAX_BYTES,
   formatGatewayPreflightJson,
   formatGatewayPreflightText,
   summarizeGatewayPreflight,
@@ -87,5 +88,28 @@ describe("Cloudflare Gateway preflight", () => {
     expect(summary.parsed).toBe(0);
     expect(summary.invalid).toBe(1);
     expect(summary.caveats.join(" ")).toContain("No valid Gateway log records");
+    expect(formatGatewayPreflightText(summary)).not.toContain("safe_to_import");
+  });
+
+  test("blocks parser truncation instead of presenting a partial import as ready", () => {
+    const jsonl = Array.from({ length: 5_001 }, (_, index) => JSON.stringify({
+      log_id: `log-${index}`,
+      timestamp: "2026-07-09T10:00:00Z",
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      request: { messages: [{ role: "user", content: "fixture" }] },
+      response: { choices: [{ message: { content: "fixture" } }] },
+    })).join("\n");
+    const summary = summarizeGatewayPreflight(jsonl);
+    expect(summary.truncated).toBe(true);
+    expect(summary.status).toBe("blocked");
+  });
+
+  test("blocks files over the live importer's byte limit", () => {
+    const summary = summarizeGatewayPreflight("x".repeat(DEFAULT_MAX_BYTES + 1));
+    expect(summary.status).toBe("blocked");
+    expect(summary.over_size).toBe(true);
+    expect(summary.caveats.join(" ")).toMatch(/8 MiB.*limit/i);
+    expect(formatGatewayPreflightText(summary)).toContain("no_data_sent");
   });
 });
