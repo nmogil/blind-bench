@@ -6,7 +6,7 @@ import { CycleStatusPill } from "@/components/CycleStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, ClipboardCheck, Layers, Plus } from "lucide-react";
+import { ArrowRight, ClipboardCheck, EyeOff, Layers, Plus } from "lucide-react";
 
 export function EvaluatePage() {
   const { projectId, role } = useProject();
@@ -17,8 +17,12 @@ export function EvaluatePage() {
     api.reviewCycles.list,
     role !== "evaluator" ? { projectId } : "skip",
   );
+  const comparisons = useQuery(
+    api.comparisonCampaigns.listCampaigns,
+    role !== "evaluator" ? { projectId } : "skip",
+  );
 
-  const isLoading = cycles === undefined;
+  const isLoading = cycles === undefined || comparisons === undefined;
 
   const basePath = `/orgs/${orgSlug}/projects/${projectId}`;
 
@@ -59,6 +63,7 @@ export function EvaluatePage() {
   }
 
   const hasAnything =
+    (comparisons?.length ?? 0) > 0 ||
     openCycles.length > 0 ||
     draftCycles.length > 0 ||
     pastItems.length > 0;
@@ -68,11 +73,10 @@ export function EvaluatePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Evaluate</h1>
         <div className="flex items-center gap-2">
-          <Link
-            to={`${basePath}/cycles/new`}
-            className={buttonVariants({ size: "sm" })}
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
+          <Link to={`${basePath}/comparisons/new`} className={buttonVariants({ size: "sm" })}>
+            <Plus className="mr-1.5 h-4 w-4" /> New comparison
+          </Link>
+          <Link to={`${basePath}/cycles/new`} className={buttonVariants({ size: "sm", variant: "outline" })}>
             New cycle
           </Link>
         </div>
@@ -81,15 +85,21 @@ export function EvaluatePage() {
       {!hasAnything ? (
         <EmptyState
           icon={ClipboardCheck}
-          heading="Pool runs into a Review Cycle to evaluate them blind"
-          description="Once you have completed runs, group them here so reviewers can rate outputs without seeing which version produced what."
+          heading="Compare completed attempts without exposing their source"
+          description="Import paired responses for a fast blind comparison, or pool existing runs into a review cycle."
           action={{
-            label: "Start a cycle",
-            onClick: () => navigate(`${basePath}/cycles/new`),
+            label: "New blind comparison",
+            onClick: () => navigate(`${basePath}/comparisons/new`),
           }}
         />
       ) : (
         <div className="max-w-2xl space-y-6">
+          {(comparisons?.length ?? 0) > 0 && <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Blind comparisons</h2>
+            {comparisons?.map((comparison) => <Link key={comparison.id} to={`${basePath}/comparisons/${comparison.id}`} className="flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50">
+              <div className="flex min-w-0 flex-1 items-center gap-3"><EyeOff className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0"><p className="truncate text-sm font-medium">{comparison.name}</p><p className="text-xs text-muted-foreground">{comparison.caseCount} cases · {comparison.judgments} judgments · {comparison.status}</p></div></div><ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </Link>)}
+          </section>}
           {/* Active items — need attention now */}
           {(openCycles.length > 0 || draftCycles.length > 0) && (
             <section className="space-y-3">

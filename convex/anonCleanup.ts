@@ -10,8 +10,9 @@ const BATCH_SIZE = 200;
  * public invite page, so a bot — or a user who bails before accepting — can
  * mint empty anonymous users. An anon user that never accepted a reviewer
  * invite has no projectCollaborators row: it is inert (can see and do nothing)
- * and safe to delete. We keep any anon user that became an evaluator so their
- * in-flight review session and ratings survive.
+ * and safe to delete. We keep any anon user that became an evaluator or
+ * redeemed an opaque review session so their in-flight campaign, comments,
+ * identity label, and judgments survive.
  *
  * Deleting a Convex Auth user means cascading its auth rows by hand
  * (authSessions → authRefreshTokens, authAccounts → authVerificationCodes);
@@ -36,7 +37,12 @@ export const cleanupAnonUsers = internalMutation({
         .query("projectCollaborators")
         .withIndex("by_user", (q) => q.eq("userId", user._id))
         .first();
-      if (collaborator) continue; // active reviewer — keep
+      if (collaborator) continue; // active project reviewer — keep
+      const reviewSession = await ctx.db
+        .query("agentTraceReviewSessions")
+        .withIndex("by_reviewer", (q) => q.eq("reviewerUserId", user._id))
+        .first();
+      if (reviewSession) continue; // opaque/campaign reviewer — keep
 
       await deleteAuthUser(ctx, user._id);
       deleted++;

@@ -731,6 +731,32 @@ const schema = defineSchema({
     updatedAt: v.number(),
   }).index("by_project", ["projectId"]),
 
+  // #341: owner-created blind comparison campaign over comparable trace
+  // matchups. The share token only permits joining; reviewer content and votes
+  // require a separate user-bound opaque session token.
+  comparisonCampaigns: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(),
+    status: v.union(
+      v.literal("importing"),
+      v.literal("draft"),
+      v.literal("open"),
+      v.literal("closed"),
+    ),
+    shareToken: v.string(),
+    importKey: v.string(),
+    caseCount: v.optional(v.number()),
+    judgmentCount: v.optional(v.number()),
+    rawPayloadStorageId: v.optional(v.id("_storage")),
+    createdById: v.id("users"),
+    createdAt: v.number(),
+    openedAt: v.optional(v.number()),
+    closedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_share_token", ["shareToken"])
+    .index("by_project_import", ["projectId", "importKey"]),
+
   // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
   // Deliberately tiny — metadata + usage rollups only, NO step content — so it
   // stays well under the Convex ~1MiB doc cap regardless of trace length. Step
@@ -899,6 +925,11 @@ const schema = defineSchema({
     projectId: v.id("projects"),
     leftTraceId: v.id("agentTraces"),
     rightTraceId: v.id("agentTraces"),
+    // Present for matchups created through a paired comparison campaign.
+    campaignId: v.optional(v.id("comparisonCampaigns")),
+    caseKey: v.optional(v.string()),
+    segment: v.optional(v.string()),
+    sortOrder: v.optional(v.number()),
     // Length of the shared prefix; both sides diverge at this step index.
     divergenceStepIndex: v.number(),
     leftBlindLabel: v.string(),
@@ -908,7 +939,9 @@ const schema = defineSchema({
     invalidReason: v.optional(v.literal("prefix_mismatch")),
   })
     .index("by_project", ["projectId"])
-    .index("by_left", ["leftTraceId"]),
+    .index("by_left", ["leftTraceId"])
+    .index("by_campaign", ["campaignId"])
+    .index("by_campaign_case", ["campaignId", "caseKey"]),
 
   // One immutable logical decision per (matchup, reviewer). Reviewers can
   // revise their own row, but never overwrite another reviewer's judgment.
@@ -916,17 +949,35 @@ const schema = defineSchema({
     projectId: v.id("projects"),
     reviewerUserId: v.id("users"),
     token: v.string(),
-    kind: v.union(v.literal("trace"), v.literal("matchup")),
+    kind: v.union(
+      v.literal("trace"),
+      v.literal("matchup"),
+      v.literal("campaign"),
+    ),
     // Session-scoped randomized presentation order prevents one global
     // left/right ordering from biasing every reviewer.
     leftFirst: v.optional(v.boolean()),
     agentTraceId: v.optional(v.id("agentTraces")),
     matchupId: v.optional(v.id("agentTraceMatchups")),
+    campaignId: v.optional(v.id("comparisonCampaigns")),
+    reviewerDisplayName: v.optional(v.string()),
+    campaignOrder: v.optional(
+      v.array(
+        v.object({
+          matchupId: v.id("agentTraceMatchups"),
+          leftFirst: v.boolean(),
+        }),
+      ),
+    ),
+    currentIndex: v.optional(v.number()),
+    visibleCount: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
   })
     .index("by_token", ["token"])
     .index("by_reviewer", ["reviewerUserId"])
     .index("by_trace_and_reviewer", ["agentTraceId", "reviewerUserId"])
-    .index("by_matchup_and_reviewer", ["matchupId", "reviewerUserId"]),
+    .index("by_matchup_and_reviewer", ["matchupId", "reviewerUserId"])
+    .index("by_campaign_and_reviewer", ["campaignId", "reviewerUserId"]),
 
   agentTraceMatchupDecisions: defineTable({
     matchupId: v.id("agentTraceMatchups"),
@@ -936,8 +987,10 @@ const schema = defineSchema({
       v.literal("left"),
       v.literal("right"),
       v.literal("tie"),
+      v.literal("neither"),
       v.literal("skip"),
     ),
+    note: v.optional(v.string()),
     reasonTags: v.array(
       v.union(
         v.literal("tone"),

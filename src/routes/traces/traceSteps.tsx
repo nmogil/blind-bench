@@ -8,7 +8,7 @@
  * trace stays responsive. No real ids or provenance attributes reach the DOM.
  */
 import { Fragment, useEffect, useState } from "react";
-import { usePaginatedQuery, useMutation, useAction } from "convex/react";
+import { usePaginatedQuery, useMutation, useAction, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -274,6 +274,7 @@ function StepCard({
           agentTraceId={agentTraceId}
           reviewToken={reviewToken}
           step={step}
+          matchupSide={matchupSide}
           comments={comments}
         />
       )}
@@ -296,16 +297,20 @@ function StepComments({
   agentTraceId,
   reviewToken,
   step,
+  matchupSide,
   comments,
 }: {
   agentTraceId?: Id<"agentTraces">;
   reviewToken?: string;
   step: TraceStep;
+  matchupSide?: "left" | "right";
   comments: TraceComment[];
 }) {
   const addOwnerComment = useMutation(api.agentTraceReview.addComment);
   const addReviewComment = useMutation(api.agentTraceReviewSessions.addComment);
-  const deleteComment = useMutation(api.agentTraceReview.deleteComment);
+  const addMatchupComment = useMutation(api.agentTraceReviewSessions.addMatchupComment);
+  const deleteOwnerComment = useMutation(api.agentTraceReview.deleteComment);
+  const deleteMatchupComment = useMutation(api.agentTraceReviewSessions.deleteMatchupComment);
 
   const [composing, setComposing] = useState(false);
   const [body, setBody] = useState("");
@@ -328,7 +333,16 @@ function StepComments({
       const target = step.kind === "tool_call"
         ? { kind: "tool_call" as const, stepIndex: step.stepIndex }
         : { kind: "step" as const, stepIndex: step.stepIndex };
-      if (reviewToken !== undefined) {
+      if (reviewToken !== undefined && matchupSide !== undefined) {
+        await addMatchupComment({
+          token: reviewToken,
+          side: matchupSide,
+          target,
+          comment: body,
+          label,
+          tags: tags.length ? tags : undefined,
+        });
+      } else if (reviewToken !== undefined) {
         await addReviewComment({
           token: reviewToken,
           target,
@@ -359,7 +373,11 @@ function StepComments({
 
   async function remove(commentId: TraceComment["_id"]) {
     try {
-      await deleteComment({ commentId });
+      if (reviewToken !== undefined && matchupSide !== undefined) {
+        await deleteMatchupComment({ token: reviewToken, side: matchupSide, commentId });
+      } else {
+        await deleteOwnerComment({ commentId });
+      }
     } catch {
       // A failed delete is non-blocking; the row simply stays.
     }
@@ -578,7 +596,8 @@ function MatchupTokenSteps({
     { token, side },
     { initialNumItems: 50 },
   );
-  return <StepListResults {...page} reviewToken={token} matchupSide={side} divergenceStepIndex={divergenceStepIndex} />;
+  const comments = useQuery(api.agentTraceReviewSessions.listMatchupComments, { token, side });
+  return <StepListResults {...page} reviewToken={token} matchupSide={side} comments={comments} divergenceStepIndex={divergenceStepIndex} />;
 }
 
 function StepListResults({
