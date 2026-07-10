@@ -34,6 +34,27 @@ const annotations = [
       </div>
     </div>
 
+    <!-- Verdict strip: the blind review that closed on the v3 run -->
+    <div
+      class="flex flex-col gap-2 border-b border-border bg-muted/20 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1 sm:px-6"
+    >
+      <div class="flex items-center gap-2 whitespace-nowrap">
+        <span class="font-mono text-[10px] font-semibold uppercase tracking-widest text-primary">
+          Verdict
+        </span>
+        <span class="hidden text-border sm:inline" aria-hidden="true">&middot;</span>
+        <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Blind review closed
+        </span>
+      </div>
+      <p class="text-sm font-semibold text-foreground">
+        Tone flagged on both outputs &middot; 7 of 9 reviewers
+      </p>
+      <p class="min-w-0 text-xs leading-relaxed text-muted-foreground sm:ml-auto sm:text-right">
+        &ldquo;Too formal to send &mdash; reads like a corporate form letter.&rdquo;
+      </p>
+    </div>
+
     <!-- Three-column grid: before / annotations / after -->
     <div
       class="grid grid-cols-1 divide-y divide-border lg:grid-cols-[1fr_minmax(220px,280px)_1fr] lg:divide-x lg:divide-y-0"
