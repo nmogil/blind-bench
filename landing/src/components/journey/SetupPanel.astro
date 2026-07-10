@@ -1,99 +1,78 @@
 ---
 import Play from '../../icons/Play.astro';
 
-const outputs = [
-  { label: 'A', name: 'Control', detail: 'live in production' },
-  { label: 'B', name: 'Candidate', detail: 'new agent version' },
-];
 ---
 
-<div class="mx-auto max-w-4xl">
-  <div class="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl ring-1 ring-foreground/5 dark:border-border">
-    <!-- Window chrome -->
-    <div class="flex items-center gap-2 border-b border-border px-4 py-3">
-      <div class="flex gap-1.5" aria-hidden="true">
-        <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-        <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-        <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-      </div>
-      <div class="ml-4 flex-1">
-        <div class="mx-auto w-fit rounded-md bg-muted px-3 py-1 text-xs text-muted-foreground">
-          New review cycle &middot; support agent &middot; v3
-        </div>
-      </div>
-    </div>
+<div class="setup-state">
+  <div class="flex items-center justify-between gap-4 border-b border-border/80 px-4 py-3 sm:px-5">
+    <span class="truncate font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-foreground/70">Trace received</span>
+    <span class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+      <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+      Ready
+    </span>
+  </div>
 
-    <!-- Two-column: editor + config -->
-    <div
-      class="grid grid-cols-1 divide-y divide-border lg:grid-cols-[1.5fr_1fr] lg:divide-x lg:divide-y-0"
-    >
-      <!-- Left: prompt editor -->
-      <div class="p-5 sm:p-6">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Agent prompt
-          </span>
-          <span class="font-mono text-[11px] text-muted-foreground">agent.md</span>
-        </div>
-        <div class="rounded-lg border border-border bg-muted/30 p-4">
-          <p class="font-mono text-sm leading-relaxed text-foreground/85">
-            You are a customer support agent. <span class="setup-highlight">Be friendly and professional.</span> Respond clearly to the user&rsquo;s message and resolve their issue.
-          </p>
-        </div>
-
-        <div class="mt-4">
-          <div class="mb-2 flex items-center gap-2">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Variables
-            </span>
-          </div>
-          <div class="flex flex-wrap gap-1.5">
-            <span class="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-[11px] text-foreground/80">
-              &#123;&#123;customer_message&#125;&#125;
-            </span>
-            <span class="inline-flex items-center rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-[11px] text-foreground/80">
-              &#123;&#123;account_tier&#125;&#125;
-            </span>
-          </div>
+  <div class="grid gap-px bg-border/80 sm:grid-cols-[0.9fr_1.1fr]">
+    <div class="bg-card p-4 sm:p-5">
+      <p class="font-mono text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Source artifact</p>
+      <div class="mt-3 flex items-center gap-3 rounded-lg border border-border bg-background/45 p-3">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/25 bg-primary/10 font-mono text-[10px] font-semibold text-primary">JSONL</span>
+        <div class="min-w-0">
+          <p class="truncate font-mono text-xs text-foreground/90">support-agent-run.jsonl</p>
+          <p class="mt-1 text-[10px] text-muted-foreground">24 turns · 3 test cases</p>
         </div>
       </div>
-
-      <!-- Right: model slots -->
-      <div class="bg-muted/20 p-5 sm:p-6">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Candidate vs control
-          </span>
-          <span class="text-[11px] text-muted-foreground">blind to reviewers</span>
+      <div class="mt-4 space-y-2.5" aria-label="Import checks">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-muted-foreground">Trajectory parsed</span>
+          <span class="font-mono text-foreground/70">24/24</span>
         </div>
-        <div class="space-y-2">
-          {
-            outputs.map((m) => (
-              <div class="rounded-lg border border-border bg-card p-3">
-                <div class="flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary">
-                      {m.label}
-                    </span>
-                    <span class="truncate text-xs font-medium text-foreground">{m.name}</span>
-                  </div>
-                </div>
-                <p class="mt-1 pl-7 text-[10px] text-muted-foreground">{m.detail}</p>
-              </div>
-            ))
-          }
+        <div class="h-px bg-border/80"><div class="h-px w-full bg-primary/70"></div></div>
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-muted-foreground">Sensitive fields</span>
+          <span class="font-mono text-foreground/70">isolated</span>
         </div>
       </div>
     </div>
 
-    <!-- Bottom bar -->
-    <div class="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
-      <span class="text-xs text-muted-foreground">
-        3 cases &middot; BYOK
-      </span>
-      <span class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm">
+    <div class="bg-card p-4 sm:p-5">
+      <div class="flex items-center justify-between gap-3">
+        <p class="font-mono text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Review batch</p>
+        <span class="text-[10px] text-muted-foreground">hidden from reviewers</span>
+      </div>
+      <div class="mt-3 space-y-2">
+        <div class="flex items-center gap-3 rounded-lg border border-border bg-background/45 p-3">
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded bg-muted font-mono text-[10px] font-semibold text-foreground/80">A</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-medium text-foreground">Control</p>
+            <p class="mt-0.5 truncate text-[10px] text-muted-foreground">live support agent</p>
+          </div>
+          <span class="font-mono text-[9px] text-muted-foreground">v3</span>
+        </div>
+        <div class="flex items-center gap-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+          <span class="inline-flex h-6 w-6 items-center justify-center rounded bg-primary/12 font-mono text-[10px] font-semibold text-primary">B</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-medium text-foreground">Candidate</p>
+            <p class="mt-0.5 truncate text-[10px] text-muted-foreground">new agent revision</p>
+          </div>
+          <span class="font-mono text-[9px] text-primary">v4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="border-t border-border/80 bg-background/35 px-4 py-3.5 sm:px-5">
+    <div class="flex items-start gap-3">
+      <span class="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Prompt</span>
+      <p class="min-w-0 font-mono text-[11px] leading-relaxed text-foreground/75 sm:text-xs">
+        You are a customer support agent. <span class="setup-highlight">Be friendly and professional.</span> Resolve the issue clearly.
+      </p>
+    </div>
+    <div class="mt-3 flex items-center justify-between border-t border-border/70 pt-3">
+      <span class="text-[10px] text-muted-foreground">Case BB-1842 · BYOK</span>
+      <span class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[10px] font-medium text-primary-foreground">
         <Play class="h-3 w-3" />
-        Start review
+        Prepare review
       </span>
     </div>
   </div>
@@ -101,10 +80,9 @@ const outputs = [
 
 <style>
   .setup-highlight {
-    background-color: color-mix(in oklch, var(--primary) 15%, transparent);
-    color: var(--primary);
-    padding: 0.1em 0.25em;
-    margin: 0 -0.05em;
     border-radius: 3px;
+    background: color-mix(in oklch, var(--primary) 15%, transparent);
+    color: var(--primary);
+    padding: 0.08em 0.22em;
   }
 </style>

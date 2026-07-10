@@ -1,275 +1,335 @@
 ---
-import ArrowRight from '../../icons/ArrowRight.astro';
 import User from '../../icons/User.astro';
 
+interface Props {
+  instance: 'desktop' | 'mobile';
+  compact?: boolean;
+}
+
+const { instance, compact = false } = Astro.props;
 const convexSiteUrl = import.meta.env.PUBLIC_CONVEX_SITE_URL || '';
 ---
 
-<div class="mx-auto max-w-4xl scroll-mt-32 lg:scroll-mt-24" id="demo-section" data-convex-url={convexSiteUrl}>
-  <!-- Customer message -->
-  <div class="mb-6 rounded-xl border border-border bg-muted/50 p-5">
-    <div class="flex items-start gap-3">
-      <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber/15">
-        <User class="h-4 w-4 text-amber" />
+<div
+  class:list={['share-state', compact && 'share-state-compact']}
+  data-demo-instance={instance}
+  data-convex-url={convexSiteUrl}
+>
+  <div class="border-b border-border/80 px-4 py-3 sm:px-5">
+    <div class="flex items-center justify-between gap-3">
+      <span class="truncate font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-foreground/70">Identity removed</span>
+      <span class="font-mono text-[9px] uppercase tracking-[0.14em] text-primary">Blind mode</span>
+    </div>
+
+    <div class="mt-3 grid grid-cols-2 gap-2" aria-hidden="true">
+      <div class="identity-route relative overflow-hidden rounded-md border border-border bg-background/45 px-3 py-2">
+        <span class="source-identity block truncate font-mono text-[9px] text-muted-foreground">Claude Haiku · control</span>
+        <span class="blind-identity absolute inset-0 flex items-center px-3 font-mono text-[10px] font-semibold text-primary">Output A</span>
+        <span class="blind-shutter absolute inset-y-0 left-0 w-full origin-left bg-primary"></span>
       </div>
-      <div>
-        <p class="mb-1 text-xs font-medium text-muted-foreground">Customer message</p>
-        <p class="text-sm leading-relaxed text-foreground/90">
-          &ldquo;Hi, I just noticed I was charged twice for my subscription this month &mdash; $49 on March 3rd and again on March 5th. I&rsquo;ve been a customer for two years and this is really frustrating. Can you help me get this sorted out?&rdquo;
+      <div class="identity-route relative overflow-hidden rounded-md border border-border bg-background/45 px-3 py-2">
+        <span class="source-identity block truncate font-mono text-[9px] text-muted-foreground">GPT-4o · candidate</span>
+        <span class="blind-identity absolute inset-0 flex items-center px-3 font-mono text-[10px] font-semibold text-primary">Output B</span>
+        <span class="blind-shutter absolute inset-y-0 left-0 w-full origin-left bg-primary"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="border-b border-border/80 bg-background/30 px-4 py-3 sm:px-5">
+    <div class="flex items-start gap-3">
+      <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber/12">
+        <User class="h-3.5 w-3.5 text-amber" />
+      </span>
+      <div class="min-w-0">
+        <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Test case · duplicate charge</p>
+        <p class="mt-1 text-[11px] leading-relaxed text-foreground/80 sm:text-xs">
+          “I was charged $49 twice this month. I’ve been a customer for two years—can you sort this out?”
         </p>
       </div>
     </div>
   </div>
 
-  <!-- Demo container -->
-  <div id="demo-container">
-    <div class="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl ring-1 ring-foreground/5 dark:border-border">
-      <!-- Window chrome -->
-      <div class="flex items-center gap-2 border-b border-border px-4 py-3">
-        <div class="flex gap-1.5">
-          <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-          <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-          <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
+  <div class="grid gap-px bg-border/80 sm:grid-cols-2" data-demo-outputs>
+    <button
+      type="button"
+      class="demo-choice bg-card p-4 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/25 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring sm:p-5"
+      data-choice="A"
+      aria-pressed="false"
+    >
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="demo-blind-label inline-flex h-6 w-6 items-center justify-center rounded bg-primary/12 font-mono text-[10px] font-semibold text-primary">A</span>
+          <span class="demo-blind-tag font-mono text-[9px] uppercase tracking-[0.13em] text-muted-foreground">Output</span>
+          <span class="demo-real-label hidden font-mono text-[9px] font-medium text-primary">Control</span>
         </div>
-        <div class="ml-4 flex-1">
-          <div class="mx-auto w-fit rounded-md bg-muted px-3 py-1 text-xs text-muted-foreground">
-            Blind review &middot; Which response is better?
-          </div>
+        <span class="choice-check text-[10px] text-primary opacity-0" aria-hidden="true">Selected</span>
+      </div>
+      <p class="text-[11px] leading-[1.65] text-foreground/78 sm:text-xs">
+        I’m sorry about the double charge. I’ve issued a refund for the duplicate $49 payment; it should appear in 3–5 business days. Reply here if it doesn’t and I’ll escalate it.
+      </p>
+    </button>
+
+    <button
+      type="button"
+      class="demo-choice bg-card p-4 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/25 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring sm:p-5"
+      data-choice="B"
+      aria-pressed="false"
+    >
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="demo-blind-label inline-flex h-6 w-6 items-center justify-center rounded bg-primary/12 font-mono text-[10px] font-semibold text-primary">B</span>
+          <span class="demo-blind-tag font-mono text-[9px] uppercase tracking-[0.13em] text-muted-foreground">Output</span>
+          <span class="demo-real-label hidden font-mono text-[9px] font-medium text-primary">Candidate</span>
         </div>
+        <span class="choice-check text-[10px] text-primary opacity-0" aria-hidden="true">Selected</span>
       </div>
-
-      <!-- Two-column outputs -->
-      <div class="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0" id="demo-outputs">
-        <!-- Output A (secretly: Claude Haiku · control) -->
-        <button
-          type="button"
-          class="demo-choice p-5 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
-          data-choice="A"
-          id="choice-a"
-        >
-          <div class="mb-4 flex items-center gap-2">
-            <span class="demo-blind-label inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary transition-opacity duration-300">A</span>
-            <span class="demo-blind-tag text-xs text-muted-foreground transition-opacity duration-300">Output</span>
-            <span class="demo-real-label shimmer-text text-xs font-medium text-primary opacity-0 transition-opacity duration-300">Claude Haiku 4 &middot; control</span>
-          </div>
-          <p class="text-sm leading-relaxed text-foreground/80">
-            I&rsquo;m really sorry about the double charge &mdash; that&rsquo;s completely on us and I understand how frustrating that must be, especially as a long-time customer. I&rsquo;ve just issued a refund for the duplicate $49 charge. You should see it back in your account within 3&ndash;5 business days. If it doesn&rsquo;t show up by then, reply here and I&rsquo;ll escalate it right away.
-          </p>
-        </button>
-
-        <!-- Output B (secretly: GPT-4o · candidate) -->
-        <button
-          type="button"
-          class="demo-choice p-5 text-left transition-[background-color,opacity,box-shadow] duration-300 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none sm:p-6"
-          data-choice="B"
-          id="choice-b"
-        >
-          <div class="mb-4 flex items-center gap-2">
-            <span class="demo-blind-label inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary transition-opacity duration-300">B</span>
-            <span class="demo-blind-tag text-xs text-muted-foreground transition-opacity duration-300">Output</span>
-            <span class="demo-real-label shimmer-text text-xs font-medium text-primary opacity-0 transition-opacity duration-300">GPT-4o &middot; candidate</span>
-          </div>
-          <p class="text-sm leading-relaxed text-foreground/80">
-            Thank you for reaching out and for being a valued customer for two years. I&rsquo;ve reviewed your billing history and can confirm that a duplicate charge of $49.00 was processed on March 5th in error. I have initiated a full refund for the erroneous charge, which will be reflected in your statement within 3&ndash;5 business days. Additionally, I have flagged your account to ensure this issue does not recur. Please do not hesitate to contact us should you require any further assistance.
-          </p>
-        </button>
-      </div>
-
-      <!-- Bottom bar -->
-      <div class="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
-        <span class="text-xs text-muted-foreground" id="demo-status">2 outputs &middot; Blind mode</span>
-        <span class="text-xs font-medium text-primary transition-opacity duration-300" id="demo-prompt">
-          Click the response you&rsquo;d send
-        </span>
-      </div>
-    </div>
+      <p class="text-[11px] leading-[1.65] text-foreground/78 sm:text-xs">
+        Thank you for reaching out. I confirmed the second $49 charge was an error and initiated a full refund. It will be reflected within 3–5 business days. Your account has also been flagged.
+      </p>
+    </button>
   </div>
 
-  <!-- Reveal section (hidden until vote) -->
-  <div class="mt-8 text-center transition-[opacity,transform] duration-500" id="demo-reveal" role="status" aria-live="polite" aria-atomic="true" style="opacity:0;transform:translateY(12px)">
-    <p class="text-lg font-semibold text-foreground" id="reveal-headline"></p>
-    <p class="mt-2 text-sm text-muted-foreground" id="reveal-stats"></p>
-    <p class="mx-auto mb-6 mt-6 max-w-lg text-base leading-relaxed text-muted-foreground">
-      One blind call. Blind Bench makes it the default for every agent change.
-    </p>
-    <a
-      href="https://app.blindbench.dev"
-      class="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-md transition-[box-shadow,opacity] hover:shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-    >
-      Get started
-      <ArrowRight class="h-4 w-4" />
-    </a>
+  <div class="flex min-h-12 items-center justify-between gap-3 border-t border-border/80 bg-background/35 px-4 py-3 sm:px-5">
+    <span class="text-[10px] text-muted-foreground" data-demo-status>2 outputs · identities sealed</span>
+    <span class="text-right text-[10px] font-medium text-primary" data-demo-prompt>Choose the reply you’d send</span>
+    <div class="text-right" data-demo-reveal role="status" aria-live="polite" aria-atomic="true" hidden>
+      <p class="text-[10px] font-medium text-foreground" data-reveal-headline></p>
+      <p class="mt-0.5 text-[10px] text-muted-foreground" data-reveal-stats></p>
+    </div>
   </div>
 </div>
 
 <style>
-  .demo-choice {
-    cursor: pointer;
+  .share-state {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+  }
+
+  .share-state [data-demo-outputs] {
+    flex: 1;
+  }
+
+  .source-identity,
+  .blind-identity,
+  .blind-shutter {
+    transition:
+      opacity 180ms ease,
+      transform 360ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .blind-identity {
+    opacity: 0;
+  }
+
+  .blind-shutter {
+    transform: scaleX(0);
+  }
+
+  :global(.journey-workbench[data-active-step='1']) .blind-shutter {
+    animation: blind-pass 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  :global(.journey-workbench[data-active-step='1']) .source-identity {
+    opacity: 0;
+    transition-delay: 250ms;
+  }
+
+  :global(.journey-workbench[data-active-step='1']) .blind-identity {
+    opacity: 1;
+    transition-delay: 280ms;
+  }
+
+  .share-state-compact .source-identity,
+  .share-state-compact .blind-shutter {
+    opacity: 0;
+  }
+
+  .share-state-compact .blind-identity {
+    opacity: 1;
+  }
+
+  @keyframes blind-pass {
+    0% { transform: scaleX(0); transform-origin: left; }
+    48% { transform: scaleX(1); transform-origin: left; }
+    52% { transform: scaleX(1); transform-origin: right; }
+    100% { transform: scaleX(0); transform-origin: right; }
+  }
+
+  .demo-choice.selected {
+    background: color-mix(in oklch, var(--primary) 7%, var(--card));
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 65%, transparent);
+  }
+
+  .demo-choice.selected .choice-check {
+    opacity: 1;
+  }
+
+  .demo-choice.dimmed {
+    opacity: 0.42;
   }
 
   .demo-choice.voted {
     cursor: default;
   }
 
-  .demo-choice.voted:hover {
-    background: transparent;
-  }
-
-  .demo-choice.selected {
-    box-shadow: inset 0 0 0 2px var(--primary);
-  }
-
-  .demo-choice.dimmed {
-    opacity: 0.45;
-  }
-
   .demo-choice.revealed .demo-blind-label,
   .demo-choice.revealed .demo-blind-tag {
-    opacity: 0;
-    position: absolute;
-    pointer-events: none;
+    display: none;
   }
 
   .demo-choice.revealed .demo-real-label {
-    opacity: 1;
+    display: inline;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .source-identity,
+    .blind-identity,
+    .blind-shutter,
+    .demo-choice {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    :global(.journey-workbench[data-active-step='1']) .blind-shutter {
+      opacity: 0;
+    }
   }
 </style>
 
 <script>
-  const section = document.getElementById('demo-section');
-  const convexUrl = section?.dataset.convexUrl || '';
-  const choiceA = document.getElementById('choice-a') as HTMLButtonElement | null;
-  const choiceB = document.getElementById('choice-b') as HTMLButtonElement | null;
-  const revealSection = document.getElementById('demo-reveal');
-  const revealHeadline = document.getElementById('reveal-headline');
-  const revealStats = document.getElementById('reveal-stats');
-  const demoPrompt = document.getElementById('demo-prompt');
+  type VoteChoice = 'A' | 'B';
+  type VoteStats = {
+    readonly totalVotes: number;
+    readonly percentA: number;
+    readonly percentB: number;
+  };
 
-  const STORAGE_KEY = 'bb-demo-vote';
-  let hasVoted = false;
+  const storageKey = 'bb-demo-vote';
 
-  const previousVote = localStorage.getItem(STORAGE_KEY);
-  if (previousVote) {
-    hasVoted = true;
-    showReveal(previousVote as 'A' | 'B', true);
-    loadStats(previousVote as 'A' | 'B');
-  }
+  const isVoteChoice = (value: string | null): value is VoteChoice =>
+    value === 'A' || value === 'B';
 
-  function handleVote(choice: 'A' | 'B') {
-    if (hasVoted) return;
-    hasVoted = true;
-    localStorage.setItem(STORAGE_KEY, choice);
-
-    showReveal(choice, false);
-
-    if (convexUrl) {
-      fetch(`${convexUrl}/api/demo-vote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choice }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.totalVotes && data.totalVotes > 1) {
-            const yourPercent = choice === 'A' ? data.percentA : data.percentB;
-            animateCounter(yourPercent, data.totalVotes);
-          }
-        })
-        .catch(() => {});
+  const readStoredVote = (): VoteChoice | null => {
+    try {
+      const value = localStorage.getItem(storageKey);
+      return isVoteChoice(value) ? value : null;
+    } catch {
+      return null;
     }
-  }
+  };
 
-  function showReveal(choice: 'A' | 'B', instant: boolean) {
-    const selected = choice === 'A' ? choiceA : choiceB;
-    const other = choice === 'A' ? choiceB : choiceA;
-
-    choiceA?.classList.add('voted');
-    choiceB?.classList.add('voted');
-
-    if (instant) {
-      selected?.classList.add('selected', 'revealed');
-      other?.classList.add('dimmed', 'revealed');
-      if (demoPrompt) demoPrompt.style.opacity = '0';
-      if (revealHeadline) {
-        revealHeadline.textContent =
-          choice === 'A'
-            ? 'You picked the control.'
-            : 'You picked the candidate.';
-      }
-      if (revealSection) {
-        revealSection.style.opacity = '1';
-        revealSection.style.transform = 'translateY(0)';
-      }
-      return;
+  const storeVote = (choice: VoteChoice) => {
+    try {
+      localStorage.setItem(storageKey, choice);
+    } catch {
+      // Storage is optional; the in-page vote still works without it.
     }
+  };
 
-    selected?.classList.add('selected');
-    other?.classList.add('dimmed');
-    if (demoPrompt) demoPrompt.style.opacity = '0';
+  const parseVoteStats = (value: unknown): VoteStats | null => {
+    if (typeof value !== 'object' || value === null) return null;
+    const totalVotes: unknown = Reflect.get(value, 'totalVotes');
+    const percentA: unknown = Reflect.get(value, 'percentA');
+    const percentB: unknown = Reflect.get(value, 'percentB');
+    if (
+      typeof totalVotes !== 'number' ||
+      typeof percentA !== 'number' ||
+      typeof percentB !== 'number'
+    ) return null;
+    return { totalVotes, percentA, percentB };
+  };
 
-    const revealDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300;
-    setTimeout(() => {
-      choiceA?.classList.add('revealed');
-      choiceB?.classList.add('revealed');
-    }, revealDelay);
+  document.querySelectorAll<HTMLElement>('[data-demo-instance]').forEach((section) => {
+    if (section.dataset.initialized === 'true') return;
+    section.dataset.initialized = 'true';
 
-    setTimeout(
-      () => {
+    const choices = Array.from(section.querySelectorAll<HTMLButtonElement>('[data-choice]'));
+    const reveal = section.querySelector<HTMLElement>('[data-demo-reveal]');
+    const revealHeadline = section.querySelector<HTMLElement>('[data-reveal-headline]');
+    const revealStats = section.querySelector<HTMLElement>('[data-reveal-stats]');
+    const prompt = section.querySelector<HTMLElement>('[data-demo-prompt]');
+    const status = section.querySelector<HTMLElement>('[data-demo-status]');
+    const convexUrl = section.dataset.convexUrl || '';
+    let hasVoted = false;
+
+    const renderStats = (choice: VoteChoice, stats: VoteStats) => {
+      if (!revealStats || stats.totalVotes <= 1) return;
+      const percent = choice === 'A' ? stats.percentA : stats.percentB;
+      revealStats.textContent = `${percent}% agreed · ${stats.totalVotes.toLocaleString()} votes`;
+    };
+
+    const loadStats = async (choice: VoteChoice) => {
+      if (!convexUrl) return;
+      try {
+        const response = await fetch(`${convexUrl}/api/demo-stats`);
+        const value: unknown = await response.json();
+        const stats = parseVoteStats(value);
+        if (stats) renderStats(choice, stats);
+      } catch {
+        // Aggregate stats are optional; the local vote remains complete.
+      }
+    };
+
+    const showReveal = (choice: VoteChoice) => {
+      for (const button of choices) {
+        const buttonChoice = button.dataset.choice;
+        const selected = buttonChoice === choice;
+        button.classList.add('voted', 'revealed');
+        button.classList.toggle('selected', selected);
+        button.classList.toggle('dimmed', !selected);
+        button.setAttribute('aria-pressed', String(selected));
+      }
+      if (prompt) prompt.hidden = true;
+      if (status) status.textContent = 'Verdict recorded · identities revealed';
+      if (reveal) reveal.hidden = false;
+      requestAnimationFrame(() => {
         if (revealHeadline) {
           revealHeadline.textContent =
-            choice === 'A'
-              ? 'You picked the control.'
-              : 'You picked the candidate.';
+            choice === 'A' ? 'Control selected' : 'Candidate selected';
         }
-        if (revealSection) {
-          revealSection.style.opacity = '1';
-          revealSection.style.transform = 'translateY(0)';
-        }
-      },
-      revealDelay + 300,
-    );
-  }
+      });
+    };
 
-  function loadStats(choice: 'A' | 'B') {
-    if (!convexUrl) return;
-    fetch(`${convexUrl}/api/demo-stats`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.totalVotes && data.totalVotes > 1) {
-          const yourPercent = choice === 'A' ? data.percentA : data.percentB;
-          if (revealStats) {
-            revealStats.textContent = `${yourPercent}% of visitors made the same choice (${data.totalVotes.toLocaleString()} votes)`;
-          }
-        }
-      })
-      .catch(() => {});
-  }
+    const submitVote = async (choice: VoteChoice) => {
+      if (hasVoted) return;
+      const storedVote = readStoredVote();
+      if (storedVote) {
+        hasVoted = true;
+        showReveal(storedVote);
+        return;
+      }
+      hasVoted = true;
+      storeVote(choice);
+      showReveal(choice);
 
-  function animateCounter(targetPercent: number, totalVotes: number) {
-    if (!revealStats) return;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!convexUrl) return;
+      try {
+        const response = await fetch(`${convexUrl}/api/demo-vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choice }),
+        });
+        const value: unknown = await response.json();
+        const stats = parseVoteStats(value);
+        if (stats) renderStats(choice, stats);
+      } catch {
+        // The illustrative vote still succeeds when aggregate stats are unavailable.
+      }
+    };
 
-    if (reducedMotion) {
-      revealStats.textContent = `${targetPercent}% of visitors made the same choice (${totalVotes.toLocaleString()} votes)`;
-      return;
+    for (const button of choices) {
+      button.addEventListener('click', () => {
+        const choice = button.dataset.choice || null;
+        if (isVoteChoice(choice)) void submitVote(choice);
+      });
     }
 
-    let current = 0;
-    const duration = 500;
-    const steps = 20;
-    const interval = duration / steps;
-    const increment = targetPercent / steps;
-
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= targetPercent) {
-        current = targetPercent;
-        clearInterval(timer);
-      }
-      revealStats.textContent = `${Math.round(current)}% of visitors made the same choice (${totalVotes.toLocaleString()} votes)`;
-    }, interval);
-  }
-
-  choiceA?.addEventListener('click', () => handleVote('A'));
-  choiceB?.addEventListener('click', () => handleVote('B'));
+    const previousVote = readStoredVote();
+    if (previousVote) {
+      hasVoted = true;
+      showReveal(previousVote);
+      void loadStats(previousVote);
+    }
+  });
 </script>

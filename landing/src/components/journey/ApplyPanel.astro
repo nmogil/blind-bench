@@ -1,193 +1,144 @@
 ---
 import ArrowRight from '../../icons/ArrowRight.astro';
 
-// Content mirrors the real optimizer fixture in
-// convex/lib/__tests__/optimizerFixtures.ts — the customer-support tone case.
+interface Props {
+  compact?: boolean;
+}
 
-const annotations = [
-  {
-    label: 'A',
-    quote: 'Reads like a corporate form letter.',
-    target: '"Dear valued customer, I appreciate your inquiry."',
-  },
-  {
-    label: 'B',
-    quote: 'Too robotic — "I understand your concern" is filler.',
-    target: '"I understand your concern and will assist you."',
-  },
-];
+const { compact = false } = Astro.props;
 ---
 
-<div class="mx-auto max-w-5xl">
-  <div class="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl ring-1 ring-foreground/5 dark:border-border">
-    <!-- Window chrome -->
-    <div class="flex items-center gap-2 border-b border-border px-4 py-3">
-      <div class="flex gap-1.5" aria-hidden="true">
-        <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-        <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
-        <div class="h-2.5 w-2.5 rounded-full bg-border"></div>
+<div class:list={['apply-state', compact && 'apply-state-compact']}>
+  <div class="flex items-center justify-between gap-4 border-b border-border/80 px-4 py-3 sm:px-5">
+    <span class="truncate font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-foreground/70">Verdict routed</span>
+    <span class="font-mono text-[9px] uppercase tracking-[0.14em] text-primary">Loop closed</span>
+  </div>
+
+  <div class="border-b border-border/80 bg-background/30 px-4 py-3 sm:px-5">
+    <div class="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+      <div>
+        <p class="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">Blind verdict</p>
+        <p class="mt-1 text-sm font-semibold text-foreground">Candidate +12%</p>
       </div>
-      <div class="ml-4 flex-1">
-        <div class="mx-auto w-fit rounded-md bg-muted px-3 py-1 text-xs text-muted-foreground">
-          Optimizer &middot; v3 &rarr; v4
+      <div class="hidden h-px bg-border sm:block"><div class="verdict-line h-px bg-primary"></div></div>
+      <p class="max-w-[230px] text-[10px] leading-relaxed text-muted-foreground sm:text-right">
+        7 of 9 reviewers flagged the same tone issue.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid gap-px bg-border/80 sm:grid-cols-[0.92fr_1.08fr]">
+    <div class="bg-card p-4 sm:p-5">
+      <div class="flex items-center justify-between gap-3">
+        <p class="font-mono text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Evidence attached</p>
+        <span class="font-mono text-[9px] text-muted-foreground">2 notes</span>
+      </div>
+      <div class="mt-3 space-y-2.5">
+        <div class="annotation-card rounded-lg border border-border bg-background/45 p-3">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-5 w-5 items-center justify-center rounded bg-primary/12 font-mono text-[9px] font-semibold text-primary">A</span>
+            <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">Tone</span>
+          </div>
+          <p class="mt-2 text-[11px] leading-relaxed text-foreground/78">“Reads like a corporate form letter.”</p>
+        </div>
+        <div class="annotation-card annotation-card-delay rounded-lg border border-border bg-background/45 p-3">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-5 w-5 items-center justify-center rounded bg-primary/12 font-mono text-[9px] font-semibold text-primary">B</span>
+            <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">Specificity</span>
+          </div>
+          <p class="mt-2 text-[11px] leading-relaxed text-foreground/78">“‘I understand your concern’ is filler.”</p>
         </div>
       </div>
     </div>
 
-    <!-- Verdict strip: the blind review that closed on the v3 run -->
-    <div
-      class="flex flex-col gap-2 border-b border-border bg-muted/20 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1 sm:px-6"
-    >
-      <div class="flex items-center gap-2 whitespace-nowrap">
-        <span class="font-mono text-[10px] font-semibold uppercase tracking-widest text-primary">
-          Verdict
-        </span>
-        <span class="hidden text-border sm:inline" aria-hidden="true">&middot;</span>
-        <span class="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Blind review closed
-        </span>
+    <div class="bg-card p-4 sm:p-5">
+      <div class="flex items-center justify-between gap-3">
+        <p class="font-mono text-[9px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Prompt revision</p>
+        <span class="font-mono text-[9px] text-primary">v3 → v4</span>
       </div>
-      <p class="text-sm font-semibold text-foreground">
-        Tone flagged on both outputs &middot; 7 of 9 reviewers
-      </p>
-      <p class="min-w-0 text-xs leading-relaxed text-muted-foreground sm:ml-auto sm:text-right">
-        &ldquo;Too formal to send &mdash; reads like a corporate form letter.&rdquo;
-      </p>
-    </div>
-
-    <!-- Three-column grid: before / annotations / after -->
-    <div
-      class="grid grid-cols-1 divide-y divide-border lg:grid-cols-[1fr_minmax(220px,280px)_1fr] lg:divide-x lg:divide-y-0"
-    >
-      <!-- Before: v3 -->
-      <div class="p-5 sm:p-6">
-        <div class="mb-3 flex items-center gap-2">
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground"
-          >
-            v3
-          </span>
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Previous prompt
-          </span>
-        </div>
-        <p class="font-mono text-sm leading-relaxed text-foreground/80">
-          You are a <span class="diff-removed">helpful</span> customer
-          support agent. Answer the user&rsquo;s
-          <span class="diff-removed">question</span>.
+      <div class="mt-3 rounded-lg border border-border bg-background/45 p-3.5 font-mono text-[11px] leading-[1.7] text-foreground/75">
+        <p>
+          You are a <span class="diff-old">helpful</span> customer support agent.
+        </p>
+        <p class="mt-2">
+          <span class="diff-new">Write like a helpful coworker, not a corporate robot. Avoid form-letter openers and get to the point warmly.</span>
         </p>
       </div>
-
-      <!-- Middle: annotations -->
-      <div class="bg-muted/30 p-5 sm:p-6">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Reviewer annotations
-          </span>
-          <span class="text-[11px] text-muted-foreground">
-            from v3 run
-          </span>
-        </div>
-        <div class="space-y-3">
-          {
-            annotations.map((a) => (
-              <div class="rounded-lg border border-border bg-card p-3">
-                <div class="flex items-center gap-2">
-                  <span class="inline-flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold text-foreground">
-                    {a.label}
-                  </span>
-                  <span class="text-[11px] text-muted-foreground">
-                    Output {a.label}
-                  </span>
-                </div>
-                <p class="mt-2 text-xs leading-relaxed text-foreground/80">
-                  &ldquo;{a.quote}&rdquo;
-                </p>
-                <p class="mt-1.5 truncate font-mono text-[10px] text-muted-foreground">
-                  on {a.target}
-                </p>
-              </div>
-            ))
-          }
-        </div>
-        <div
-          class="mt-4 hidden items-center justify-center gap-2 text-[11px] text-primary lg:flex"
-          aria-hidden="true"
-        >
-          <span>applied</span>
-          <ArrowRight class="h-3 w-3" />
-        </div>
-      </div>
-
-      <!-- After: v4 -->
-      <div class="p-5 sm:p-6">
-        <div class="mb-3 flex items-center gap-2">
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary"
-          >
-            v4
-          </span>
-          <span class="text-xs font-medium text-primary uppercase tracking-wide">
-            Proposed prompt
-          </span>
-        </div>
-        <p class="font-mono text-sm leading-relaxed text-foreground/80">
-          You are a customer support agent. <span class="diff-added">Be friendly and professional. Write like a helpful coworker, not a corporate robot.</span>
-          <span class="diff-added">Avoid formal openers (&ldquo;Dear valued customer&rdquo;) and form-letter phrases (&ldquo;I understand your concern&rdquo;).</span>
-          <span class="diff-added">Get to the point and be warm.</span>
-        </p>
+      <div class="mt-3 flex items-center gap-2 text-[10px] text-primary">
+        <span>Reviewer evidence applied</span>
+        <ArrowRight class="h-3 w-3" />
       </div>
     </div>
+  </div>
 
-    <!-- Reasoning footer -->
-    <div class="border-t border-border bg-muted/20 px-5 py-4 sm:px-6">
-      <div class="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Why these changes
-      </div>
-      <p class="text-xs leading-relaxed text-foreground/75">
-        Both outputs drifted on tone.
-        <span class="citation">Output A</span>
-        went corporate; <span class="citation">Output B</span> defaulted to
-        empty filler. The rewrite adds explicit prohibitions and a positive
-        anchor (&ldquo;helpful coworker, not a corporate robot&rdquo;).
-      </p>
-    </div>
+  <div class="flex items-center justify-between gap-3 border-t border-border/80 bg-background/35 px-4 py-3 sm:px-5">
+    <span class="text-[10px] text-muted-foreground">Case BB-1842 · audit trail preserved</span>
+    <span class="inline-flex items-center gap-1.5 rounded-md border border-primary/25 bg-primary/8 px-2.5 py-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-primary">
+      <span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+      Next run ready
+    </span>
   </div>
 </div>
 
 <style>
-  /* Diff highlights — blue/purple scheme matches src/components/PromptDiff.tsx. */
-  .diff-removed {
-    background-color: color-mix(in oklch, var(--step-3) 15%, transparent);
-    color: var(--step-3);
-    padding: 0.1em 0.25em;
-    margin: 0 -0.05em;
+  .diff-old {
     border-radius: 3px;
+    background: color-mix(in oklch, var(--step-3) 15%, transparent);
+    color: var(--step-3);
+    padding: 0.08em 0.2em;
     text-decoration: line-through;
     text-decoration-thickness: 1px;
-    text-decoration-color: color-mix(in oklch, var(--step-3) 50%, transparent);
   }
 
-  .diff-added {
-    background-color: color-mix(in oklch, var(--primary) 15%, transparent);
-    color: var(--primary);
-    padding: 0.1em 0.25em;
-    margin: 0 -0.05em;
+  .diff-new {
     border-radius: 3px;
+    background: color-mix(in oklch, var(--primary) 15%, transparent);
+    color: var(--primary);
+    padding: 0.08em 0.2em;
   }
 
-  .citation {
-    display: inline-block;
-    background-color: color-mix(in oklch, var(--amber) 18%, transparent);
-    color: var(--amber-foreground);
-    padding: 0.05em 0.45em;
-    border-radius: 4px;
-    font-weight: 500;
-    font-size: 0.95em;
+  .verdict-line {
+    transform: scaleX(0);
+    transform-origin: left;
   }
 
-  :global(.dark) .citation {
-    color: var(--amber);
-    background-color: color-mix(in oklch, var(--amber) 15%, transparent);
+  .annotation-card {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  :global(.journey-workbench[data-active-step='2']) .verdict-line {
+    transform: scaleX(1);
+    transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1) 120ms;
+  }
+
+  :global(.journey-workbench[data-active-step='2']) .annotation-card {
+    opacity: 1;
+    transform: translateX(0);
+    transition:
+      opacity 320ms ease 180ms,
+      transform 420ms cubic-bezier(0.16, 1, 0.3, 1) 180ms;
+  }
+
+  :global(.journey-workbench[data-active-step='2']) .annotation-card-delay {
+    transition-delay: 280ms;
+  }
+
+  .apply-state-compact .verdict-line {
+    transform: scaleX(1);
+  }
+
+  .apply-state-compact .annotation-card {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .verdict-line,
+    .annotation-card {
+      opacity: 1;
+      transform: none;
+      transition: none !important;
+    }
   }
 </style>
