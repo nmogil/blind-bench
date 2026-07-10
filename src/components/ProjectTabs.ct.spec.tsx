@@ -7,7 +7,7 @@ import { ProjectTabs } from "./ProjectTabs";
 const projectId = "project-1" as Id<"projects">;
 
 /** The primary project shell exposes only the ingestion-first workflow. */
-test("project navigation leads with Runs, Reviews, and Results", async ({ mount }) => {
+test("project navigation leads with Runs, Reviews, and Results", async ({ mount, page }) => {
   const component = await mount(
     <MemoryRouter initialEntries={[`/orgs/demo/projects/${projectId}/traces`]}>
       <ProjectProvider
@@ -35,5 +35,9 @@ test("project navigation leads with Runs, Reviews, and Results", async ({ mount 
   await expect(component.getByRole("link", { name: "Run prompt", exact: true })).toHaveCount(0);
   await expect(component.getByRole("link", { name: "Export", exact: true })).toHaveCount(0);
 
-  await expect(component.getByRole("button", { name: /tools/i })).toBeVisible();
+  const tools = component.getByRole("button", { name: /tools/i });
+  await expect(tools).toBeVisible();
+  await tools.click();
+  await expect(page.getByRole("menuitem", { name: "Add runs" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Prompt playground" })).toBeVisible();
 });

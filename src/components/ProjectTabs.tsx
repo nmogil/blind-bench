@@ -14,6 +14,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -85,21 +86,25 @@ export function ProjectTabs() {
               <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Import and sources</DropdownMenuLabel>
-              {secondaryItems.slice(0, 2).map((item) => (
-                <DropdownMenuItem key={item.path} render={<NavLink to={`${basePath}/${item.path}`} />}>
-                  <item.icon aria-hidden="true" className="mr-2 h-4 w-4" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Import and sources</DropdownMenuLabel>
+                {secondaryItems.slice(0, 2).map((item) => (
+                  <DropdownMenuItem key={item.path} render={<NavLink to={`${basePath}/${item.path}`} />}>
+                    <item.icon aria-hidden="true" className="mr-2 h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>Prompt playground</DropdownMenuLabel>
-              {secondaryItems.slice(2, 5).map((item) => (
-                <DropdownMenuItem key={item.path} render={<NavLink to={`${basePath}/${item.path}`} />}>
-                  <item.icon aria-hidden="true" className="mr-2 h-4 w-4" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Prompt playground</DropdownMenuLabel>
+                {secondaryItems.slice(2, 5).map((item) => (
+                  <DropdownMenuItem key={item.path} render={<NavLink to={`${basePath}/${item.path}`} />}>
+                    <item.icon aria-hidden="true" className="mr-2 h-4 w-4" />
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem render={<NavLink to={`${basePath}/${secondaryItems[5].path}`} />}>
                 <Activity aria-hidden="true" className="mr-2 h-4 w-4" />
