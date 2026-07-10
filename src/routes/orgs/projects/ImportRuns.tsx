@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useAction } from "convex/react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { useProject } from "@/contexts/ProjectContext";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { friendlyError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
@@ -16,13 +17,14 @@ import {
 import {
   Braces,
   CheckCircle2,
+  Download,
   FileSpreadsheet,
   Route,
   ShieldAlert,
   Upload,
 } from "lucide-react";
 
-type ImportSource = "csv" | "otlp" | "pi" | "claude_code";
+type ImportSource = "paired" | "csv" | "otlp" | "pi" | "claude_code";
 type CsvResult = FunctionReturnType<typeof api.csvImport.importMappedCsv>;
 type OtlpResult = FunctionReturnType<typeof api.otlpFileImport.importOtlpJson>;
 type PiResult = FunctionReturnType<typeof api.piImport.importPiSession>;
@@ -32,8 +34,19 @@ type ImportResult = CsvResult | OtlpResult | PiResult | ClaudeResult;
 type MappingField = Exclude<keyof CsvTraceMapping, "metadataColumns">;
 
 const MAX_BYTES = 8 * 1024 * 1024;
+const PAIRED_TEMPLATE = [
+  "case_id,context,candidate_a,candidate_b,candidate_a_model,candidate_b_model,segment,privacy_class",
+  'case-1,"Shared prompt or prior conversation","First completed attempt","Second completed attempt",model-a,model-b,demo,internal',
+].join("\n");
 
 const SOURCES = [
+  {
+    id: "paired",
+    title: "Paired comparison",
+    description: "Upload 2 completed attempts for every shared context and start a blind review.",
+    accept: ".csv,text/csv",
+    icon: FileSpreadsheet,
+  },
   {
     id: "csv",
     title: "CSV",
@@ -104,6 +117,13 @@ const FIELD_GUESSES: Record<MappingField, ReadonlyArray<string>> = {
   privacyClassColumn: ["privacy_class", "sensitivity"],
 };
 
+const PAIRED_HEADERS = ["case_id", "context", "candidate_a", "candidate_b"] as const;
+
+function isPairedComparisonCsv(headers: ReadonlyArray<string>): boolean {
+  const headerSet = new Set(headers);
+  return PAIRED_HEADERS.every((header) => headerSet.has(header));
+}
+
 function guessMapping(headers: ReadonlyArray<string>): Partial<Record<MappingField, string>> {
   const lower = new Map(headers.map((header) => [header.toLowerCase(), header]));
   const mapping: Partial<Record<MappingField, string>> = {};
@@ -118,13 +138,20 @@ function guessMapping(headers: ReadonlyArray<string>): Partial<Record<MappingFie
 
 export function ImportRuns() {
   const { projectId } = useProject();
+  const { orgSlug } = useParams<{ orgSlug: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const importCsv = useAction(api.csvImport.importMappedCsv);
+  const importPairedCsv = useAction(api.comparisonCampaigns.importPairedCsv);
   const importOtlp = useAction(api.otlpFileImport.importOtlpJson);
   const importPi = useAction(api.piImport.importPiSession);
   const importClaude = useAction(api.claudeCodeImport.importClaudeCodeSession);
 
-  const [source, setSource] = useState<ImportSource>("csv");
+  const [source, setSource] = useState<ImportSource>(
+    searchParams.get("source") === "paired" ? "paired" : "csv",
+  );
   const [fileName, setFileName] = useState("");
+  const [comparisonName, setComparisonName] = useState("");
   const [payload, setPayload] = useState("");
   const [csvHeaders, setCsvHeaders] = useState<ReadonlyArray<string>>([]);
   const [csvRows, setCsvRows] = useState(0);
@@ -142,10 +169,14 @@ export function ImportRuns() {
   const csvReady =
     source !== "csv" ||
     (mapping.inputColumn !== undefined && mapping.outputColumn !== undefined);
+  const pairedReady =
+    source !== "paired" ||
+    (comparisonName.trim().length > 0 && isPairedComparisonCsv(csvHeaders));
 
   function resetFile(nextSource: ImportSource) {
     setSource(nextSource);
     setFileName("");
+    setComparisonName("");
     setPayload("");
     setCsvHeaders([]);
     setCsvRows(0);
@@ -167,27 +198,52 @@ export function ImportRuns() {
     const text = await file.text();
     setFileName(file.name);
     setPayload(text);
-    if (source === "csv") {
+    if (source === "csv" || source === "paired") {
       try {
         const rows = parseCsvRows(text);
         const headers = rows[0]?.map((header) => header.trim()) ?? [];
         if (headers.length === 0) throw new Error("CSV must contain a header row.");
         setCsvHeaders(headers);
         setCsvRows(Math.max(0, rows.length - 1));
-        setMapping(guessMapping(headers));
+        if (isPairedComparisonCsv(headers)) {
+          setSource("paired");
+          setMapping({});
+          setMetadataColumns([]);
+          setComparisonName((current) => current || file.name.replace(/\.csv$/i, ""));
+        } else if (source === "paired") {
+          setError("Paired comparison CSV requires case_id, context, candidate_a, and candidate_b columns.");
+        } else {
+          setMapping(guessMapping(headers));
+        }
       } catch (cause: unknown) {
         setError(friendlyError(cause, "Could not read this CSV file."));
       }
     }
   }
 
+  function downloadPairedTemplate() {
+    const url = URL.createObjectURL(new Blob([PAIRED_TEMPLATE], { type: "text/csv" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "blindbench-paired-comparison.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleImport() {
-    if (!payload || !csvReady || busy) return;
+    if (!payload || !csvReady || !pairedReady || busy) return;
     setBusy(true);
     setError("");
     setResult(null);
     try {
-      if (source === "csv") {
+      if (source === "paired") {
+        const result = await importPairedCsv({
+          projectId,
+          name: comparisonName.trim(),
+          csv: payload,
+        });
+        navigate(`/orgs/${orgSlug}/projects/${projectId}/comparisons/${result.campaignId}`);
+      } else if (source === "csv") {
         const inputColumn = mapping.inputColumn;
         const outputColumn = mapping.outputColumn;
         if (!inputColumn || !outputColumn) {
@@ -233,7 +289,7 @@ export function ImportRuns() {
       <header>
         <div className="flex items-center gap-2">
           <Upload aria-hidden="true" className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Import completed runs</h1>
+          <h1 className="text-2xl font-bold">Import runs and comparisons</h1>
         </div>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Bring traces from the systems you already run. Blind Bench stores and
@@ -241,7 +297,7 @@ export function ImportRuns() {
         </p>
       </header>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="list" aria-label="Import source">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" role="list" aria-label="Import source">
         {SOURCES.map((item) => {
           const Icon = item.icon;
           const selected = source === item.id;
@@ -270,6 +326,24 @@ export function ImportRuns() {
           <CardTitle className="text-base">{selectedSource.title} file</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {source === "paired" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="comparison-name">Comparison name</Label>
+              <Input
+                id="comparison-name"
+                value={comparisonName}
+                onChange={(event) => setComparisonName(event.target.value)}
+                placeholder="Alpha vs Beta — support replies"
+                maxLength={120}
+              />
+              <p className="text-xs text-muted-foreground">
+                Upload 2 completed attempts for every shared context. Required columns: <code>case_id</code>, <code>context</code>, <code>candidate_a</code>, and <code>candidate_b</code>.
+              </p>
+              <Button type="button" variant="ghost" size="sm" onClick={downloadPairedTemplate}>
+                <Download aria-hidden="true" className="h-3.5 w-3.5" /> Download template
+              </Button>
+            </div>
+          )}
           <label
             htmlFor="run-import-file"
             className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground"
@@ -305,8 +379,8 @@ export function ImportRuns() {
 
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
-          <Button onClick={handleImport} disabled={busy || !payload || !csvReady}>
-            {busy ? "Importing…" : "Import runs"}
+          <Button onClick={handleImport} disabled={busy || !payload || !csvReady || !pairedReady}>
+            {busy ? "Importing…" : source === "paired" ? "Create comparison" : "Import runs"}
           </Button>
         </CardContent>
       </Card>

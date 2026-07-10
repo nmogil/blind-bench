@@ -33,6 +33,7 @@ const FIXTURE_BODY = {
 // depends on the action fn, so a fresh fn each render would loop forever.
 const noop = () => {};
 const getBodyFn = async () => FIXTURE_BODY;
+const importPairedComparison = async () => ({ campaignId: "campaign-import-test" });
 const noopMutation = async () => undefined;
 const createImportProject = async () => ({ orgSlug: "test-org", projectId: "test-project" });
 const PAGINATED = {
@@ -46,7 +47,14 @@ export function usePaginatedQuery() {
   return PAGINATED;
 }
 
-export function useAction() {
+export function useAction(action?: unknown) {
+  try {
+    if (getFunctionName(action as never) === "comparisonCampaigns:importPairedCsv") {
+      return importPairedComparison;
+    }
+  } catch {
+    // Keep unrelated component-test actions on the stable body fixture.
+  }
   return getBodyFn;
 }
 
