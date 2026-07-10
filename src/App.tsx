@@ -38,6 +38,7 @@ const NotFound = lazy(() => import("./routes/errors/NotFound").then(m => ({ defa
 const Denied = lazy(() => import("./routes/errors/Denied").then(m => ({ default: m.Denied })));
 const QuickCompare = lazy(() => import("./routes/compare/QuickCompare").then(m => ({ default: m.QuickCompare })));
 const ReviewDemo = lazy(() => import("./routes/review/DemoDeck").then(m => ({ default: m.DemoDeck })));
+const ComparisonReview = lazy(() => import("./routes/review/ComparisonReview").then(m => ({ default: m.ComparisonReview })));
 const SessionDeck = lazy(() => import("./routes/review/SessionDeck").then(m => ({ default: m.SessionDeck })));
 const ReviewRunStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewRunStarter })));
 const ReviewCycleStarter = lazy(() => import("./routes/review/ReviewStarter").then(m => ({ default: m.ReviewCycleStarter })));
@@ -51,6 +52,8 @@ const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail
 const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/VersionDashboard").then(m => ({ default: m.VersionDashboard })));
 const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
 const ExportTraining = lazy(() => import("./routes/orgs/projects/ExportTraining").then(m => ({ default: m.ExportTraining })));
+const ComparisonCampaignNew = lazy(() => import("./routes/orgs/projects/ComparisonCampaignNew").then(m => ({ default: m.ComparisonCampaignNew })));
+const ComparisonCampaignDetail = lazy(() => import("./routes/orgs/projects/ComparisonCampaignDetail").then(m => ({ default: m.ComparisonCampaignDetail })));
 const IngestEndpoint = lazy(() => import("./routes/orgs/projects/IngestEndpoint").then(m => ({ default: m.IngestEndpoint })));
 const ImportRuns = lazy(() => import("./routes/orgs/projects/ImportRuns").then(m => ({ default: m.ImportRuns })));
 const TraceList = lazy(() => import("./routes/traces/TraceList").then(m => ({ default: m.TraceList })));
@@ -73,6 +76,7 @@ export function App() {
         <Route path="/auth/sign-in" element={<AuthGatePublic />} />
         <Route path="/compare" element={<QuickCompare />} />
         <Route path="/review/demo" element={<ReviewDemo />} />
+        <Route path="/review/campaign/:shareToken" element={<ComparisonReview />} />
         <Route path="/invite/:token" element={<InviteLanding />} />
         <Route path="/legal/terms" element={<Terms />} />
         <Route path="/legal/privacy" element={<Privacy />} />
@@ -126,6 +130,8 @@ export function App() {
                 element={<CycleDetail />}
               />
               <Route path="evaluate" element={<EvaluatePage />} />
+              <Route path="comparisons/new" element={<ComparisonCampaignNew />} />
+              <Route path="comparisons/:campaignId" element={<ComparisonCampaignDetail />} />
               <Route path="export" element={<ExportTraining />} />
               <Route path="ingest" element={<IngestEndpoint />} />
               <Route path="traces" element={<TraceList />} />

@@ -41,7 +41,13 @@ const TARGET = v.union(
   v.object({ kind: v.literal("tool_call"), stepIndex: v.number() }),
 );
 const RATING = v.union(v.literal("best"), v.literal("acceptable"), v.literal("weak"));
-const WINNER = v.union(v.literal("left"), v.literal("right"), v.literal("tie"), v.literal("skip"));
+const WINNER = v.union(
+  v.literal("left"),
+  v.literal("right"),
+  v.literal("tie"),
+  v.literal("neither"),
+  v.literal("skip"),
+);
 const SIDE = v.union(v.literal("left"), v.literal("right"));
 
 type ReadCtx = QueryCtx | MutationCtx;
@@ -57,6 +63,19 @@ async function sessionForUser(
     .unique();
   if (!session || session.reviewerUserId !== userId) {
     throw new Error("Review session not found or expired.");
+  }
+  if (session.kind === "campaign") {
+    const campaign = session.campaignId
+      ? await ctx.db.get(session.campaignId)
+      : null;
+    if (
+      !campaign ||
+      campaign.projectId !== session.projectId ||
+      campaign.status !== "open"
+    ) {
+      throw new Error("Review session not found or expired.");
+    }
+    return session;
   }
   const collaborator = await ctx.db
     .query("projectCollaborators")
@@ -96,16 +115,26 @@ async function matchupSession(
   readonly session: Doc<"agentTraceReviewSessions">;
   readonly matchup: Doc<"agentTraceMatchups">;
   readonly userId: Id<"users">;
+  readonly leftFirst: boolean;
 }> {
   const session = await sessionForUser(ctx, token);
-  if (session.kind !== "matchup" || session.matchupId === undefined) {
-    throw new Error("This review link is not a matchup session.");
+  let matchupId: Id<"agentTraceMatchups"> | undefined;
+  let leftFirst = session.leftFirst ?? true;
+  if (session.kind === "matchup") {
+    matchupId = session.matchupId;
+  } else if (session.kind === "campaign") {
+    const entry = session.campaignOrder?.[session.currentIndex ?? 0];
+    matchupId = entry?.matchupId;
+    leftFirst = entry?.leftFirst ?? true;
   }
-  const matchup = await ctx.db.get(session.matchupId);
+  if (matchupId === undefined) {
+    throw new Error("This review link has no active matchup.");
+  }
+  const matchup = await ctx.db.get(matchupId);
   if (!matchup || matchup.projectId !== session.projectId) {
     throw new Error("Review matchup is no longer available.");
   }
-  return { session, matchup, userId: session.reviewerUserId };
+  return { session, matchup, userId: session.reviewerUserId, leftFirst };
 }
 
 /** List the caller's opaque trajectory and matchup review sessions. */
@@ -386,7 +415,10 @@ export const setVerdict = mutation({
 export const getMatchup = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
-    const { session, matchup, userId } = await matchupSession(ctx, args.token);
+    const { session, matchup, userId, leftFirst } = await matchupSession(ctx, args.token);
+    if (session.kind === "campaign") {
+      throw new Error("Campaign matchups use the campaign review flow.");
+    }
     const project = await ctx.db.get(matchup.projectId);
     const decision = await ctx.db
       .query("agentTraceMatchupDecisions")
@@ -394,7 +426,6 @@ export const getMatchup = query({
         q.eq("matchupId", matchup._id).eq("userId", userId),
       )
       .unique();
-    const leftFirst = session.leftFirst ?? true;
     return {
       projectName: project?.name ?? "Project",
       divergenceStepIndex: matchup.divergenceStepIndex,
@@ -441,11 +472,85 @@ export const listMatchupSteps = query({
   },
 });
 
+/** List the caller's comments for one side of the active opaque matchup. */
+export const listMatchupComments = query({
+  args: { token: v.string(), side: SIDE },
+  handler: async (ctx, args) => {
+    const { matchup, userId } = await matchupSession(ctx, args.token);
+    const traceId = args.side === "left" ? matchup.leftTraceId : matchup.rightTraceId;
+    const rows = await ctx.db
+      .query("agentTraceComments")
+      .withIndex("by_trace", (q) => q.eq("agentTraceId", traceId))
+      .collect();
+    return rows.filter((row) => row.userId === userId).map((row) => ({
+      _id: row._id,
+      target: row.target,
+      comment: row.comment,
+      label: row.label,
+      tags: row.tags ?? [],
+      mine: true,
+      createdAt: row._creationTime,
+    }));
+  },
+});
+
+/** Add a step/tool comment to one side of the active opaque matchup. */
+export const addMatchupComment = mutation({
+  args: {
+    token: v.string(),
+    side: SIDE,
+    target: TARGET,
+    comment: v.string(),
+    label: LABEL,
+    tags: v.optional(v.array(TAG)),
+  },
+  handler: async (ctx, args): Promise<Id<"agentTraceComments">> => {
+    const { matchup, userId } = await matchupSession(ctx, args.token);
+    const traceId = args.side === "left" ? matchup.leftTraceId : matchup.rightTraceId;
+    const trace = await ctx.db.get(traceId);
+    if (!trace) throw new Error("Review trajectory is no longer available.");
+    const body = args.comment.trim();
+    if (!body) throw new Error("Add a comment before saving.");
+    if (
+      args.target.kind !== "trace" &&
+      (args.target.stepIndex < 0 || args.target.stepIndex >= trace.stepCount)
+    ) {
+      throw new Error("That step is not part of this trace.");
+    }
+    return await ctx.db.insert("agentTraceComments", {
+      agentTraceId: trace._id,
+      projectId: trace.projectId,
+      userId,
+      target: args.target,
+      comment: body,
+      label: args.label,
+      tags: args.tags,
+    });
+  },
+});
+
+/** Delete the caller's own comment through the same opaque matchup token. */
+export const deleteMatchupComment = mutation({
+  args: { token: v.string(), side: SIDE, commentId: v.id("agentTraceComments") },
+  handler: async (ctx, args) => {
+    const { matchup, userId } = await matchupSession(ctx, args.token);
+    const traceId = args.side === "left" ? matchup.leftTraceId : matchup.rightTraceId;
+    const comment = await ctx.db.get(args.commentId);
+    if (!comment || comment.userId !== userId || comment.agentTraceId !== traceId) {
+      throw new Error("Comment not found.");
+    }
+    await ctx.db.delete(comment._id);
+  },
+});
+
 /** Record one independent matchup decision through an opaque session. */
 export const decideMatchup = mutation({
   args: { token: v.string(), winner: WINNER, reasonTags: v.array(TAG) },
   handler: async (ctx, args) => {
-    const { matchup, userId } = await matchupSession(ctx, args.token);
+    const { session, matchup, userId } = await matchupSession(ctx, args.token);
+    if (session.kind === "campaign") {
+      throw new Error("Campaign choices must use the campaign review flow.");
+    }
     if (matchup.comparabilityStatus !== "valid") {
       throw new Error("This matchup is not comparable because its prefixes differ.");
     }

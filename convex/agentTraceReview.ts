@@ -38,7 +38,13 @@ const TARGET = v.union(
   v.object({ kind: v.literal("tool_call"), stepIndex: v.number() }),
 );
 const RATING = v.union(v.literal("best"), v.literal("acceptable"), v.literal("weak"));
-const WINNER = v.union(v.literal("left"), v.literal("right"), v.literal("tie"), v.literal("skip"));
+const WINNER = v.union(
+  v.literal("left"),
+  v.literal("right"),
+  v.literal("tie"),
+  v.literal("neither"),
+  v.literal("skip"),
+);
 
 const REVIEW_ROLES = ["owner", "editor", "evaluator"] as const;
 
@@ -178,6 +184,10 @@ export const createMatchup = mutation({
     divergenceStepIndex: v.number(),
     leftBlindLabel: v.string(),
     rightBlindLabel: v.string(),
+    campaignId: v.optional(v.id("comparisonCampaigns")),
+    caseKey: v.optional(v.string()),
+    segment: v.optional(v.string()),
+    sortOrder: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<Id<"agentTraceMatchups">> => {
     const left = await ctx.db.get(args.leftTraceId);
@@ -187,6 +197,15 @@ export const createMatchup = mutation({
       throw new Error("Both traces must be in the same project.");
     }
     await requireProjectRole(ctx, left.projectId, ["owner", "editor"]);
+    if (args.campaignId !== undefined) {
+      const campaign = await ctx.db.get(args.campaignId);
+      if (!campaign || campaign.projectId !== left.projectId) {
+        throw new Error("Comparison campaign not found in this project.");
+      }
+      if (!args.caseKey?.trim()) {
+        throw new Error("Campaign matchups require a case key.");
+      }
+    }
     if (!Number.isInteger(args.divergenceStepIndex) || args.divergenceStepIndex < 0) {
       throw new Error("Divergence step must be a non-negative integer.");
     }
@@ -208,10 +227,23 @@ export const createMatchup = mutation({
       throw new Error("Both traces must contain the divergence step.");
     }
     const comparable = leftStep.prefixHash === rightStep.prefixHash;
+    if (args.campaignId !== undefined && args.caseKey !== undefined) {
+      const existing = await ctx.db
+        .query("agentTraceMatchups")
+        .withIndex("by_campaign_case", (q) =>
+          q.eq("campaignId", args.campaignId).eq("caseKey", args.caseKey),
+        )
+        .unique();
+      if (existing) return existing._id;
+    }
     const matchupId = await ctx.db.insert("agentTraceMatchups", {
       projectId: left.projectId,
       leftTraceId: args.leftTraceId,
       rightTraceId: args.rightTraceId,
+      campaignId: args.campaignId,
+      caseKey: args.caseKey,
+      segment: args.segment,
+      sortOrder: args.sortOrder,
       divergenceStepIndex: args.divergenceStepIndex,
       leftBlindLabel: args.leftBlindLabel,
       rightBlindLabel: args.rightBlindLabel,
@@ -219,7 +251,7 @@ export const createMatchup = mutation({
       comparabilityStatus: comparable ? "valid" : "invalid",
       invalidReason: comparable ? undefined : "prefix_mismatch",
     });
-    if (comparable) {
+    if (comparable && args.campaignId === undefined) {
       await ensureMatchupSessionsForProjectReviewers(ctx, matchupId, left.projectId);
     }
     return matchupId;
@@ -232,6 +264,7 @@ export const decideMatchup = mutation({
     matchupId: v.id("agentTraceMatchups"),
     winner: WINNER,
     reasonTags: v.array(TAG),
+    note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const matchup = await ctx.db.get(args.matchupId);
@@ -253,6 +286,7 @@ export const decideMatchup = mutation({
       await ctx.db.patch(existing._id, {
         winner: args.winner,
         reasonTags: args.reasonTags,
+        note: args.note,
         decidedAt: Date.now(),
       });
       return existing._id;
@@ -263,6 +297,7 @@ export const decideMatchup = mutation({
       userId,
       winner: args.winner,
       reasonTags: args.reasonTags,
+      note: args.note,
       decidedAt: Date.now(),
     });
   },

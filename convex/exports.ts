@@ -183,12 +183,22 @@ interface TrajectoryPlanRow {
 }
 
 export const gatherTrajectoryPlan = internalQuery({
-  args: { projectId: v.id("projects"), format: FORMAT },
+  args: {
+    projectId: v.id("projects"),
+    format: FORMAT,
+    campaignId: v.optional(v.id("comparisonCampaigns")),
+  },
   handler: async (
     ctx,
     args,
   ): Promise<{ plan: TrajectoryPlanRow[]; stats: ExportSourceStats }> => {
     await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    if (args.campaignId !== undefined) {
+      const campaign = await ctx.db.get(args.campaignId);
+      if (!campaign || campaign.projectId !== args.projectId) {
+        throw new Error("Comparison campaign not found.");
+      }
+    }
     const stepsOf = (traceId: Id<"agentTraces">) =>
       ctx.db
         .query("agentTraceSteps")
@@ -199,10 +209,13 @@ export const gatherTrajectoryPlan = internalQuery({
     const reviewerIds = new Set<string>();
 
     if (args.format === "dpo") {
-      const matchups = await ctx.db
+      const allMatchups = await ctx.db
         .query("agentTraceMatchups")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
+      const matchups = args.campaignId === undefined
+        ? allMatchups
+        : allMatchups.filter((matchup) => matchup.campaignId === args.campaignId);
       for (const m of matchups) {
         const [leftTrace, rightTrace] = await Promise.all([
           ctx.db.get(m.leftTraceId),
@@ -226,7 +239,10 @@ export const gatherTrajectoryPlan = internalQuery({
         const directional = decisions.filter(
           (decision) => decision.winner === "left" || decision.winner === "right",
         );
-        if (decisions.some((decision) => decision.winner === "tie" || decision.winner === "skip")) {
+        if (decisions.some((decision) =>
+          decision.winner === "tie" ||
+          decision.winner === "neither" ||
+          decision.winner === "skip")) {
           plan.push({ privacyClass, metadata: {}, excludeReason: "no_preference" });
           continue;
         }
@@ -353,6 +369,7 @@ export const generateExport = action({
     format: FORMAT,
     // Explicit consent to include prod-sensitive (confidential/pii/phi) rows.
     allowSensitive: v.optional(v.boolean()),
+    campaignId: v.optional(v.id("comparisonCampaigns")),
   },
   handler: async (
     ctx,
@@ -363,6 +380,9 @@ export const generateExport = action({
     excludedCount: number;
     manifest: ExportManifest;
   }> => {
+    if (args.campaignId !== undefined && args.source !== "trajectory") {
+      throw new Error("Campaign exports use the trajectory source.");
+    }
     if (args.format === "annotated") {
       throw new Error("Annotated export isn’t available yet — use DPO or SFT.");
     }
@@ -384,6 +404,7 @@ export const generateExport = action({
       const res = await ctx.runQuery(internal.exports.gatherTrajectoryPlan, {
         projectId: args.projectId,
         format: args.format,
+        campaignId: args.campaignId,
       });
       const hydrated = await hydrateTrajectory(ctx, res.plan, args.format);
       classified = hydrated.rows;
