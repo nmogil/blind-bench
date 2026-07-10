@@ -12,6 +12,8 @@ const {
   description = 'Your experts review agent runs without knowing which version, model, or harness produced them. One link, no account — and the verdict routes back.',
 } = Astro.props;
 
+const canonical = new URL(Astro.url.pathname, Astro.site);
+
 const posthogKey = import.meta.env.PUBLIC_POSTHOG_KEY;
 const posthogHost = import.meta.env.PUBLIC_POSTHOG_HOST;
 ---
@@ -28,7 +30,7 @@ const posthogHost = import.meta.env.PUBLIC_POSTHOG_HOST;
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Blind Bench" />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content="https://blindbench.dev" />
+    <meta property="og:url" content={canonical.href} />
     <meta property="og:image" content="https://blindbench.dev/og-image.png" />
 
     <!-- Twitter -->
@@ -39,7 +41,7 @@ const posthogHost = import.meta.env.PUBLIC_POSTHOG_HOST;
 
     <meta name="theme-color" content="#f9f9f8" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1c1c22" media="(prefers-color-scheme: dark)" />
-    <link rel="canonical" href="https://blindbench.dev/" />
+    <link rel="canonical" href={canonical.href} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="preload"

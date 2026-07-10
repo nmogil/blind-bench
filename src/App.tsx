@@ -167,7 +167,11 @@ function AuthGatePublic() {
         <Navigate to="/" replace />
       </Authenticated>
       <Unauthenticated>
-        <SignIn />
+        {/* Local fallback so the lazy chunk load doesn't suspend into the
+            app-level Suspense and flash its skeleton. */}
+        <Suspense fallback={<div className="min-h-screen" />}>
+          <SignIn />
+        </Suspense>
       </Unauthenticated>
       <AuthLoading>
         <div className="min-h-screen" />
