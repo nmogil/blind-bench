@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://blindbench.dev/sitemap.xml
+Sitemap: https://blindbench.dev/sitemap-index.xml
