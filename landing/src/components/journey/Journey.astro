@@ -1,5 +1,5 @@
 ---
-import JourneyDiagram from './JourneyDiagram.astro';
+import JourneyWorkbench from './JourneyWorkbench.astro';
 import SetupPanel from './SetupPanel.astro';
 import SharePanel from './SharePanel.astro';
 import ApplyPanel from './ApplyPanel.astro';
@@ -30,106 +30,58 @@ const steps = [
 ---
 
 <section id="how-it-works" class="scroll-mt-16 py-20 lg:py-28">
-  <!-- Section header (narrower for readability) -->
   <div class="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
     <div class="reveal">
-      <h2
-        class="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl"
-      >
+      <p class="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-primary">The closed review loop</p>
+      <h2 class="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
         From agent run to a verdict you trust.
-        <span class="block font-semibold text-muted-foreground/60">
-          Three steps, one link.
-        </span>
       </h2>
-      <p class="mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg">
-        Bring in what your agent produced, get blind judgment from the people
-        who know the domain, and route their verdict back to where it changes
-        the next run.
+      <p class="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+        Bring in what your agent produced, get blind judgment from the people who know the domain, and route their verdict back to where it changes the next run.
       </p>
     </div>
   </div>
 
-  <!-- Mobile-only sticky progress pill. The full diagram is hidden on
-       mobile (it would consume ~360px above the fold without ever being
-       visible while the steps scroll past). This compact bar reuses the
-       same data-active-step tracking so the active step still updates
-       visually as the user scrolls. -->
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:hidden">
-    <div
-      class="journey-mobile-progress sticky top-14 z-40 mt-10 -mx-4 border-y border-border/70 bg-background/85 px-4 py-2.5 backdrop-blur-md sm:-mx-6 sm:px-6"
-      data-journey-progress
-      data-active-step="0"
-      aria-hidden="true"
-    >
-      <ol class="flex items-center gap-2">
-        {
-          steps.map((s, i) => (
-            <>
-              <li
-                class="journey-progress-item flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md px-2 py-1.5"
-                data-progress-item={i}
-              >
-                <span class="journey-progress-dot inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-border bg-card font-mono text-[10px] font-semibold text-muted-foreground transition-[color,border-color,background-color,box-shadow] duration-300">
-                  {i + 1}
+  <div class="mx-auto mt-14 max-w-7xl px-4 sm:px-6 lg:mt-16 lg:px-8">
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)] lg:gap-12 xl:gap-16">
+      <div class="space-y-20 lg:space-y-0">
+        {steps.map((step, index) => (
+          <article
+            class="journey-step scroll-mt-24"
+            data-journey-step={index}
+            id={index === 1 ? 'demo-section' : undefined}
+            aria-label={`Step ${index + 1}: ${step.eyebrow}`}
+          >
+            <div class="journey-copy lg:max-w-sm">
+              <div class="mb-5 flex items-center gap-3">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/35 bg-primary/8 font-mono text-[10px] font-semibold text-primary">
+                  {step.number}
                 </span>
-                <span class="journey-progress-label truncate text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground transition-colors duration-300">
-                  {s.eyebrow}
+                <span class="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-primary">
+                  {step.eyebrow}
                 </span>
-              </li>
-              {i < steps.length - 1 && (
-                <li class="h-px w-2 flex-shrink-0 bg-border/60" aria-hidden="true" />
-              )}
-            </>
-          ))
-        }
-      </ol>
-    </div>
-  </div>
+              </div>
+              <h3 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{step.title}</h3>
+              <p class="mt-3 text-base leading-relaxed text-muted-foreground">{step.description}</p>
+            </div>
 
-  <!-- Sticky split: diagram (left) + step blocks (right) — wider container -->
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-    <div class="journey-scroller mt-8 lg:mt-20">
-      <div class="grid grid-cols-1 gap-12 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-10 xl:gap-16">
-        <!-- Left: sticky diagram (desktop only — mobile uses the compact
-             progress pill above) -->
-        <div class="journey-sticky-col hidden lg:block">
-          <div class="journey-sticky-inner lg:sticky lg:top-24 lg:flex lg:h-[calc(100vh-7rem)] lg:items-center">
-            <JourneyDiagram default={0} />
+            <div
+              class="journey-mobile-scene mt-8 overflow-hidden rounded-xl border border-border/90 bg-card shadow-[0_20px_60px_-44px_rgba(0,0,0,0.7)] ring-1 ring-foreground/4 lg:hidden"
+              data-mobile-journey-state={index}
+            >
+              {index === 0 && <SetupPanel />}
+              {index === 1 && <SharePanel instance="mobile" compact />}
+              {index === 2 && <ApplyPanel compact />}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div class="hidden lg:block">
+        <div class="sticky top-24 flex h-[calc(100vh-7rem)] items-start pt-10">
+          <div class="w-full">
+            <JourneyWorkbench />
           </div>
-        </div>
-
-        <!-- Right: stacked step blocks -->
-        <div class="space-y-24 lg:space-y-32">
-          {
-            steps.map((s, i) => (
-              <article
-                class="journey-step"
-                data-journey-step={i}
-                aria-label={`Step ${s.number}: ${s.eyebrow}`}
-              >
-                <div class="mb-6 flex items-center gap-3">
-                  <span class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/40 bg-primary/10 font-mono text-[11px] font-semibold text-primary">
-                    {i + 1}
-                  </span>
-                  <span class="font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-primary">
-                    {s.eyebrow}
-                  </span>
-                </div>
-                <h3 class="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                  {s.title}
-                </h3>
-                <p class="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">
-                  {s.description}
-                </p>
-
-                <div class="mt-8">
-                  {i === 0 && <SetupPanel />}
-                  {i === 1 && <SharePanel />}
-                  {i === 2 && <ApplyPanel />}
-                </div>
-              </article>
-            ))
-          }
         </div>
       </div>
     </div>
@@ -137,106 +89,90 @@ const steps = [
 </section>
 
 <style>
-  /* On desktop, give each step block enough vertical room so the sticky
-     diagram has scroll distance to dwell on each. The min-height of the
-     last block is reduced so the section ends near the bottom of its panel
-     rather than leaving empty space below the final step. */
   @media (min-width: 1024px) {
     .journey-step {
-      min-height: 80vh;
       display: flex;
+      min-height: 72vh;
       flex-direction: column;
       justify-content: center;
     }
-    .journey-step:last-child {
-      min-height: 0;
+
+    .journey-step:first-child {
+      justify-content: flex-start;
+      padding-top: clamp(2.5rem, 7vh, 4.5rem);
     }
   }
 
-  /* Mobile progress pill — active item picks up the primary color when the
-     parent's data-active-step matches. Mirrors the diagram highlight. */
-  .journey-mobile-progress[data-active-step='0'] .journey-progress-item[data-progress-item='0'] .journey-progress-dot,
-  .journey-mobile-progress[data-active-step='1'] .journey-progress-item[data-progress-item='1'] .journey-progress-dot,
-  .journey-mobile-progress[data-active-step='2'] .journey-progress-item[data-progress-item='2'] .journey-progress-dot {
-    color: var(--primary);
-    border-color: color-mix(in oklch, var(--primary) 60%, transparent);
-    background-color: color-mix(in oklch, var(--primary) 14%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 10%, transparent);
-  }
-
-  .journey-mobile-progress[data-active-step='0'] .journey-progress-item[data-progress-item='0'] .journey-progress-label,
-  .journey-mobile-progress[data-active-step='1'] .journey-progress-item[data-progress-item='1'] .journey-progress-label,
-  .journey-mobile-progress[data-active-step='2'] .journey-progress-item[data-progress-item='2'] .journey-progress-label {
-    color: var(--primary);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .journey-progress-dot,
-    .journey-progress-label {
-      transition: none;
+  @media (max-width: 389px) {
+    .journey-mobile-scene {
+      margin-inline: -0.25rem;
     }
   }
 </style>
 
 <script>
-  type DiagramEl = HTMLElement & { dataset: { activeStep?: string } };
+  type WorkbenchElement = HTMLElement & { dataset: { activeStep?: string } };
 
   const section = document.getElementById('how-it-works');
-  if (section) {
-    const diagram = section.querySelector<DiagramEl>('[data-journey-diagram]');
-    const progress = section.querySelector<HTMLElement>('[data-journey-progress]');
-    const stepEls = Array.from(
-      section.querySelectorAll<HTMLElement>('[data-journey-step]'),
-    );
+  const workbench = section?.querySelector<WorkbenchElement>('[data-journey-workbench]');
+  const stepElements = section
+    ? Array.from(section.querySelectorAll<HTMLElement>('[data-journey-step]'))
+    : [];
+  const stateElements = workbench
+    ? Array.from(workbench.querySelectorAll<HTMLElement>('[data-workbench-state]'))
+    : [];
 
-    // Either the desktop diagram OR the mobile progress bar is enough to
-    // run the tracker — both share the same data-active-step contract.
-    if ((diagram || progress) && stepEls.length) {
-      let active = Number(
-        diagram?.dataset.activeStep || progress?.dataset.activeStep || '0',
-      );
+  if (workbench && stepElements.length === 3 && stateElements.length === 3) {
+    let activeStep = Number(workbench.dataset.activeStep ?? '0');
 
-      const setActive = (i: number) => {
-        if (i === active) return;
-        active = i;
-        if (diagram) diagram.dataset.activeStep = String(i);
-        if (progress) progress.dataset.activeStep = String(i);
-      };
+    const setActiveStep = (nextStep: number) => {
+      if (nextStep === activeStep) return;
+      activeStep = nextStep;
+      workbench.dataset.activeStep = String(nextStep);
 
-      // Pick the step whose center is closest to the viewport's vertical center.
-      // Runs on scroll/resize; rAF-throttled to keep it cheap.
-      let ticking = false;
-      const update = () => {
-        ticking = false;
-        const viewportCenter = window.innerHeight / 2;
-        let best = 0;
-        let bestDist = Infinity;
-        for (let i = 0; i < stepEls.length; i++) {
-          const r = stepEls[i].getBoundingClientRect();
-          const center = r.top + r.height / 2;
-          const dist = Math.abs(center - viewportCenter);
-          if (dist < bestDist) {
-            bestDist = dist;
-            best = i;
-          }
+      for (const state of stateElements) {
+        const isActive = state.dataset.workbenchState === String(nextStep);
+        state.setAttribute('aria-hidden', String(!isActive));
+        state.inert = !isActive;
+      }
+    };
+
+    let frameRequested = false;
+    const updateActiveStep = () => {
+      frameRequested = false;
+      const viewportCenter = window.innerHeight / 2;
+      let closestStep = 0;
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      for (const [index, stepElement] of stepElements.entries()) {
+        const rect = stepElement.getBoundingClientRect();
+        const distance = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestStep = index;
         }
-        setActive(best);
-      };
+      }
 
-      const onScroll = () => {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(update);
-      };
+      const currentStep = stepElements[activeStep];
+      if (!currentStep || closestStep === activeStep) return;
+      const currentRect = currentStep.getBoundingClientRect();
+      const currentDistance = Math.abs(
+        currentRect.top + currentRect.height / 2 - viewportCenter,
+      );
+      const switchThreshold = window.innerHeight * 0.08;
+      if (currentDistance - closestDistance > switchThreshold) {
+        setActiveStep(closestStep);
+      }
+    };
 
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll);
-      update();
+    const requestUpdate = () => {
+      if (frameRequested) return;
+      frameRequested = true;
+      requestAnimationFrame(updateActiveStep);
+    };
 
-      // Hash support: #demo-section (used by Nav + CtaFooter) — anchor
-      // scroll still works because <SharePanel> keeps id="demo-section".
-      // The scroll listener will pick up the resulting position and set
-      // the diagram to step 2 automatically.
-    }
+    window.addEventListener('scroll', requestUpdate, { passive: true });
+    window.addEventListener('resize', requestUpdate);
+    updateActiveStep();
   }
 </script>
