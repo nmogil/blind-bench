@@ -91,5 +91,21 @@ describe("Claude Code preflight summary", () => {
     expect(summary.status).toBe("blocked");
     expect(summary.steps).toBe(0);
     expect(summary.caveats.join(" ")).toContain("No reviewable steps");
+    expect(formatClaudeCodePreflightText(summary)).not.toContain("safe_to_upload");
+  });
+
+  test("blocks files over the real 8 MiB importer limit", () => {
+    const summary = summarizeClaudeCodePreflight("x".repeat(8 * 1024 * 1024 + 1));
+    expect(summary.status).toBe("blocked");
+    expect(summary.caveats.join(" ")).toMatch(/8 MiB.*limit/i);
+    expect(formatClaudeCodePreflightText(summary)).toContain("no_data_sent");
+  });
+
+  test("reports when parser line limits truncate the file", () => {
+    const line = JSON.stringify({ type: "mode", mode: "normal", sessionId: SID });
+    const summary = summarizeClaudeCodePreflight(Array.from({ length: 50_001 }, () => line).join("\n"));
+    expect(summary.truncated).toBe(true);
+    expect(summary.status).toBe("blocked");
+    expect(summary.caveats.join(" ")).toMatch(/line limit.*split/i);
   });
 });

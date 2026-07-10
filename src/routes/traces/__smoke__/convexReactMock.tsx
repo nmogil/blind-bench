@@ -34,6 +34,7 @@ const FIXTURE_BODY = {
 const noop = () => {};
 const getBodyFn = async () => FIXTURE_BODY;
 const noopMutation = async () => undefined;
+const createImportProject = async () => ({ orgSlug: "test-org", projectId: "test-project" });
 const PAGINATED = {
   results: FIXTURE_STEPS,
   status: "Exhausted" as const,
@@ -49,21 +50,30 @@ export function useAction() {
   return getBodyFn;
 }
 
-export function useMutation() {
+export function useMutation(mutation?: unknown) {
+  try {
+    if (getFunctionName(mutation as never) === "projects:createForImport") {
+      return createImportProject;
+    }
+  } catch {
+    // Keep unrelated component-test mutations as stable no-ops.
+  }
   return noopMutation;
 }
 
 // Fixture rows for the blind reviewer's discovery list (listReviewableTraces).
 export const FIXTURE_REVIEWABLE = [
   {
-    _id: "trace_review_1",
+    token: "opaque-review-token-1",
+    kind: "trace",
     projectName: "Support Router",
     status: "ready",
     stepCount: 12,
     createdAt: 2,
   },
   {
-    _id: "trace_review_2",
+    token: "opaque-review-token-2",
+    kind: "trace",
     projectName: "Refund Agent",
     status: "ready",
     stepCount: 3,
@@ -73,6 +83,17 @@ export const FIXTURE_REVIEWABLE = [
 
 // A blind reviewer's getTrace payload — provenance stripped by the backend
 // (harness/model/product undefined), projectName + usage retained.
+export const FIXTURE_BLIND_MATCHUP = {
+  projectName: "Support Router",
+  divergenceStepIndex: 1,
+  firstSide: "right",
+  leftBlindLabel: "B",
+  rightBlindLabel: "A",
+  comparable: true,
+  winner: null,
+  reasonTags: [],
+};
+
 export const FIXTURE_BLIND_TRACE = {
   _id: "trace_review_1",
   projectName: "Support Router",
@@ -95,13 +116,18 @@ export const FIXTURE_BLIND_TRACE = {
 export function useQuery(query: unknown) {
   try {
     switch (getFunctionName(query as never)) {
-      case "agentTraces:listReviewableTraces":
+      case "agentTraceReviewSessions:listMine":
         return FIXTURE_REVIEWABLE;
       case "agentTraces:getTrace":
+      case "agentTraceReviewSessions:getTrace":
         return FIXTURE_BLIND_TRACE;
+      case "agentTraceReviewSessions:getMatchup":
+        return FIXTURE_BLIND_MATCHUP;
       case "agentTraceReview:myVerdict":
+      case "agentTraceReviewSessions:myVerdict":
         return null;
       case "agentTraceReview:listComments":
+      case "agentTraceReviewSessions:listComments":
         return [];
     }
   } catch {

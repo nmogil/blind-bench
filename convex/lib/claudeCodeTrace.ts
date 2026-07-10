@@ -30,6 +30,7 @@ export interface ClaudeCodeSummary {
   events: number;
   steps: number;
   invalid: number;
+  truncated: boolean;
   invalidLines: number[];
   droppedMeta: number;
   compactions: number;
@@ -207,6 +208,7 @@ export function parseClaudeCodeSession(
       events: events.length,
       steps: steps.length,
       invalid: invalidLines.length,
+      truncated: lines.length > maxLines,
       invalidLines: invalidLines.slice(0, 100),
       droppedMeta,
       compactions,

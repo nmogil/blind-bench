@@ -74,14 +74,19 @@ const BODY_FIELD: Partial<Record<TraceStep["kind"], string>> = {
  */
 export function StepBody({
   agentTraceId,
+  reviewToken,
+  matchupSide,
   stepIndex,
   field,
 }: {
-  agentTraceId: Id<"agentTraces">;
+  agentTraceId?: Id<"agentTraces">;
+  reviewToken?: string;
+  matchupSide?: "left" | "right";
   stepIndex?: number;
   field?: string;
 }) {
-  const getBody = useAction(api.agentTraces.getStepBody);
+  const getOwnerBody = useAction(api.agentTraces.getStepBody);
+  const getReviewBody = useAction(api.agentTraceReviewSessions.getStepBody);
   const [state, setState] = useState<{
     status: "loading" | "done" | "error";
     data?: unknown;
@@ -90,8 +95,12 @@ export function StepBody({
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
-    getBody({ agentTraceId, stepIndex })
-      .then((data) => {
+    const request = reviewToken !== undefined
+      ? getReviewBody({ token: reviewToken, stepIndex, matchupSide })
+      : agentTraceId !== undefined
+        ? getOwnerBody({ agentTraceId, stepIndex })
+        : Promise.reject(new Error("Missing trace access scope"));
+    request.then((data) => {
         if (!cancelled) setState({ status: "done", data });
       })
       .catch(() => {
@@ -100,7 +109,7 @@ export function StepBody({
     return () => {
       cancelled = true;
     };
-  }, [agentTraceId, stepIndex, getBody]);
+  }, [agentTraceId, reviewToken, matchupSide, stepIndex, getOwnerBody, getReviewBody]);
 
   if (state.status === "loading") {
     return <Skeleton className="h-16 w-full" />;
@@ -169,10 +178,14 @@ function metaBits(step: TraceStep): string[] {
 function StepCard({
   step,
   agentTraceId,
+  reviewToken,
+  matchupSide,
   comments,
 }: {
   step: TraceStep;
-  agentTraceId: Id<"agentTraces">;
+  agentTraceId?: Id<"agentTraces">;
+  reviewToken?: string;
+  matchupSide?: "left" | "right";
   /** When provided, comment affordances render. Undefined = read-only. */
   comments?: TraceComment[];
 }) {
@@ -248,6 +261,8 @@ function StepCard({
         <div className={cn("px-3 pb-3", !expanded && "hidden")}>
           <StepBody
             agentTraceId={agentTraceId}
+            reviewToken={reviewToken}
+            matchupSide={matchupSide}
             stepIndex={step.stepIndex}
             field={BODY_FIELD[step.kind]}
           />
@@ -257,6 +272,7 @@ function StepCard({
       {comments !== undefined && (
         <StepComments
           agentTraceId={agentTraceId}
+          reviewToken={reviewToken}
           step={step}
           comments={comments}
         />
@@ -278,14 +294,17 @@ const LABEL_TONE: Record<string, string> = {
 
 function StepComments({
   agentTraceId,
+  reviewToken,
   step,
   comments,
 }: {
-  agentTraceId: Id<"agentTraces">;
+  agentTraceId?: Id<"agentTraces">;
+  reviewToken?: string;
   step: TraceStep;
   comments: TraceComment[];
 }) {
-  const addComment = useMutation(api.agentTraceReview.addComment);
+  const addOwnerComment = useMutation(api.agentTraceReview.addComment);
+  const addReviewComment = useMutation(api.agentTraceReviewSessions.addComment);
   const deleteComment = useMutation(api.agentTraceReview.deleteComment);
 
   const [composing, setComposing] = useState(false);
@@ -306,16 +325,28 @@ function StepComments({
     setBusy(true);
     setError("");
     try {
-      await addComment({
-        agentTraceId,
-        target:
-          step.kind === "tool_call"
-            ? { kind: "tool_call", stepIndex: step.stepIndex }
-            : { kind: "step", stepIndex: step.stepIndex },
-        comment: body,
-        label,
-        tags: tags.length ? tags : undefined,
-      });
+      const target = step.kind === "tool_call"
+        ? { kind: "tool_call" as const, stepIndex: step.stepIndex }
+        : { kind: "step" as const, stepIndex: step.stepIndex };
+      if (reviewToken !== undefined) {
+        await addReviewComment({
+          token: reviewToken,
+          target,
+          comment: body,
+          label,
+          tags: tags.length ? tags : undefined,
+        });
+      } else if (agentTraceId !== undefined) {
+        await addOwnerComment({
+          agentTraceId,
+          target,
+          comment: body,
+          label,
+          tags: tags.length ? tags : undefined,
+        });
+      } else {
+        throw new Error("Missing trace access scope");
+      }
       setBody("");
       setTags([]);
       setComposing(false);
@@ -474,40 +505,115 @@ function StepComments({
 
 export function StepList({
   agentTraceId,
+  reviewToken,
+  matchupSide,
   comments,
   divergenceStepIndex,
 }: {
-  agentTraceId: Id<"agentTraces">;
+  agentTraceId?: Id<"agentTraces">;
+  reviewToken?: string;
+  matchupSide?: "left" | "right";
   /** When provided, per-step comment affordances render. */
   comments?: TraceComment[];
   /** Draws a "paths diverge here" marker before this step (matchup view). */
   divergenceStepIndex?: number;
 }) {
-  const { results, status, loadMore } = usePaginatedQuery(
+  if (reviewToken !== undefined && matchupSide !== undefined) {
+    return <MatchupTokenSteps token={reviewToken} side={matchupSide} divergenceStepIndex={divergenceStepIndex} />;
+  }
+  if (reviewToken !== undefined) {
+    return <TraceTokenSteps token={reviewToken} comments={comments} divergenceStepIndex={divergenceStepIndex} />;
+  }
+  if (agentTraceId !== undefined) {
+    return <OwnerSteps agentTraceId={agentTraceId} comments={comments} divergenceStepIndex={divergenceStepIndex} />;
+  }
+  return <p className="text-sm text-destructive">This trajectory is unavailable.</p>;
+}
+
+function OwnerSteps({
+  agentTraceId,
+  comments,
+  divergenceStepIndex,
+}: {
+  readonly agentTraceId: Id<"agentTraces">;
+  readonly comments?: TraceComment[];
+  readonly divergenceStepIndex?: number;
+}) {
+  const page = usePaginatedQuery(
     api.agentTraces.listSteps,
     { agentTraceId },
     { initialNumItems: 50 },
   );
+  return <StepListResults {...page} agentTraceId={agentTraceId} comments={comments} divergenceStepIndex={divergenceStepIndex} />;
+}
 
+function TraceTokenSteps({
+  token,
+  comments,
+  divergenceStepIndex,
+}: {
+  readonly token: string;
+  readonly comments?: TraceComment[];
+  readonly divergenceStepIndex?: number;
+}) {
+  const page = usePaginatedQuery(
+    api.agentTraceReviewSessions.listSteps,
+    { token },
+    { initialNumItems: 50 },
+  );
+  return <StepListResults {...page} reviewToken={token} comments={comments} divergenceStepIndex={divergenceStepIndex} />;
+}
+
+function MatchupTokenSteps({
+  token,
+  side,
+  divergenceStepIndex,
+}: {
+  readonly token: string;
+  readonly side: "left" | "right";
+  readonly divergenceStepIndex?: number;
+}) {
+  const page = usePaginatedQuery(
+    api.agentTraceReviewSessions.listMatchupSteps,
+    { token, side },
+    { initialNumItems: 50 },
+  );
+  return <StepListResults {...page} reviewToken={token} matchupSide={side} divergenceStepIndex={divergenceStepIndex} />;
+}
+
+function StepListResults({
+  results,
+  status,
+  loadMore,
+  agentTraceId,
+  reviewToken,
+  matchupSide,
+  comments,
+  divergenceStepIndex,
+}: {
+  readonly results: ReadonlyArray<TraceStep>;
+  readonly status: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
+  readonly loadMore: (numItems: number) => void;
+  readonly agentTraceId?: Id<"agentTraces">;
+  readonly reviewToken?: string;
+  readonly matchupSide?: "left" | "right";
+  readonly comments?: TraceComment[];
+  readonly divergenceStepIndex?: number;
+}) {
   if (status === "LoadingFirstPage") {
     return (
       <div className="space-y-2">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-11 w-full" />
-        ))}
+        {[0, 1, 2, 3, 4].map((index) => <Skeleton key={index} className="h-11 w-full" />)}
       </div>
     );
   }
-
   if (results.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-        No steps to show yet. If this trajectory was just imported, it may still
-        be processing — refresh in a moment.
+        No steps to show yet. If this trajectory was just imported, it may still be processing — refresh in a moment.
       </p>
     );
   }
-
   return (
     <div className="space-y-3">
       <ol className="space-y-2">
@@ -517,27 +623,18 @@ export function StepList({
             <StepCard
               step={step}
               agentTraceId={agentTraceId}
-              comments={
-                comments === undefined
-                  ? undefined
-                  : comments.filter(
-                      (c) =>
-                        c.target.kind !== "trace" &&
-                        c.target.stepIndex === step.stepIndex,
-                    )
-              }
+              reviewToken={reviewToken}
+              matchupSide={matchupSide}
+              comments={comments === undefined
+                ? undefined
+                : comments.filter((comment) =>
+                    comment.target.kind !== "trace" && comment.target.stepIndex === step.stepIndex)}
             />
           </Fragment>
         ))}
       </ol>
-
       {status === "CanLoadMore" && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => loadMore(50)}
-        >
+        <Button type="button" variant="outline" size="sm" onClick={() => loadMore(50)}>
           Load more steps
         </Button>
       )}

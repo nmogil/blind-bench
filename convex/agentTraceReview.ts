@@ -11,7 +11,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { requireProjectRole } from "./lib/auth";
+import { isBlindReviewer, requireProjectRole } from "./lib/auth";
+import { ensureMatchupSessionsForProjectReviewers } from "./lib/traceReviewSessions";
 
 const LABEL = v.union(
   v.literal("suggestion"),
@@ -48,6 +49,9 @@ async function traceForReview(
   const trace = await ctx.db.get(agentTraceId);
   if (!trace) throw new Error("Trace not found.");
   const { userId } = await requireProjectRole(ctx, trace.projectId, [...REVIEW_ROLES]);
+  if (await isBlindReviewer(ctx, trace.projectId)) {
+    throw new Error("Use an opaque review session for trajectory feedback.");
+  }
   return { trace, userId };
 }
 
@@ -183,15 +187,42 @@ export const createMatchup = mutation({
       throw new Error("Both traces must be in the same project.");
     }
     await requireProjectRole(ctx, left.projectId, ["owner", "editor"]);
-    return await ctx.db.insert("agentTraceMatchups", {
+    if (!Number.isInteger(args.divergenceStepIndex) || args.divergenceStepIndex < 0) {
+      throw new Error("Divergence step must be a non-negative integer.");
+    }
+    const [leftStep, rightStep] = await Promise.all([
+      ctx.db
+        .query("agentTraceSteps")
+        .withIndex("by_trace_and_index", (q) =>
+          q.eq("agentTraceId", args.leftTraceId).eq("stepIndex", args.divergenceStepIndex),
+        )
+        .unique(),
+      ctx.db
+        .query("agentTraceSteps")
+        .withIndex("by_trace_and_index", (q) =>
+          q.eq("agentTraceId", args.rightTraceId).eq("stepIndex", args.divergenceStepIndex),
+        )
+        .unique(),
+    ]);
+    if (!leftStep || !rightStep) {
+      throw new Error("Both traces must contain the divergence step.");
+    }
+    const comparable = leftStep.prefixHash === rightStep.prefixHash;
+    const matchupId = await ctx.db.insert("agentTraceMatchups", {
       projectId: left.projectId,
       leftTraceId: args.leftTraceId,
       rightTraceId: args.rightTraceId,
       divergenceStepIndex: args.divergenceStepIndex,
       leftBlindLabel: args.leftBlindLabel,
       rightBlindLabel: args.rightBlindLabel,
-      reasonTags: [],
+      prefixHash: comparable ? leftStep.prefixHash : undefined,
+      comparabilityStatus: comparable ? "valid" : "invalid",
+      invalidReason: comparable ? undefined : "prefix_mismatch",
     });
+    if (comparable) {
+      await ensureMatchupSessionsForProjectReviewers(ctx, matchupId, left.projectId);
+    }
+    return matchupId;
   },
 });
 
@@ -206,10 +237,32 @@ export const decideMatchup = mutation({
     const matchup = await ctx.db.get(args.matchupId);
     if (!matchup) throw new Error("Matchup not found.");
     const { userId } = await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
-    await ctx.db.patch(args.matchupId, {
+    if (await isBlindReviewer(ctx, matchup.projectId)) {
+      throw new Error("Use an opaque review session for matchup decisions.");
+    }
+    if (matchup.comparabilityStatus !== "valid") {
+      throw new Error("This matchup is not comparable because its prefixes differ.");
+    }
+    const existing = await ctx.db
+      .query("agentTraceMatchupDecisions")
+      .withIndex("by_matchup_and_user", (q) =>
+        q.eq("matchupId", args.matchupId).eq("userId", userId),
+      )
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        winner: args.winner,
+        reasonTags: args.reasonTags,
+        decidedAt: Date.now(),
+      });
+      return existing._id;
+    }
+    return await ctx.db.insert("agentTraceMatchupDecisions", {
+      matchupId: args.matchupId,
+      projectId: matchup.projectId,
+      userId,
       winner: args.winner,
       reasonTags: args.reasonTags,
-      userId,
       decidedAt: Date.now(),
     });
   },
@@ -225,8 +278,17 @@ export const getMatchup = query({
   handler: async (ctx, args) => {
     const matchup = await ctx.db.get(args.matchupId);
     if (!matchup) return null;
-    await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
+    const { userId } = await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
+    if (await isBlindReviewer(ctx, matchup.projectId)) {
+      throw new Error("Use an opaque review session for matchup access.");
+    }
     const project = await ctx.db.get(matchup.projectId);
+    const decision = await ctx.db
+      .query("agentTraceMatchupDecisions")
+      .withIndex("by_matchup_and_user", (q) =>
+        q.eq("matchupId", args.matchupId).eq("userId", userId),
+      )
+      .unique();
     return {
       _id: matchup._id,
       projectName: project?.name ?? "Project",
@@ -235,8 +297,10 @@ export const getMatchup = query({
       divergenceStepIndex: matchup.divergenceStepIndex,
       leftBlindLabel: matchup.leftBlindLabel,
       rightBlindLabel: matchup.rightBlindLabel,
-      winner: matchup.winner ?? null,
-      reasonTags: matchup.reasonTags,
+      comparable: matchup.comparabilityStatus === "valid",
+      invalidReason: matchup.invalidReason,
+      winner: decision?.winner ?? null,
+      reasonTags: decision?.reasonTags ?? [],
     };
   },
 });

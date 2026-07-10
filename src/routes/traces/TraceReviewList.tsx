@@ -1,9 +1,8 @@
 /**
  * #271 (M31): blind reviewer's cross-project discovery list of trajectories to
  * review. Rendered under EvalLayout at /eval/traces — no org/project context.
- * Reads everything from `listReviewableTraces`; for blind reviewers the backend
- * strips product/harness/model, so those rows show only the project name and
- * step count. No real ids or provenance attributes reach the DOM.
+ * Reads opaque review sessions only. Raw trace/matchup IDs never reach the
+ * reviewer payload, route, or DOM.
  */
 import { useQuery } from "convex/react";
 import { Link } from "react-router-dom";
@@ -26,7 +25,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function TraceReviewList() {
-  const traces = useQuery(api.agentTraces.listReviewableTraces, {});
+  const sessions = useQuery(api.agentTraceReviewSessions.listMine, {});
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -42,13 +41,13 @@ export function TraceReviewList() {
       </header>
 
       <div className="mt-6">
-        {traces === undefined ? (
+        {sessions === undefined ? (
           <div className="space-y-2">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
-        ) : traces.length === 0 ? (
+        ) : sessions.length === 0 ? (
           <div className="max-w-lg space-y-3 rounded-lg border border-dashed p-6">
             <p className="text-sm">
               No trajectories assigned to review yet. When a teammate shares an
@@ -57,38 +56,29 @@ export function TraceReviewList() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {traces.map((t) => {
-              const provenance = [t.product, t.harnessName, t.model].filter(
-                Boolean,
-              );
-              return (
-                <li key={t._id}>
-                  <Link
-                    to={`/eval/traces/${t._id}`}
-                    className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {t.projectName}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {provenance.length > 0 && (
-                          <>{provenance.join(" · ")} · </>
-                        )}
-                        {t.stepCount} {t.stepCount === 1 ? "step" : "steps"}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <StatusBadge status={t.status} />
-                      <ArrowRight
-                        aria-hidden="true"
-                        className="h-4 w-4 text-muted-foreground"
-                      />
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
+            {sessions.map((session) => (
+              <li key={session.token}>
+                <Link
+                  to={session.kind === "trace"
+                    ? `/eval/traces/${session.token}`
+                    : `/eval/matchups/${session.token}`}
+                  className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted/50"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{session.projectName}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {session.kind === "trace"
+                        ? `${session.stepCount ?? 0} ${(session.stepCount ?? 0) === 1 ? "step" : "steps"}`
+                        : "A/B trajectory matchup"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <StatusBadge status={session.status} />
+                    <ArrowRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              </li>
+            ))}
           </ul>
         )}
       </div>

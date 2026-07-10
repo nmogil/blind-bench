@@ -14,7 +14,7 @@ tags:
 
 > Part of [[MOC - Blind Bench]]
 
-> "Git meets Google Docs" for collaborative prompt engineering
+> Ingestion-neutral blind human review for completed AI runs
 
 ---
 
@@ -40,20 +40,19 @@ tags:
 
 ## Overview
 
-**Blind Bench** is a collaborative prompt engineering platform that enables teams to iteratively refine prompts through structured human evaluation and LLM-assisted improvements.
+**Blind Bench** is the execution-neutral blind human-review layer for completed AI runs. Customers execute prompts and agents in their existing harnesses, gateways, CI, or observability stack; Blind Bench imports the resulting evidence, removes provenance from reviewer-facing projections, captures independent judgment, and exports reusable evaluation artifacts.
 
-### Core Workflow
+### Core Workflow (M33 direction of record)
 
 ```
-1. CREATE        2. RUN            3. EVALUATE         4. OPTIMIZE
-──────────       ────────          ──────────          ──────────
-User creates     Prompt runs       Collaborators       System generates
-prompt with      3x against        review outputs      new prompt from
-variables        a test case       blind, leave        all feedback
-                                   feedback
-
-                        ◄────────── REPEAT ──────────►
+1. EXECUTE ELSEWHERE   2. IMPORT          3. REVIEW BLIND     4. REUSE
+───────────────────    ─────────          ───────────────     ────────
+Pi, Claude Code,       CSV, OTLP, native  Experts inspect     Verdicts become
+CI, gateways, and      JSON, or harness   opaque trajectory   regression cases,
+customer runtimes      session JSONL      review sessions     evidence, or exports
 ```
+
+The original prompt playground remains supported as a secondary authoring and experimentation tool. It is not the first-run path or the architectural center. Blind Bench does **not** provision sandboxes, execute arbitrary harness code, store runtime credentials, or own runtime cleanup and compute billing.
 
 ### Tech Stack
 
@@ -64,7 +63,8 @@ variables        a test case       blind, leave        all feedback
 | Database | Convex DB |
 | Auth | Convex Auth |
 | File Storage | Convex file storage |
-| LLM Provider | OpenRouter (BYOK per org) |
+| Optional playground LLM provider | OpenRouter (BYOK per org; secondary flow) |
+| Primary ingest boundary | Native `eval-record` v1 plus CSV, OTLP, Pi, and Claude Code adapters |
 | Observability | TODO — action-layer seam preserved |
 
 ---

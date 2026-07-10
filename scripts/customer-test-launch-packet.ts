@@ -53,6 +53,7 @@ export async function main(argv: string[]): Promise<number> {
   const packet = buildCustomerTestLaunchPacket({
     outDir: args.outDir,
     customerLabel: args.customerLabel,
+    generatedAt: new Date().toISOString(),
   });
   writeCustomerTestLaunchPacket(packet);
   process.stdout.write(args.json ? formatCustomerTestLaunchPacketJson(packet) : formatCustomerTestLaunchPacketMarkdown(packet));

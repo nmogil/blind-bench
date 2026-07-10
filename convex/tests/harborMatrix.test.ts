@@ -38,7 +38,7 @@ async function seed(t: ReturnType<typeof convexTest>) {
 }
 
 describe("#268 Harbor matrix → spine → blind review (real trajectories)", () => {
-  test("3 combos of the same task import and are blind-reviewable side-by-side", async () => {
+  test("3 combos import into opaque review sessions and invalid A/B prefixes are rejected", async () => {
     const t = convexTest(schema);
     const { ids, asOwner, asBlind } = await seed(t);
 
@@ -54,14 +54,17 @@ describe("#268 Harbor matrix → spine → blind review (real trajectories)", ()
     }
 
     // A blind reviewer discovers all 3, provenance stripped (no model/harness).
-    const list = await asBlind.query(api.agentTraces.listReviewableTraces, {});
-    expect(list).toHaveLength(3);
+    const list = await asBlind.query(api.agentTraceReviewSessions.listMine, {});
+    const traceSessions = list.filter((session) => session.kind === "trace");
+    expect(traceSessions).toHaveLength(3);
     expect(JSON.stringify(list)).not.toContain("claude-opus");
     expect(JSON.stringify(list)).not.toContain("claude_code");
+    expect(JSON.stringify(list)).not.toContain("agentTraceId");
 
-    // Blind step read on the winner (Opus solved) — steps render, no provenance.
-    const page = await asBlind.query(api.agentTraces.listSteps, {
-      agentTraceId: persisted.opus!,
+    const token = traceSessions[0]?.token;
+    if (!token) throw new Error("Missing opaque review session");
+    const page = await asBlind.query(api.agentTraceReviewSessions.listSteps, {
+      token,
       paginationOpts: { numItems: 50, cursor: null },
     });
     expect(page.page.length).toBeGreaterThan(0);
@@ -75,14 +78,9 @@ describe("#268 Harbor matrix → spine → blind review (real trajectories)", ()
       leftBlindLabel: "Trajectory A",
       rightBlindLabel: "Trajectory B",
     });
-    await asBlind.mutation(api.agentTraceReview.decideMatchup, {
-      matchupId,
-      winner: "left",
-      reasonTags: ["accuracy"],
-    });
-    const m = await asBlind.query(api.agentTraceReview.getMatchup, { matchupId });
-    expect(m?.winner).toBe("left");
-    // No provenance in the matchup payload — reviewer can't see which model won.
-    expect(JSON.stringify(m)).not.toContain("claude");
+    const matchup = await t.run(async (ctx) => await ctx.db.get(matchupId));
+    expect(matchup?.comparabilityStatus).toBe("invalid");
+    expect(matchup?.invalidReason).toBe("prefix_mismatch");
+    expect((await asBlind.query(api.agentTraceReviewSessions.listMine, {})).filter((session) => session.kind === "matchup")).toHaveLength(0);
   });
 });

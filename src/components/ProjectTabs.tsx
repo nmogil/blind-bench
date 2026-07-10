@@ -4,12 +4,16 @@ import { cn } from "@/lib/utils";
 import { Settings } from "lucide-react";
 
 const tabs = [
-  { label: "Editor", path: "versions" },
-  { label: "Run", path: "run" },
-  { label: "Test Cases", path: "test-cases" },
-  { label: "Evaluate", path: "evaluate" },
+  { label: "Import", path: "import" },
+  { label: "Trajectories", path: "traces" },
+  { label: "Review", path: "evaluate" },
   { label: "Export", path: "export" },
-  { label: "Ingest", path: "ingest" },
+  { label: "Live ingest", path: "ingest" },
+  // The original prompt playground remains available, but imported behavior is
+  // the primary product flow.
+  { label: "Playground", path: "versions" },
+  { label: "Run prompt", path: "run" },
+  { label: "Test Cases", path: "test-cases" },
   { label: "History", path: "history" },
 ];
 
@@ -29,12 +33,13 @@ export function ProjectTabs() {
           // Evaluators: hide authoring/setup tabs
           if (
             role === "evaluator" &&
-            (tab.label === "Run" ||
-              tab.label === "Editor" ||
+            (tab.label === "Import" ||
+              tab.label === "Playground" ||
+              tab.label === "Run prompt" ||
               tab.label === "Test Cases" ||
-              tab.label === "Evaluate" ||
+              tab.label === "Review" ||
               tab.label === "Export" ||
-              tab.label === "Ingest")
+              tab.label === "Live ingest")
           )
             return null;
 

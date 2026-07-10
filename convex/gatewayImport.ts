@@ -134,11 +134,11 @@ export const importGatewayLogs = action({
     sidecarJson: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<ImportGatewayLogsResult> => {
-    // UTF-16 char length, not exact bytes — a cheap upper-bound guard before
-    // we do any work.
-    if (args.jsonl.length > DEFAULT_LIMITS.maxBytes) {
+    await ctx.runQuery(internal.agentTraces.authorizePersist, { projectId: args.projectId });
+    const inputBytes = new TextEncoder().encode(args.jsonl).byteLength;
+    if (inputBytes > DEFAULT_LIMITS.maxBytes) {
       throw new Error(
-        `Payload too large (${args.jsonl.length} chars, limit ${DEFAULT_LIMITS.maxBytes}). Split the export into smaller batches.`,
+        `Payload too large (${inputBytes} bytes, limit ${DEFAULT_LIMITS.maxBytes}). Split the export into smaller batches.`,
       );
     }
 
@@ -158,6 +158,9 @@ export const importGatewayLogs = action({
       DEFAULT_LIMITS,
       sidecarMap,
     );
+    if (truncated) {
+      throw new Error(`Payload exceeds the ${DEFAULT_LIMITS.maxLines}-line parser limit. Split the export and retry.`);
+    }
 
     const { imported, deduped, newRows }: InsertImportRowsResult =
       await ctx.runMutation(internal.gatewayImport.insertImportRows, {

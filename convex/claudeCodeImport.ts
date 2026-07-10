@@ -33,13 +33,18 @@ export const importClaudeCodeSession = action({
     jsonl: v.string(),
   },
   handler: async (ctx, args): Promise<ImportResult> => {
-    if (args.jsonl.length > MAX_BYTES) {
+    await ctx.runQuery(internal.agentTraces.authorizePersist, { projectId: args.projectId });
+    const inputBytes = new TextEncoder().encode(args.jsonl).byteLength;
+    if (inputBytes > MAX_BYTES) {
       throw new Error(
-        `Session too large (${args.jsonl.length} chars, limit ${MAX_BYTES}). Split the transcript or trim old turns.`,
+        `Session too large (${inputBytes} bytes, limit ${MAX_BYTES}). Split the transcript or trim old turns.`,
       );
     }
 
     const { sessionId, trace, summary } = parseClaudeCodeSession(args.jsonl);
+    if (summary.truncated) {
+      throw new Error("Session exceeds the 50,000-line parser limit. Split the transcript and retry.");
+    }
 
     // Persist through the spine first — it dedups by trace id (`cc-<sessionId>`),
     // so a re-upload short-circuits before any storage write. Auth (project

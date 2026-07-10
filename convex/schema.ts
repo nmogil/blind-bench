@@ -636,8 +636,12 @@ const schema = defineSchema({
       v.literal("promptlayer"),
       v.literal("manual_paste"),
       v.literal("cloudflare_ai_gateway"),
-      // #265: Claude Code session .jsonl upload — first trajectory ingestion.
+      // Coding-harness session JSONL uploads — imported artifacts only; Blind
+      // Bench does not execute either harness.
       v.literal("claude_code"),
+      v.literal("pi"),
+      // Flat mapped CSV rows normalize into the same trajectory spine.
+      v.literal("csv"),
       // #263: OTLP Gen-AI span push (Cloudflare AI Gateway + any OTel source).
       v.literal("otlp"),
       // Native `eval-record` v1 JSON push — Blind Bench's own public ingest schema.
@@ -792,6 +796,10 @@ const schema = defineSchema({
   agentTraceSteps: defineTable({
     agentTraceId: v.id("agentTraces"),
     stepIndex: v.number(),
+    // SHA-256 chain of every normalized step before this one. Matchup
+    // creation compares this value at the declared divergence to prove both
+    // candidates share an identical prompt/trajectory prefix.
+    prefixHash: v.string(),
     kind: v.union(
       v.literal("message"),
       v.literal("tool_call"),
@@ -895,14 +903,40 @@ const schema = defineSchema({
     divergenceStepIndex: v.number(),
     leftBlindLabel: v.string(),
     rightBlindLabel: v.string(),
-    userId: v.optional(v.id("users")),
-    winner: v.optional(
-      v.union(
-        v.literal("left"),
-        v.literal("right"),
-        v.literal("tie"),
-        v.literal("skip"),
-      ),
+    prefixHash: v.optional(v.string()),
+    comparabilityStatus: v.union(v.literal("valid"), v.literal("invalid")),
+    invalidReason: v.optional(v.literal("prefix_mismatch")),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_left", ["leftTraceId"]),
+
+  // One immutable logical decision per (matchup, reviewer). Reviewers can
+  // revise their own row, but never overwrite another reviewer's judgment.
+  agentTraceReviewSessions: defineTable({
+    projectId: v.id("projects"),
+    reviewerUserId: v.id("users"),
+    token: v.string(),
+    kind: v.union(v.literal("trace"), v.literal("matchup")),
+    // Session-scoped randomized presentation order prevents one global
+    // left/right ordering from biasing every reviewer.
+    leftFirst: v.optional(v.boolean()),
+    agentTraceId: v.optional(v.id("agentTraces")),
+    matchupId: v.optional(v.id("agentTraceMatchups")),
+  })
+    .index("by_token", ["token"])
+    .index("by_reviewer", ["reviewerUserId"])
+    .index("by_trace_and_reviewer", ["agentTraceId", "reviewerUserId"])
+    .index("by_matchup_and_reviewer", ["matchupId", "reviewerUserId"]),
+
+  agentTraceMatchupDecisions: defineTable({
+    matchupId: v.id("agentTraceMatchups"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    winner: v.union(
+      v.literal("left"),
+      v.literal("right"),
+      v.literal("tie"),
+      v.literal("skip"),
     ),
     reasonTags: v.array(
       v.union(
@@ -916,10 +950,10 @@ const schema = defineSchema({
         v.literal("other"),
       ),
     ),
-    decidedAt: v.optional(v.number()),
+    decidedAt: v.number(),
   })
-    .index("by_project", ["projectId"])
-    .index("by_left", ["leftTraceId"]),
+    .index("by_matchup", ["matchupId"])
+    .index("by_matchup_and_user", ["matchupId", "userId"]),
 
   // #53 (export bridge): a generated training-data export. The JSONL is in
   // storage; this row tracks provenance + counts and gates the download to a

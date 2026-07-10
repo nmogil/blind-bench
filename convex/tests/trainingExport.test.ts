@@ -51,6 +51,16 @@ describe("#53 training-export data-boundary gate", () => {
     expect(excluded[0]?.reason).toBe("degenerate");
   });
 
+  test("invalid SFT roles or a missing final assistant turn are excluded", () => {
+    const rows: ClassifiedRow[] = [
+      { row: { kind: "sft", messages: [{ role: "developer", content: "x" }, { role: "assistant", content: "ok" }] }, privacyClass: "public" },
+      { row: { kind: "sft", messages: [{ role: "user", content: "unfinished" }] }, privacyClass: "public" },
+    ];
+    const { included, excluded } = gateRows(rows);
+    expect(included).toHaveLength(0);
+    expect(excluded.map((row) => row.reason)).toEqual(["invalid_sft_shape", "invalid_sft_shape"]);
+  });
+
   test("empty rows are excluded with a reason, never silently dropped", () => {
     const rows: ClassifiedRow[] = [
       { row: dpo({ chosen: "   " }), privacyClass: "public" },

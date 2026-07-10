@@ -1,26 +1,36 @@
 import { test, expect } from "@playwright/experimental-ct-react";
 import { MemoryRouter } from "react-router-dom";
-import type { Id } from "../../../convex/_generated/dataModel";
-import { TraceReviewBody } from "./TraceReviewBody";
+import { TraceTokenMatchupBody } from "./TraceTokenMatchupBody";
+import { TraceTokenReviewBody } from "./TraceTokenReviewBody";
 
-// #271 render smoke for the BLIND reviewer's review page: the getTrace payload
-// has provenance stripped, so the surface must show "Trajectory" (no harness/
-// model), the bias-reduction framing, the verdict control, and the steps.
-test("blind review page: no provenance, bias framing, verdict, and steps render", async ({
+// Reviewer smoke uses the opaque-token API surface, not a raw agentTraceId.
+test("blind token review: no provenance, bias framing, verdict, and steps render", async ({
   mount,
 }) => {
-  const cmp = await mount(
+  const component = await mount(
     <MemoryRouter>
-      <TraceReviewBody
-        agentTraceId={"t" as Id<"agentTraces">}
-        backTo="/eval/traces"
-        backLabel="Trajectories to review"
-      />
+      <TraceTokenReviewBody token="opaque-review-token" />
     </MemoryRouter>,
   );
-  await expect(cmp).toContainText("Trajectory"); // header, no provenance
-  await expect(cmp).toContainText("Blinding reduces bias; it is not anonymity");
-  await expect(cmp).toContainText("Your verdict");
-  await expect(cmp).toContainText("Acceptable");
-  await expect(cmp).toContainText("run_command"); // steps render via StepList
+  await expect(component).toContainText("Trajectory");
+  await expect(component).toContainText("Blinding reduces bias; it is not anonymity");
+  await expect(component).toContainText("Your verdict");
+  await expect(component).toContainText("Acceptable");
+  await expect(component).toContainText("run_command");
+  await expect(component.locator("[data-trace-id], [data-step-id]")).toHaveCount(0);
+});
+
+test("blind matchup uses session-scoped A/B order without provenance IDs", async ({ mount }) => {
+  const component = await mount(
+    <MemoryRouter>
+      <TraceTokenMatchupBody token="opaque-matchup-token" />
+    </MemoryRouter>,
+  );
+  await expect(component.getByRole("heading", { name: "Which next move is better?" })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "A", exact: true })).toBeVisible();
+  await expect(component.getByRole("heading", { name: "B", exact: true })).toBeVisible();
+  await expect(component.getByRole("button", { name: "A better" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "B better" })).toBeVisible();
+  await expect(component.locator("[data-trace-id], [data-step-id], [data-matchup-id]")).toHaveCount(0);
+  await expect(component).not.toContainText(/Claude|OpenAI|Pi session/i);
 });

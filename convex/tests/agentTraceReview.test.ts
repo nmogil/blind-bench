@@ -56,14 +56,21 @@ async function persist(asUser: Ident, projectId: Id<"projects">, run: JeevesClog
   return res.agentTraceId;
 }
 
+async function reviewToken(asUser: Ident, kind: "trace" | "matchup" = "trace") {
+  const sessions = await asUser.query(api.agentTraceReviewSessions.listMine, {});
+  const session = sessions.find((candidate) => candidate.kind === kind);
+  if (!session) throw new Error(`Missing ${kind} review session`);
+  return session.token;
+}
+
 describe("#267 step-level trace review", () => {
   test("blind reviewer comments on a tool-call step; owner sees it anchored correctly", async () => {
     const t = convexTest(schema);
     const { ids, asOwner, asBlind } = await seed(t);
     const traceId = await persist(asOwner, ids.projectId, baseRun);
 
-    await asBlind.mutation(api.agentTraceReview.addComment, {
-      agentTraceId: traceId,
+    await asBlind.mutation(api.agentTraceReviewSessions.addComment, {
+      token: await reviewToken(asBlind),
       target: { kind: "tool_call", stepIndex: 3 }, // the create_escalation call
       comment: "Escalating on hardship without verifying is risky.",
       label: "issue",
@@ -80,10 +87,10 @@ describe("#267 step-level trace review", () => {
   test("out-of-range step anchor is rejected", async () => {
     const t = convexTest(schema);
     const { ids, asOwner, asBlind } = await seed(t);
-    const traceId = await persist(asOwner, ids.projectId, baseRun);
+    await persist(asOwner, ids.projectId, baseRun);
     await expect(
-      asBlind.mutation(api.agentTraceReview.addComment, {
-        agentTraceId: traceId,
+      asBlind.mutation(api.agentTraceReviewSessions.addComment, {
+        token: await reviewToken(asBlind),
         target: { kind: "step", stepIndex: 99 },
         comment: "no such step",
         label: "thought",
@@ -96,10 +103,11 @@ describe("#267 step-level trace review", () => {
     const { ids, asOwner, asBlind } = await seed(t);
     const traceId = await persist(asOwner, ids.projectId, baseRun);
 
-    await asBlind.mutation(api.agentTraceReview.setVerdict, { agentTraceId: traceId, rating: "weak" });
-    await asBlind.mutation(api.agentTraceReview.setVerdict, { agentTraceId: traceId, rating: "acceptable", note: "changed my mind" });
+    const token = await reviewToken(asBlind);
+    await asBlind.mutation(api.agentTraceReviewSessions.setVerdict, { token, rating: "weak" });
+    await asBlind.mutation(api.agentTraceReviewSessions.setVerdict, { token, rating: "acceptable", note: "changed my mind" });
 
-    const mine = await asBlind.query(api.agentTraceReview.myVerdict, { agentTraceId: traceId });
+    const mine = await asBlind.query(api.agentTraceReviewSessions.myVerdict, { token });
     expect(mine?.rating).toBe("acceptable");
     const count = await t.run(async (ctx) =>
       (await ctx.db.query("agentTraceVerdicts").withIndex("by_trace", (q) => q.eq("agentTraceId", traceId)).collect()).length,
@@ -112,14 +120,13 @@ describe("#267 step-level trace review", () => {
     const { ids, asOwner, asBlind } = await seed(t);
     await persist(asOwner, ids.projectId, baseRun);
 
-    const list = await asBlind.query(api.agentTraces.listReviewableTraces, {});
+    const list = await asBlind.query(api.agentTraceReviewSessions.listMine, {});
     expect(list).toHaveLength(1);
     expect(list[0]?.projectName).toBe("P");
     expect(list[0]?.stepCount).toBeGreaterThan(0);
-    // Blinded: no harness/model/product for the evaluator.
-    expect(list[0]?.harnessName).toBeUndefined();
-    expect(list[0]?.model).toBeUndefined();
+    expect(list[0]?.kind).toBe("trace");
     expect(JSON.stringify(list)).not.toContain("jeeves_clog");
+    expect(JSON.stringify(list)).not.toContain("agentTraceId");
   });
 
   test("step-level pairwise: owner sets up, blind reviewer picks the winner", async () => {
@@ -128,7 +135,7 @@ describe("#267 step-level trace review", () => {
     const left = await persist(asOwner, ids.projectId, baseRun);
     const right = await persist(asOwner, ids.projectId, { ...baseRun, run_id: "JEEVES-RUN-REVIEW-B", final_answer: "Did nothing." });
 
-    const matchupId = await asOwner.mutation(api.agentTraceReview.createMatchup, {
+    await asOwner.mutation(api.agentTraceReview.createMatchup, {
       leftTraceId: left,
       rightTraceId: right,
       divergenceStepIndex: 3,
@@ -136,15 +143,17 @@ describe("#267 step-level trace review", () => {
       rightBlindLabel: "Trajectory B",
     });
 
-    await asBlind.mutation(api.agentTraceReview.decideMatchup, {
-      matchupId,
+    const token = await reviewToken(asBlind, "matchup");
+    await asBlind.mutation(api.agentTraceReviewSessions.decideMatchup, {
+      token,
       winner: "left",
       reasonTags: ["accuracy"],
     });
 
-    const m = await asBlind.query(api.agentTraceReview.getMatchup, { matchupId });
+    const m = await asBlind.query(api.agentTraceReviewSessions.getMatchup, { token });
     expect(m?.winner).toBe("left");
-    expect(m?.leftBlindLabel).toBe("Trajectory A");
+    expect(new Set([m?.leftBlindLabel, m?.rightBlindLabel])).toEqual(new Set(["A", "B"]));
+    expect(["left", "right"]).toContain(m?.firstSide);
     // No provenance in the matchup payload.
     expect(JSON.stringify(m)).not.toContain("jeeves_clog");
     expect(JSON.stringify(m)).not.toContain("claude-sonnet-4-0");

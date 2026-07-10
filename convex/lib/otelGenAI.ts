@@ -20,6 +20,7 @@ import { redactValue } from "./agentTrace";
 export interface OtelIngestSummary {
   traces: number;
   spans: number;
+  ignoredSpans: number;
   steps: number;
   requestMissing: number;
   responseMissing: number;
@@ -152,6 +153,7 @@ export function mapOtlpToTraces(payload: unknown): OtelMapResult {
   const summary: OtelIngestSummary = {
     traces: 0,
     spans: 0,
+    ignoredSpans: 0,
     steps: 0,
     requestMissing: 0,
     responseMissing: 0,
@@ -166,6 +168,12 @@ export function mapOtlpToTraces(payload: unknown): OtelMapResult {
       for (const s of arr(rec(ss)?.spans)) {
         const span = rec(s);
         if (!span) continue;
+        const attrs = flattenAttrs(span.attributes);
+        const isGenAiSpan = Object.keys(attrs).some((key) => key.startsWith("gen_ai."));
+        if (!isGenAiSpan) {
+          summary.ignoredSpans++;
+          continue;
+        }
         summary.spans++;
         const traceId = str(span.traceId) ?? str(span.trace_id) ?? `otlp-${summary.spans}`;
         (byTrace.get(traceId) ?? byTrace.set(traceId, []).get(traceId)!).push(span);
@@ -252,5 +260,6 @@ export function mapOtlpToTraces(payload: unknown): OtelMapResult {
   }
 
   summary.models = [...models];
+  summary.invalid = summary.traces === 0;
   return { traces, summary };
 }

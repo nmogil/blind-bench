@@ -66,6 +66,32 @@ describe("training export verifier", () => {
     expect(summary.errors).toContain("test:line_2:invalid_json");
   });
 
+  test("requires manifest count and row-hash bindings", () => {
+    const dir = writeExportDir();
+    const manifestPath = join(dir, "training-dataset.manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    delete manifest.split_counts;
+    delete manifest.row_entries;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+
+    const summary = verifyTrainingExportArtifacts({ artifactDir: dir });
+    expect(summary.readiness).toBe("not_ready");
+    expect(summary.errors).toContain("manifest_split_counts_missing");
+    expect(summary.errors).toContain("manifest_row_entries_missing");
+  });
+
+  test("requires supported roles and a final assistant completion", () => {
+    const dir = writeExportDir();
+    writeFileSync(
+      join(dir, "training-dataset.test.jsonl"),
+      `${JSON.stringify({ messages: [{ role: "developer", content: "unsupported" }, { role: "user", content: "unfinished" }] })}\n`,
+    );
+    const summary = verifyTrainingExportArtifacts({ artifactDir: dir });
+    expect(summary.readiness).toBe("not_ready");
+    expect(summary.errors).toContain("test:line_1:message_role_unsupported");
+    expect(summary.errors).toContain("test:line_1:final_message_not_assistant");
+  });
+
   test("blocks forbidden substrings without echoing the substring in text or JSON", () => {
     const dir = writeExportDir();
     const forbidden = "TOKEN_DO_NOT_PRINT_123456";

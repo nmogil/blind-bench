@@ -46,7 +46,7 @@ export function TraceList() {
           </p>
         </div>
         <Link
-          to={`${base}/trace-import`}
+          to={`${projectBase}/import`}
           className={buttonVariants({ size: "sm", variant: "outline" })}
         >
           <Upload aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />
@@ -68,11 +68,11 @@ export function TraceList() {
               agent’s steps, tool calls, and decisions.
             </p>
             <Link
-              to={`${base}/trace-import`}
+              to={`${projectBase}/import`}
               className={buttonVariants({ size: "sm" })}
             >
               <Upload aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />
-              Import an agent session
+              Import completed runs
             </Link>
           </div>
         ) : (
