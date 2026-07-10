@@ -78,6 +78,7 @@ export interface ExcludedRow {
     | "non_comparable_prefix"
     | "review_disagreement"
     | "no_preference"
+    | "no_approved_verdict"
     | "invalid_sft_shape";
   privacyClass: PrivacyClass;
 }

@@ -21,7 +21,6 @@ import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ShortcutCheatSheet } from "@/components/ShortcutCheatSheet";
 import { PostHogOrgGroupBridge } from "@/components/PostHogOrgGroupBridge";
-import { CopilotPanel } from "@/components/CopilotPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function OrgLayout() {
@@ -80,7 +79,6 @@ export function OrgLayout() {
             <main className="flex-1 overflow-auto">
               <Outlet />
             </main>
-            <CopilotPanel />
           </div>
         </div>
         <NewProjectDialog

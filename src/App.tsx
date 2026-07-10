@@ -51,11 +51,15 @@ const CycleCreator = lazy(() => import("./routes/orgs/projects/cycles/CycleCreat
 const CycleDetail = lazy(() => import("./routes/orgs/projects/cycles/CycleDetail").then(m => ({ default: m.CycleDetail })));
 const VersionDashboard = lazy(() => import("./routes/orgs/projects/cycles/VersionDashboard").then(m => ({ default: m.VersionDashboard })));
 const EvaluatePage = lazy(() => import("./routes/orgs/projects/EvaluatePage").then(m => ({ default: m.EvaluatePage })));
-const ExportTraining = lazy(() => import("./routes/orgs/projects/ExportTraining").then(m => ({ default: m.ExportTraining })));
 const ComparisonCampaignNew = lazy(() => import("./routes/orgs/projects/ComparisonCampaignNew").then(m => ({ default: m.ComparisonCampaignNew })));
 const ComparisonCampaignDetail = lazy(() => import("./routes/orgs/projects/ComparisonCampaignDetail").then(m => ({ default: m.ComparisonCampaignDetail })));
+const ReviewBuilder = lazy(() => import("./routes/orgs/projects/ReviewBuilder").then(m => ({ default: m.ReviewBuilder })));
+const VerdictReviewDetail = lazy(() => import("./routes/orgs/projects/VerdictReviewDetail").then(m => ({ default: m.VerdictReviewDetail })));
+const VerdictReview = lazy(() => import("./routes/review/VerdictReview").then(m => ({ default: m.VerdictReview })));
+const ReviewResults = lazy(() => import("./routes/orgs/projects/ReviewResults").then(m => ({ default: m.ReviewResults })));
 const IngestEndpoint = lazy(() => import("./routes/orgs/projects/IngestEndpoint").then(m => ({ default: m.IngestEndpoint })));
 const ImportRuns = lazy(() => import("./routes/orgs/projects/ImportRuns").then(m => ({ default: m.ImportRuns })));
+const ProjectSources = lazy(() => import("./routes/orgs/projects/settings/ProjectSources").then(m => ({ default: m.ProjectSources })));
 const TraceList = lazy(() => import("./routes/traces/TraceList").then(m => ({ default: m.TraceList })));
 const TraceViewer = lazy(() => import("./routes/traces/TraceViewer").then(m => ({ default: m.TraceViewer })));
 const TraceMatchup = lazy(() => import("./routes/traces/TraceMatchup").then(m => ({ default: m.TraceMatchup })));
@@ -77,6 +81,7 @@ export function App() {
         <Route path="/compare" element={<QuickCompare />} />
         <Route path="/review/demo" element={<ReviewDemo />} />
         <Route path="/review/campaign/:shareToken" element={<ComparisonReview />} />
+        <Route path="/review/verdict/:shareToken" element={<VerdictReview />} />
         <Route path="/invite/:token" element={<InviteLanding />} />
         <Route path="/legal/terms" element={<Terms />} />
         <Route path="/legal/privacy" element={<Privacy />} />
@@ -99,7 +104,7 @@ export function App() {
             <Route path="settings/openrouter-key" element={<OpenRouterKey />} />
             <Route path="settings/billing" element={<Billing />} />
             <Route path="projects/:projectId" element={<ProjectLayout />}>
-              <Route index element={<Navigate to="import" replace />} />
+              <Route index element={<Navigate to="traces" replace />} />
               <Route path="import" element={<ImportRuns />} />
               <Route path="variables" element={<Variables />} />
               <Route path="test-cases" element={<TestCases />} />
@@ -130,9 +135,12 @@ export function App() {
                 element={<CycleDetail />}
               />
               <Route path="evaluate" element={<EvaluatePage />} />
+              <Route path="reviews/new" element={<ReviewBuilder />} />
+              <Route path="reviews/verdict/:campaignId" element={<VerdictReviewDetail />} />
+              <Route path="results" element={<ReviewResults />} />
               <Route path="comparisons/new" element={<ComparisonCampaignNew />} />
               <Route path="comparisons/:campaignId" element={<ComparisonCampaignDetail />} />
-              <Route path="export" element={<ExportTraining />} />
+              <Route path="export" element={<Navigate to="../results" replace />} />
               <Route path="ingest" element={<IngestEndpoint />} />
               <Route path="traces" element={<TraceList />} />
               <Route
@@ -145,6 +153,7 @@ export function App() {
               />
               <Route path="history" element={<HistoryPage />} />
               <Route path="settings" element={<ProjectSettings />} />
+              <Route path="settings/sources" element={<ProjectSources />} />
               <Route
                 path="settings/collaborators"
                 element={<ProjectCollaborators />}

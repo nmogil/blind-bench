@@ -25,17 +25,10 @@ import {
   Info,
   FileText,
   Shield,
-  Compass,
 } from "lucide-react";
 
 export function HelpMenu() {
   const resetCallouts = useMutation(api.userPreferences.resetCallouts);
-  const setCopilotDismissed = useMutation(
-    api.userPreferences.setCopilotDismissed,
-  );
-  const setCopilotCollapsed = useMutation(
-    api.userPreferences.setCopilotCollapsed,
-  );
   const navigate = useNavigate();
   const [aboutOpen, setAboutOpen] = useState(false);
 
@@ -47,17 +40,6 @@ export function HelpMenu() {
           <span className="sr-only">Help</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem
-            onClick={async () => {
-              await Promise.all([
-                setCopilotDismissed({ dismissed: false }),
-                setCopilotCollapsed({ collapsed: false }),
-              ]);
-            }}
-          >
-            <Compass className="mr-2 h-4 w-4" />
-            Show setup co-pilot
-          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => toggleCheatSheet()}>
             <Keyboard className="mr-2 h-4 w-4" />
             Keyboard shortcuts
@@ -106,8 +88,8 @@ export function HelpMenu() {
             <DialogTitle>Blind Bench</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Blind-evaluate LLM outputs so the best writing wins — not the
-            loudest opinion.
+            Import completed AI runs, collect blind expert judgment, and turn
+            the result into evidence your team can reuse.
           </p>
           <p className="text-xs text-muted-foreground mt-2">Version 0.9-pre</p>
         </DialogContent>

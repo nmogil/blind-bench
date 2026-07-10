@@ -12,11 +12,14 @@ test("blind token review: no provenance, bias framing, verdict, and steps render
       <TraceTokenReviewBody token="opaque-review-token" />
     </MemoryRouter>,
   );
-  await expect(component).toContainText("Trajectory");
+  await expect(component.getByRole("heading", { name: "Run", exact: true })).toBeVisible();
   await expect(component).toContainText("Blinding reduces bias; it is not anonymity");
   await expect(component).toContainText("Your verdict");
   await expect(component).toContainText("Acceptable");
   await expect(component).toContainText("run_command");
+  const finalAnswer = component.getByText("Final answer", { exact: true });
+  const verdict = component.getByText("Your verdict", { exact: true });
+  expect((await finalAnswer.boundingBox())?.y).toBeLessThan((await verdict.boundingBox())?.y ?? 0);
   await expect(component.locator("[data-trace-id], [data-step-id]")).toHaveCount(0);
 });
 

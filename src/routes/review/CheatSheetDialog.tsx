@@ -46,8 +46,8 @@ export function CheatSheetDialog({
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
             {phase === "phase1" &&
-              "Phase 1 — review each output. Navigation is separate from rating."}
-            {phase === "phase2" && "Phase 2 — pick one of two."}
+              "Score each attempt. Navigation is separate from rating."}
+            {phase === "phase2" && "Compare two attempts and pick one."}
             {phase === "complete" && "Nothing to do here."}
           </DialogDescription>
         </DialogHeader>

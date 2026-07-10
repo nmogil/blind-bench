@@ -5,7 +5,7 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useOrgLayout } from "@/components/layouts/OrgLayout";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardCheck, FolderOpen, ChevronRight, Plug } from "lucide-react";
+import { ClipboardCheck, FolderOpen, ChevronRight } from "lucide-react";
 
 export function OrgHome() {
   const { org, orgId } = useOrg();
@@ -18,7 +18,7 @@ export function OrgHome() {
     <div className="p-6">
       <h1 className="text-2xl font-bold">{org.name}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Agent-review projects and prompt workspaces
+        Import completed AI runs, collect blind human review, and reuse the evidence.
       </p>
 
       {inFlight && inFlight.length > 0 && (
@@ -37,7 +37,7 @@ export function OrgHome() {
                     {s.projectName ? ` — ${s.projectName}` : ""}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {s.phase === "phase1" ? "Phase 1 · Review" : "Phase 2 · Battle"}
+                    {s.phase === "phase1" ? "Scoring runs" : "Comparing attempts"}
                     {" · "}
                     {s.outputCount} outputs
                   </div>
@@ -48,40 +48,6 @@ export function OrgHome() {
           ))}
         </div>
       )}
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Link
-          to={`/orgs/${org.slug}/gateway-onboarding`}
-          className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <Plug aria-hidden="true" className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <div className="text-sm font-medium">Gateway onboarding</div>
-              <div className="text-xs text-muted-foreground">
-                Feed Cloudflare AI Gateway logs into Blind Bench.
-              </div>
-            </div>
-          </div>
-          <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
-        </Link>
-
-        <Link
-          to={`/orgs/${org.slug}/scorecard`}
-          className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-accent transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <ClipboardCheck aria-hidden="true" className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <div className="text-sm font-medium">Quality scorecard</div>
-              <div className="text-xs text-muted-foreground">
-                Run deterministic quality checks over your imported traffic.
-              </div>
-            </div>
-          </div>
-          <ChevronRight aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
-        </Link>
-      </div>
 
       <div className="mt-6">
         {projects === undefined ? (
@@ -99,10 +65,10 @@ export function OrgHome() {
         ) : projects.length === 0 ? (
           <EmptyState
             icon={FolderOpen}
-            heading="No agent-review projects yet"
-            description="Create a workspace for an agent prompt, test cases, runs, blind reviews, and the verdicts you route back."
+            heading="Bring in your first completed runs"
+            description="Create a project, upload runs from the systems you already use, and send one blind review link."
             action={{
-              label: "Create project",
+              label: "Create review project",
               onClick: openNewProjectDialog,
             }}
           />

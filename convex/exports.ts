@@ -187,6 +187,7 @@ export const gatherTrajectoryPlan = internalQuery({
     projectId: v.id("projects"),
     format: FORMAT,
     campaignId: v.optional(v.id("comparisonCampaigns")),
+    verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
   },
   handler: async (
     ctx,
@@ -197,6 +198,18 @@ export const gatherTrajectoryPlan = internalQuery({
       const campaign = await ctx.db.get(args.campaignId);
       if (!campaign || campaign.projectId !== args.projectId) {
         throw new Error("Comparison campaign not found.");
+      }
+      if (campaign.status !== "closed") {
+        throw new Error("Close the comparison review before exporting training data.");
+      }
+    }
+    if (args.verdictCampaignId !== undefined) {
+      const campaign = await ctx.db.get(args.verdictCampaignId);
+      if (!campaign || campaign.projectId !== args.projectId) {
+        throw new Error("Run review not found.");
+      }
+      if (campaign.status !== "closed") {
+        throw new Error("Close the run review before exporting training data.");
       }
     }
     const stepsOf = (traceId: Id<"agentTraces">) =>
@@ -209,6 +222,9 @@ export const gatherTrajectoryPlan = internalQuery({
     const reviewerIds = new Set<string>();
 
     if (args.format === "dpo") {
+      if (args.verdictCampaignId !== undefined) {
+        throw new Error("Run verdict reviews export as SFT, not DPO.");
+      }
       const allMatchups = await ctx.db
         .query("agentTraceMatchups")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -283,36 +299,92 @@ export const gatherTrajectoryPlan = internalQuery({
         });
       }
     } else if (args.format === "sft") {
-      const traces = await ctx.db
-        .query("agentTraces")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-      for (const tr of traces) {
-        if (tr.status !== "ready") continue;
-        const verdicts = await ctx.db
-          .query("agentTraceVerdicts")
-          .withIndex("by_trace", (q) => q.eq("agentTraceId", tr._id))
+      if (args.verdictCampaignId !== undefined) {
+        const verdictCampaignId = args.verdictCampaignId;
+        const items = await ctx.db
+          .query("verdictReviewItems")
+          .withIndex("by_campaign", (q) => q.eq("campaignId", verdictCampaignId))
           .collect();
-        if (!verdicts.some((vd) => vd.rating === "best")) continue;
-        if (verdicts.some((vd) => vd.rating === "weak")) {
+        for (const item of items) {
+          const tr = await ctx.db.get(item.agentTraceId);
+          if (!tr || tr.status !== "ready") continue;
+          const verdicts = await ctx.db
+            .query("verdictReviewDecisions")
+            .withIndex("by_item", (q) => q.eq("itemId", item._id))
+            .collect();
+          for (const verdict of verdicts) reviewerIds.add(verdict.userId);
+          if (verdicts.some((verdict) => verdict.rating === "weak")) {
+            plan.push({
+              privacyClass: tr.privacyClass,
+              metadata: { reviewer_count: verdicts.length },
+              excludeReason: "review_disagreement",
+            });
+            continue;
+          }
+          if (!verdicts.some((verdict) => verdict.rating === "best")) {
+            plan.push({
+              privacyClass: tr.privacyClass,
+              metadata: { reviewer_count: verdicts.length },
+              excludeReason: "no_approved_verdict",
+            });
+            continue;
+          }
+          const steps = await stepsOf(tr._id);
           plan.push({
             privacyClass: tr.privacyClass,
-            metadata: {},
-            excludeReason: "review_disagreement",
+            metadata: { verdict: "best", reviewer_count: verdicts.length },
+            messages: steps
+              .filter((step) =>
+                step.kind === "message" &&
+                ["system", "user", "assistant"].includes(step.role ?? ""),
+              )
+              .map((step) => ({
+                meta: metaOf(step),
+                storageId: step.fullBodyStorageId,
+              })),
+            finalAnswer: tr.finalAnswerStorageId,
           });
-          for (const verdict of verdicts) reviewerIds.add(verdict.userId);
-          continue;
         }
-        const steps = await stepsOf(tr._id);
-        plan.push({
-          privacyClass: tr.privacyClass,
-          metadata: { verdict: "best" },
-          messages: steps
-            .filter((s) => s.kind === "message" && ["system", "user", "assistant"].includes(s.role ?? ""))
-            .map((s) => ({ meta: metaOf(s), storageId: s.fullBodyStorageId })),
-          finalAnswer: tr.finalAnswerStorageId,
-        });
-        for (const vd of verdicts) if (vd.rating === "best") reviewerIds.add(vd.userId);
+      } else {
+        const traces = await ctx.db
+          .query("agentTraces")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+          .collect();
+        for (const tr of traces) {
+          if (tr.status !== "ready") continue;
+          const verdicts = await ctx.db
+            .query("agentTraceVerdicts")
+            .withIndex("by_trace", (q) => q.eq("agentTraceId", tr._id))
+            .collect();
+          if (!verdicts.some((verdict) => verdict.rating === "best")) continue;
+          if (verdicts.some((verdict) => verdict.rating === "weak")) {
+            plan.push({
+              privacyClass: tr.privacyClass,
+              metadata: {},
+              excludeReason: "review_disagreement",
+            });
+            for (const verdict of verdicts) reviewerIds.add(verdict.userId);
+            continue;
+          }
+          const steps = await stepsOf(tr._id);
+          plan.push({
+            privacyClass: tr.privacyClass,
+            metadata: { verdict: "best" },
+            messages: steps
+              .filter((step) =>
+                step.kind === "message" &&
+                ["system", "user", "assistant"].includes(step.role ?? ""),
+              )
+              .map((step) => ({
+                meta: metaOf(step),
+                storageId: step.fullBodyStorageId,
+              })),
+            finalAnswer: tr.finalAnswerStorageId,
+          });
+          for (const verdict of verdicts) {
+            if (verdict.rating === "best") reviewerIds.add(verdict.userId);
+          }
+        }
       }
     }
     return { plan, stats: { sourceUnits: plan.length, reviewers: reviewerIds.size } };
@@ -370,6 +442,7 @@ export const generateExport = action({
     // Explicit consent to include prod-sensitive (confidential/pii/phi) rows.
     allowSensitive: v.optional(v.boolean()),
     campaignId: v.optional(v.id("comparisonCampaigns")),
+    verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
   },
   handler: async (
     ctx,
@@ -380,8 +453,17 @@ export const generateExport = action({
     excludedCount: number;
     manifest: ExportManifest;
   }> => {
-    if (args.campaignId !== undefined && args.source !== "trajectory") {
-      throw new Error("Campaign exports use the trajectory source.");
+    if (
+      (args.campaignId !== undefined || args.verdictCampaignId !== undefined) &&
+      args.source !== "trajectory"
+    ) {
+      throw new Error("Review exports use the trajectory source.");
+    }
+    if (args.campaignId !== undefined && args.verdictCampaignId !== undefined) {
+      throw new Error("Export one review at a time.");
+    }
+    if (args.verdictCampaignId !== undefined && args.format !== "sft") {
+      throw new Error("Run verdict reviews export as SFT.");
     }
     if (args.format === "annotated") {
       throw new Error("Annotated export isn’t available yet — use DPO or SFT.");
@@ -405,6 +487,7 @@ export const generateExport = action({
         projectId: args.projectId,
         format: args.format,
         campaignId: args.campaignId,
+        verdictCampaignId: args.verdictCampaignId,
       });
       const hydrated = await hydrateTrajectory(ctx, res.plan, args.format);
       classified = hydrated.rows;

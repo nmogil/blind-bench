@@ -18,7 +18,7 @@ This doc expands the architecture doc's 10-bullet Next Steps into demoable miles
 
 The numbering starts at M0 to mirror "milestone zero = setup" conventions. Milestones are strictly sequential on the critical path except where the dependency graph below says otherwise.
 
-> **Milestone coverage note (2026-07-07).** This doc formally covers M0–M7, with a handful of later milestones (M21, M26, M29) retro-inserted where they earned a full spec. Milestones **M8–M30** are tracked in GH issues (the source of truth per `CLAUDE.md`) and the strategy docs; they are not backfilled here. This file resumes at **M31 — Trajectory Spine**, which formalizes the approved [[Blind Bench - Agent Trace Strategy]] (Noah, 2026-07-07).
+> **Milestone coverage note (2026-07-10).** This doc formally covers M0–M7, with a handful of later milestones (M21, M26, M29) retro-inserted where they earned a full spec. Milestones **M8–M30** are tracked in GH issues (the source of truth per `CLAUDE.md`) and the strategy docs; they are not backfilled here. This file resumes at **M31 — Trajectory Spine**, which formalizes the approved [[Blind Bench - Agent Trace Strategy]], and **M34 — Runs → Reviews → Results**, tracked by epic #333 and issues #345–#348.
 
 See also:
 - [[Blind Bench - Architecture#Next Steps]] — the short form of this doc
@@ -655,6 +655,21 @@ These carry forward from [[Blind Bench - Architecture#v1 Scope & Deferred]] so t
 - **CLI / CI-CD integrations**. Possible later because everything is a Convex function.
 - **Branching versions**. Linear only in v1; schema leaves room.
 - **External HTTP API**. Deferred — would be a thin `convex/http.ts` layer with `httpAction` wrappers.
+
+---
+
+## M34 — Runs → Reviews → Results (2026-07)
+
+**Goal:** make ingestion-first blind human review the obvious repeatable product loop while preserving the prompt playground as a secondary tool.
+
+**Critical path:**
+
+1. **P0 / #345:** reduce the project shell to Runs, Reviews, Results; move imports/sources and prompt execution beneath secondary Tools/settings surfaces; remove prompt-first onboarding and co-pilot pillars.
+2. **P1 / #346:** lead every successful import into one review builder with Score runs or Compare attempts, blind preview, opaque share link, and anonymous reviewer flow.
+3. **P2 / #347:** aggregate collecting/closed evidence in Results; show provenance only to owners; unlock evidence, regression, SFT, or DPO reuse only from eligible closed results with explicit exclusions.
+4. **P3 / #348:** preserve legacy URLs without presenting cycles/campaigns/sessions/matchups as primary concepts; align docs and canonical browser verification.
+
+**Release gate:** synthetic import → opaque anonymous review → judgment/comment → owner result → eligible reuse must pass without reviewer metadata leakage. Unit/component coverage does not replace the deployed two-principal check tracked in #339.
 
 ---
 

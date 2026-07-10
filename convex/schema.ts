@@ -757,6 +757,70 @@ const schema = defineSchema({
     .index("by_share_token", ["shareToken"])
     .index("by_project_import", ["projectId", "importKey"]),
 
+  // #346: no-account blind review of one or more completed runs. Items and
+  // decisions are child rows so campaign size and reviewer count never push a
+  // single Convex document toward its size limit.
+  verdictReviewCampaigns: defineTable({
+    projectId: v.id("projects"),
+    name: v.string(),
+    instructions: v.optional(v.string()),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("open"),
+      v.literal("closed"),
+    ),
+    shareToken: v.string(),
+    itemCount: v.number(),
+    judgmentCount: v.number(),
+    createdById: v.id("users"),
+    createdAt: v.number(),
+    openedAt: v.optional(v.number()),
+    closedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_share_token", ["shareToken"]),
+
+  verdictReviewItems: defineTable({
+    campaignId: v.id("verdictReviewCampaigns"),
+    projectId: v.id("projects"),
+    agentTraceId: v.id("agentTraces"),
+    sortOrder: v.number(),
+  })
+    .index("by_campaign", ["campaignId"])
+    .index("by_campaign_and_trace", ["campaignId", "agentTraceId"]),
+
+  verdictReviewDecisions: defineTable({
+    campaignId: v.id("verdictReviewCampaigns"),
+    itemId: v.id("verdictReviewItems"),
+    projectId: v.id("projects"),
+    agentTraceId: v.id("agentTraces"),
+    userId: v.id("users"),
+    rating: v.union(
+      v.literal("best"),
+      v.literal("acceptable"),
+      v.literal("weak"),
+    ),
+    note: v.optional(v.string()),
+    decidedAt: v.number(),
+  })
+    .index("by_campaign", ["campaignId"])
+    .index("by_item", ["itemId"])
+    .index("by_campaign_and_user", ["campaignId", "userId"])
+    .index("by_item_and_user", ["itemId", "userId"]),
+
+  // Approved imported runs that should remain in the project's durable
+  // regression corpus. Promotion is idempotent per (project, trace).
+  regressionCases: defineTable({
+    projectId: v.id("projects"),
+    agentTraceId: v.id("agentTraces"),
+    verdictCampaignId: v.id("verdictReviewCampaigns"),
+    createdById: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_trace", ["projectId", "agentTraceId"])
+    .index("by_campaign", ["verdictCampaignId"]),
+
   // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
   // Deliberately tiny — metadata + usage rollups only, NO step content — so it
   // stays well under the Convex ~1MiB doc cap regardless of trace length. Step
@@ -868,6 +932,7 @@ const schema = defineSchema({
     agentTraceId: v.id("agentTraces"),
     projectId: v.id("projects"),
     userId: v.id("users"),
+    verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
     target: v.union(
       v.object({ kind: v.literal("trace") }),
       v.object({ kind: v.literal("step"), stepIndex: v.number() }),
@@ -953,6 +1018,7 @@ const schema = defineSchema({
       v.literal("trace"),
       v.literal("matchup"),
       v.literal("campaign"),
+      v.literal("verdict_campaign"),
     ),
     // Session-scoped randomized presentation order prevents one global
     // left/right ordering from biasing every reviewer.
@@ -960,6 +1026,7 @@ const schema = defineSchema({
     agentTraceId: v.optional(v.id("agentTraces")),
     matchupId: v.optional(v.id("agentTraceMatchups")),
     campaignId: v.optional(v.id("comparisonCampaigns")),
+    verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
     reviewerDisplayName: v.optional(v.string()),
     campaignOrder: v.optional(
       v.array(
@@ -969,6 +1036,7 @@ const schema = defineSchema({
         }),
       ),
     ),
+    traceOrder: v.optional(v.array(v.id("agentTraces"))),
     currentIndex: v.optional(v.number()),
     visibleCount: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -977,7 +1045,11 @@ const schema = defineSchema({
     .index("by_reviewer", ["reviewerUserId"])
     .index("by_trace_and_reviewer", ["agentTraceId", "reviewerUserId"])
     .index("by_matchup_and_reviewer", ["matchupId", "reviewerUserId"])
-    .index("by_campaign_and_reviewer", ["campaignId", "reviewerUserId"]),
+    .index("by_campaign_and_reviewer", ["campaignId", "reviewerUserId"])
+    .index("by_verdict_campaign_and_reviewer", [
+      "verdictCampaignId",
+      "reviewerUserId",
+    ]),
 
   agentTraceMatchupDecisions: defineTable({
     matchupId: v.id("agentTraceMatchups"),

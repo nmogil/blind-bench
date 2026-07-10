@@ -5,11 +5,9 @@ import { useOrg } from "@/contexts/OrgContext";
 import { cn } from "@/lib/utils";
 import {
   ClipboardCheck,
-  CloudDownload,
   CreditCard,
   FolderOpen,
   Key,
-  Plug,
   Plus,
   Settings,
   Users,
@@ -90,32 +88,12 @@ export function SideNavContent({
 
       <div className="mt-4 px-2 pb-1">
         <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Workspace
+          Review
         </span>
       </div>
-      <NavLink
-        to={`/orgs/${org.slug}/gateway-onboarding`}
-        className={linkClass}
-        onClick={onNavigate}
-      >
-        <Plug aria-hidden="true" className="h-4 w-4 shrink-0" />
-        Ingest &amp; onboarding
-      </NavLink>
-      <NavLink
-        to={`/orgs/${org.slug}/gateway-import`}
-        className={linkClass}
-        onClick={onNavigate}
-      >
-        <CloudDownload aria-hidden="true" className="h-4 w-4 shrink-0" />
-        Import Gateway logs
-      </NavLink>
-      <NavLink
-        to={`/orgs/${org.slug}/scorecard`}
-        className={linkClass}
-        onClick={onNavigate}
-      >
+      <NavLink to="/eval" className={linkClass} onClick={onNavigate}>
         <ClipboardCheck aria-hidden="true" className="h-4 w-4 shrink-0" />
-        Quality scorecard
+        Reviews for me
       </NavLink>
 
       {role === "owner" && (

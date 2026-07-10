@@ -39,7 +39,7 @@ function TraceReviewCard({ count }: { count: number }) {
         <div className="flex items-center gap-3 min-w-0">
           <Route className="h-4 w-4 shrink-0 text-primary" />
           <p className="text-sm font-medium">
-            {count} {count === 1 ? "trajectory" : "trajectories"} to review
+            {count} {count === 1 ? "run" : "runs"} to review
           </p>
         </div>
         <span aria-hidden="true" className="text-primary">

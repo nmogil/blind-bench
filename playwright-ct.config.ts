@@ -26,6 +26,10 @@ export default defineConfig({
             dir,
             "src/routes/traces/__smoke__/convexReactMock.tsx",
           ),
+          "@convex-dev/auth/react": resolve(
+            dir,
+            "src/routes/traces/__smoke__/convexAuthMock.ts",
+          ),
         },
       },
     },

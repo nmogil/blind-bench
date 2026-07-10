@@ -12,14 +12,24 @@ import { StepBody, StepList } from "./traceSteps";
 import { ArrowLeft, EyeOff, Route } from "lucide-react";
 
 const RATINGS = [
-  { value: "best", label: "Best" },
+  { value: "best", label: "Strong" },
   { value: "acceptable", label: "Acceptable" },
   { value: "weak", label: "Weak" },
 ] as const;
 type Rating = (typeof RATINGS)[number]["value"];
 
-/** Blind trajectory review body that speaks only in opaque session tokens. */
-export function TraceTokenReviewBody({ token }: { readonly token: string }) {
+/** Blind run-review body that speaks only in opaque session tokens. */
+export function TraceTokenReviewBody({
+  token,
+  backTo = "/eval/traces",
+  backLabel = "Runs to review",
+  showBackLink = true,
+}: {
+  readonly token: string;
+  readonly backTo?: string;
+  readonly backLabel?: string;
+  readonly showBackLink?: boolean;
+}) {
   const trace = useQuery(api.agentTraceReviewSessions.getTrace, { token });
   const comments = useQuery(api.agentTraceReviewSessions.listComments, { token });
 
@@ -44,14 +54,16 @@ export function TraceTokenReviewBody({ token }: { readonly token: string }) {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <Link to="/eval/traces" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft aria-hidden="true" className="h-3 w-3" />
-        Trajectories to review
-      </Link>
-      <header className="mt-3">
+      {showBackLink && (
+        <Link to={backTo} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft aria-hidden="true" className="h-3 w-3" />
+          {backLabel}
+        </Link>
+      )}
+      <header className={showBackLink ? "mt-3" : undefined}>
         <div className="flex items-center gap-2">
           <Route aria-hidden="true" className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Trajectory</h1>
+          <h1 className="text-2xl font-bold">Run</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {trace.stepCount} {trace.stepCount === 1 ? "step" : "steps"}
@@ -66,8 +78,6 @@ export function TraceTokenReviewBody({ token }: { readonly token: string }) {
         </CardContent>
       </Card>
 
-      <TokenVerdict token={token} />
-
       {trace.hasFinalAnswer && (
         <Card className="mt-6">
           <CardHeader><CardTitle className="text-base">Final answer</CardTitle></CardHeader>
@@ -79,6 +89,8 @@ export function TraceTokenReviewBody({ token }: { readonly token: string }) {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Steps</h2>
         <StepList reviewToken={token} comments={comments} />
       </section>
+
+      <TokenVerdict token={token} />
     </div>
   );
 }

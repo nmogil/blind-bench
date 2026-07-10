@@ -2,218 +2,93 @@ import { useQuery } from "convex/react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../../../convex/_generated/api";
 import { useProject } from "@/contexts/ProjectContext";
-import { CycleStatusPill } from "@/components/CycleStatusPill";
 import { EmptyState } from "@/components/EmptyState";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowRight, ClipboardCheck, EyeOff, Layers, Plus } from "lucide-react";
+import { ArrowRight, ClipboardCheck, EyeOff, ListChecks, Plus } from "lucide-react";
 
+/** Unified owner list for independent run reviews and paired comparisons. */
 export function EvaluatePage() {
   const { projectId, role } = useProject();
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const navigate = useNavigate();
-
-  const cycles = useQuery(
-    api.reviewCycles.list,
+  const verdictReviews = useQuery(
+    api.verdictReviewCampaigns.listCampaigns,
     role !== "evaluator" ? { projectId } : "skip",
   );
   const comparisons = useQuery(
     api.comparisonCampaigns.listCampaigns,
     role !== "evaluator" ? { projectId } : "skip",
   );
-
-  const isLoading = cycles === undefined || comparisons === undefined;
-
   const basePath = `/orgs/${orgSlug}/projects/${projectId}`;
 
-  const openCycles = cycles?.filter((c) => c.status === "open") ?? [];
-  const draftCycles = cycles?.filter((c) => c.status === "draft") ?? [];
-  const closedCycles = cycles?.filter((c) => c.status === "closed") ?? [];
-
-  const pastItems: Array<{
-    type: "cycle";
-    id: string;
-    name: string;
-    date: number;
-    closedAction: string | null;
-  }> = closedCycles
-    .map((c) => ({
-      type: "cycle" as const,
-      id: c._id,
-      name: c.name,
-      date: c.closedAt ?? c.createdAt,
-      closedAction: c.closedAction,
-    }))
-    .sort((a, b) => b.date - a.date);
-
-  if (isLoading) {
+  if (verdictReviews === undefined || comparisons === undefined) {
     return (
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-32" />
-          <Skeleton className="h-9 w-32" />
-        </div>
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full max-w-2xl" />
-          ))}
-        </div>
+      <div className="space-y-4 p-6">
+        <div className="flex items-center justify-between"><Skeleton className="h-8 w-32" /><Skeleton className="h-9 w-32" /></div>
+        {[1, 2, 3].map((key) => <Skeleton key={key} className="h-20 w-full max-w-2xl" />)}
       </div>
     );
   }
 
-  const hasAnything =
-    (comparisons?.length ?? 0) > 0 ||
-    openCycles.length > 0 ||
-    draftCycles.length > 0 ||
-    pastItems.length > 0;
-
+  const hasReviews = verdictReviews.length > 0 || comparisons.length > 0;
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Evaluate</h1>
-        <div className="flex items-center gap-2">
-          <Link to={`${basePath}/import?source=paired`} className={buttonVariants({ size: "sm" })}>
-            <Plus className="mr-1.5 h-4 w-4" /> New comparison
-          </Link>
-          <Link to={`${basePath}/cycles/new`} className={buttonVariants({ size: "sm", variant: "outline" })}>
-            New cycle
-          </Link>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Reviews</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Send completed runs to domain experts without exposing model or harness provenance.</p>
         </div>
+        <Link to={`${basePath}/reviews/new`} className={buttonVariants({ size: "sm" })}>
+          <Plus className="mr-1.5 h-4 w-4" /> New review
+        </Link>
       </div>
 
-      {!hasAnything ? (
+      {!hasReviews ? (
         <EmptyState
           icon={ClipboardCheck}
-          heading="Compare completed attempts without exposing their source"
-          description="Import paired responses for a fast blind comparison, or pool existing runs into a review cycle."
-          action={{
-            label: "New blind comparison",
-            onClick: () => navigate(`${basePath}/import?source=paired`),
-          }}
+          heading="Create a blind review from completed runs"
+          description="Score runs independently or compare two attempts with the same context."
+          action={{ label: "Create blind review", onClick: () => navigate(`${basePath}/reviews/new`) }}
         />
       ) : (
         <div className="max-w-2xl space-y-6">
-          {(comparisons?.length ?? 0) > 0 && <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Blind comparisons</h2>
-            {comparisons?.map((comparison) => <Link key={comparison.id} to={`${basePath}/comparisons/${comparison.id}`} className="flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50">
-              <div className="flex min-w-0 flex-1 items-center gap-3"><EyeOff className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0"><p className="truncate text-sm font-medium">{comparison.name}</p><p className="text-xs text-muted-foreground">{comparison.caseCount} cases · {comparison.judgments} judgments · {comparison.status}</p></div></div><ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </Link>)}
-          </section>}
-          {/* Active items — need attention now */}
-          {(openCycles.length > 0 || draftCycles.length > 0) && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Needs attention
-              </h2>
-
-              {/* Open cycles */}
-              {openCycles.map((cycle) => (
-                <Link
-                  key={cycle._id}
-                  to={`${basePath}/cycles/${cycle._id}`}
-                  className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 hover:bg-primary/10 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-sm font-medium truncate">
-                        {cycle.name}
-                      </span>
-                      <CycleStatusPill status={cycle.status} />
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {cycle.evaluatorProgress.completed}/
-                      {cycle.evaluatorProgress.total} evaluators complete
-                      {cycle.outputCount > 0 &&
-                        ` · ${cycle.outputCount} outputs`}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </Link>
+          {verdictReviews.length > 0 && (
+            <ReviewSection title="Score runs">
+              {verdictReviews.map((review) => (
+                <ReviewRow
+                  key={review.id}
+                  href={`${basePath}/reviews/verdict/${review.id}`}
+                  icon={ListChecks}
+                  name={review.name}
+                  detail={`${review.itemCount} runs · ${review.judgments} judgments · ${review.status}`}
+                />
               ))}
-
-              {/* Draft cycles */}
-              {draftCycles.map((cycle) => (
-                <Link
-                  key={cycle._id}
-                  to={`${basePath}/cycles/${cycle._id}`}
-                  className="flex items-center justify-between rounded-lg border border-dashed px-4 py-3 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm font-medium truncate">
-                        {cycle.name}
-                      </span>
-                      <CycleStatusPill status={cycle.status} />
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Draft — configure and start when ready
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </Link>
-              ))}
-
-            </section>
+            </ReviewSection>
           )}
-
-          {/* Past evaluations */}
-          {pastItems.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Past evaluations
-              </h2>
-              {pastItems.map((item) => (
-                <Link
-                  key={`cycle-${item.id}`}
-                  to={`${basePath}/cycles/${item.id}`}
-                  className="flex items-center justify-between rounded-lg border px-4 py-3 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm font-medium truncate">
-                        {item.name}
-                      </span>
-                      <CycleStatusPill status="closed" />
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatDate(item.date)}
-                      {item.closedAction &&
-                        ` · ${formatAction(item.closedAction)}`}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </Link>
+          {comparisons.length > 0 && (
+            <ReviewSection title="Compare attempts">
+              {comparisons.map((review) => (
+                <ReviewRow
+                  key={review.id}
+                  href={`${basePath}/comparisons/${review.id}`}
+                  icon={EyeOff}
+                  name={review.name}
+                  detail={`${review.caseCount} pairs · ${review.judgments} judgments · ${review.status}`}
+                />
               ))}
-            </section>
+            </ReviewSection>
           )}
         </div>
       )}
-
     </div>
   );
 }
 
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function ReviewSection({ title, children }: { readonly title: string; readonly children: React.ReactNode }) {
+  return <section className="space-y-3"><h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>{children}</section>;
 }
 
-function formatAction(action: string): string {
-  switch (action) {
-    case "optimized":
-      return "Optimized";
-    case "new_version":
-      return "New version created";
-    case "no_action":
-      return "No action taken";
-    default:
-      return action;
-  }
+function ReviewRow({ href, icon: Icon, name, detail }: { readonly href: string; readonly icon: typeof EyeOff; readonly name: string; readonly detail: string }) {
+  return <Link to={href} className="flex items-center justify-between rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50"><div className="flex min-w-0 flex-1 items-center gap-3"><Icon className="h-4 w-4 shrink-0 text-primary" /><div className="min-w-0"><p className="truncate text-sm font-medium">{name}</p><p className="text-xs text-muted-foreground">{detail}</p></div></div><ArrowRight className="h-4 w-4 text-muted-foreground" /></Link>;
 }

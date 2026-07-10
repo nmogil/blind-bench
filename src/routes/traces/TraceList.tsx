@@ -38,11 +38,11 @@ export function TraceList() {
         <div>
           <div className="flex items-center gap-2">
             <Route aria-hidden="true" className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-bold">Trajectories</h1>
+            <h1 className="text-2xl font-bold">Runs</h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Review imported agent runs step by step — every message, tool call,
-            and result in order.
+            Completed AI behavior from your existing systems. A run may be one
+            response or a multi-step agent trace with tool calls.
           </p>
         </div>
         <Link
@@ -64,8 +64,8 @@ export function TraceList() {
         ) : traces.length === 0 ? (
           <div className="max-w-lg space-y-3 rounded-lg border border-dashed p-6">
             <p className="text-sm">
-              No trajectories here yet. Import an agent session to review the
-              agent’s steps, tool calls, and decisions.
+              Add completed runs from the systems you already use, then create a
+              blind review for the people whose judgment matters.
             </p>
             <Link
               to={`${projectBase}/import`}
@@ -91,7 +91,7 @@ export function TraceList() {
                       <p className="truncate text-sm font-medium">
                         {provenance.length > 0
                           ? provenance.join(" · ")
-                          : "Trajectory"}
+                          : "Imported run"}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {t.stepCount} {t.stepCount === 1 ? "step" : "steps"} ·{" "}

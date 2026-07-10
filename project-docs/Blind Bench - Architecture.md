@@ -18,6 +18,17 @@ tags:
 
 ---
 
+## Current canonical product flow (M34)
+
+The primary product model is **Run → Review → Judgment → Result**.
+
+- A **Run** is any completed AI execution: a single response or a multi-step agent trace with messages and tool calls.
+- A **Review** selects runs, a rubric, and one of two owner-visible modes: **Score runs** or **Compare attempts**. Campaigns, sessions, items, matchups, and opaque tokens are storage/orchestration details, not separate product pillars.
+- A **Judgment** is a blind verdict, preference, annotation, or comment. Reviewer queries return blinded content only; provenance is joined back only on authenticated owner/editor result queries.
+- A **Result** aggregates coverage, distribution, disagreement, comments, and explicit reuse eligibility. Closed results may produce evidence summaries, regression cases, SFT rows, or comparable DPO rows with exclusion counts.
+
+The project shell exposes **Runs · Reviews · Results**. Imports and live sources support Runs; prompt versions, execution, variables, and test cases remain isolated under the secondary **Tools / Prompt playground** area. This section takes precedence over older prompt-first or review-cycle navigation descriptions below.
+
 ## Table of Contents
 
 1. [Overview](#overview)

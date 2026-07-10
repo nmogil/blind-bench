@@ -64,7 +64,7 @@ export function HistoryPage() {
         <EmptyState
           icon={Clock}
           heading="No activity yet"
-          description="Runs, version changes, review cycles, and optimizations will appear here as they happen."
+          description="Runs, prompt-tool changes, reviews, and optimizations will appear here as they happen."
         />
       ) : (
         <div className="max-w-2xl space-y-6">
