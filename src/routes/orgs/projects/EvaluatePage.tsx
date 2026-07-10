@@ -73,7 +73,7 @@ export function EvaluatePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Evaluate</h1>
         <div className="flex items-center gap-2">
-          <Link to={`${basePath}/comparisons/new`} className={buttonVariants({ size: "sm" })}>
+          <Link to={`${basePath}/import?source=paired`} className={buttonVariants({ size: "sm" })}>
             <Plus className="mr-1.5 h-4 w-4" /> New comparison
           </Link>
           <Link to={`${basePath}/cycles/new`} className={buttonVariants({ size: "sm", variant: "outline" })}>
@@ -89,7 +89,7 @@ export function EvaluatePage() {
           description="Import paired responses for a fast blind comparison, or pool existing runs into a review cycle."
           action={{
             label: "New blind comparison",
-            onClick: () => navigate(`${basePath}/comparisons/new`),
+            onClick: () => navigate(`${basePath}/import?source=paired`),
           }}
         />
       ) : (
