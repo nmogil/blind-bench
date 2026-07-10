@@ -170,7 +170,7 @@ function AuthGatePublic() {
         <SignIn />
       </Unauthenticated>
       <AuthLoading>
-        <LoadingScreen />
+        <div className="min-h-screen" />
       </AuthLoading>
     </>
   );

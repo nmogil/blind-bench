@@ -49,6 +49,25 @@ const posthogHost = import.meta.env.PUBLIC_POSTHOG_HOST;
       crossorigin
     />
 
+    <!-- Without JS the IntersectionObserver never fires, so reveal-on-scroll
+         content stays hidden. Force it visible, mirroring the reduced-motion
+         override in global.css. !important is required because the bundled
+         global.css link and Problem.astro's scoped .redacted rule both load
+         after this block and would otherwise win the cascade. -->
+    <noscript>
+      <style>
+        .reveal,
+        .reveal-scale,
+        .connector-line {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+        .redacted {
+          filter: none !important;
+        }
+      </style>
+    </noscript>
+
     <!-- Dark mode: apply before paint to avoid flash -->
     <script is:inline>
       if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
