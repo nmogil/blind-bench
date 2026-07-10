@@ -16,6 +16,10 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
 import { blindStepView, blindTraceView } from "./lib/blindProjection";
+import {
+  activeVerdictReviewItem,
+  resolveVerdictCampaignSession,
+} from "./verdictReviewCampaigns";
 
 const LABEL = v.union(
   v.literal("suggestion"),
@@ -77,6 +81,10 @@ async function sessionForUser(
     }
     return session;
   }
+  if (session.kind === "verdict_campaign") {
+    await resolveVerdictCampaignSession(ctx, token, { requireOpen: true });
+    return session;
+  }
   const collaborator = await ctx.db
     .query("projectCollaborators")
     .withIndex("by_project_and_user", (q) =>
@@ -96,14 +104,30 @@ async function traceSession(
   readonly session: Doc<"agentTraceReviewSessions">;
   readonly trace: Doc<"agentTraces">;
   readonly userId: Id<"users">;
+  readonly verdictItem?: Doc<"verdictReviewItems">;
+  readonly verdictCampaign?: Doc<"verdictReviewCampaigns">;
 }> {
   const session = await sessionForUser(ctx, token);
+  if (session.kind === "verdict_campaign") {
+    const { campaign } = await resolveVerdictCampaignSession(ctx, token, {
+      requireOpen: true,
+    });
+    const active = await activeVerdictReviewItem(ctx, session);
+    if (!active) throw new Error("This review is complete.");
+    return {
+      session,
+      trace: active.trace,
+      userId: session.reviewerUserId,
+      verdictItem: active.item,
+      verdictCampaign: campaign,
+    };
+  }
   if (session.kind !== "trace" || session.agentTraceId === undefined) {
-    throw new Error("This review link is not a trajectory session.");
+    throw new Error("This review link is not a run-review session.");
   }
   const trace = await ctx.db.get(session.agentTraceId);
   if (!trace || trace.projectId !== session.projectId) {
-    throw new Error("Review trajectory is no longer available.");
+    throw new Error("Review run is no longer available.");
   }
   return { session, trace, userId: session.reviewerUserId };
 }
@@ -319,28 +343,33 @@ export const getStepBody = action({
   },
 });
 
-/** List comments for one opaque trajectory session. */
+/** List only the caller's comments for the active opaque run-review item. */
 export const listComments = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
-    const { trace, userId } = await traceSession(ctx, args.token);
+    const { trace, userId, verdictCampaign } = await traceSession(ctx, args.token);
     const rows = await ctx.db
       .query("agentTraceComments")
       .withIndex("by_trace", (q) => q.eq("agentTraceId", trace._id))
       .collect();
-    return rows.filter((row) => row.userId === userId).map((row) => ({
-      _id: row._id,
-      target: row.target,
-      comment: row.comment,
-      label: row.label,
-      tags: row.tags ?? [],
-      mine: row.userId === userId,
-      createdAt: row._creationTime,
-    }));
+    return rows
+      .filter((row) =>
+        row.userId === userId &&
+        row.verdictCampaignId === verdictCampaign?._id,
+      )
+      .map((row) => ({
+        _id: row._id,
+        target: row.target,
+        comment: row.comment,
+        label: row.label,
+        tags: row.tags ?? [],
+        mine: true,
+        createdAt: row._creationTime,
+      }));
   },
 });
 
-/** Add a step/trace comment through an opaque trajectory session. */
+/** Add a step/trace comment through an opaque run-review session. */
 export const addComment = mutation({
   args: {
     token: v.string(),
@@ -350,7 +379,7 @@ export const addComment = mutation({
     tags: v.optional(v.array(TAG)),
   },
   handler: async (ctx, args): Promise<Id<"agentTraceComments">> => {
-    const { trace, userId } = await traceSession(ctx, args.token);
+    const { trace, userId, verdictCampaign } = await traceSession(ctx, args.token);
     const body = args.comment.trim();
     if (!body) throw new Error("Add a comment before saving.");
     if (
@@ -363,6 +392,7 @@ export const addComment = mutation({
       agentTraceId: trace._id,
       projectId: trace.projectId,
       userId,
+      verdictCampaignId: verdictCampaign?._id,
       target: args.target,
       comment: body,
       label: args.label,
@@ -371,11 +401,20 @@ export const addComment = mutation({
   },
 });
 
-/** Return the caller's verdict for one opaque trajectory session. */
+/** Return the caller's verdict for the active opaque run-review item. */
 export const myVerdict = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
-    const { trace, userId } = await traceSession(ctx, args.token);
+    const { trace, userId, verdictItem } = await traceSession(ctx, args.token);
+    if (verdictItem) {
+      const decision = await ctx.db
+        .query("verdictReviewDecisions")
+        .withIndex("by_item_and_user", (q) =>
+          q.eq("itemId", verdictItem._id).eq("userId", userId),
+        )
+        .unique();
+      return decision ? { rating: decision.rating, note: decision.note } : null;
+    }
     const verdict = await ctx.db
       .query("agentTraceVerdicts")
       .withIndex("by_trace_and_user", (q) =>
@@ -386,11 +425,56 @@ export const myVerdict = query({
   },
 });
 
-/** Upsert the caller's verdict through an opaque trajectory session. */
+/** Save a verdict and advance a campaign session, or upsert a standalone verdict. */
 export const setVerdict = mutation({
   args: { token: v.string(), rating: RATING, note: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const { trace, userId } = await traceSession(ctx, args.token);
+    const {
+      session,
+      trace,
+      userId,
+      verdictItem,
+      verdictCampaign,
+    } = await traceSession(ctx, args.token);
+    const note = args.note?.trim().slice(0, 2_000) || undefined;
+    if (verdictItem && verdictCampaign) {
+      const existing = await ctx.db
+        .query("verdictReviewDecisions")
+        .withIndex("by_item_and_user", (q) =>
+          q.eq("itemId", verdictItem._id).eq("userId", userId),
+        )
+        .unique();
+      let decisionId: Id<"verdictReviewDecisions">;
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          rating: args.rating,
+          note,
+          decidedAt: Date.now(),
+        });
+        decisionId = existing._id;
+      } else {
+        decisionId = await ctx.db.insert("verdictReviewDecisions", {
+          campaignId: verdictCampaign._id,
+          itemId: verdictItem._id,
+          projectId: trace.projectId,
+          agentTraceId: trace._id,
+          userId,
+          rating: args.rating,
+          note,
+          decidedAt: Date.now(),
+        });
+        await ctx.db.patch(verdictCampaign._id, {
+          judgmentCount: verdictCampaign.judgmentCount + 1,
+        });
+      }
+      const nextIndex = (session.currentIndex ?? 0) + 1;
+      const total = session.traceOrder?.length ?? 0;
+      await ctx.db.patch(session._id, {
+        currentIndex: nextIndex,
+        ...(nextIndex >= total ? { completedAt: Date.now() } : {}),
+      });
+      return decisionId;
+    }
     const existing = await ctx.db
       .query("agentTraceVerdicts")
       .withIndex("by_trace_and_user", (q) =>
@@ -398,7 +482,7 @@ export const setVerdict = mutation({
       )
       .unique();
     if (existing) {
-      await ctx.db.patch(existing._id, { rating: args.rating, note: args.note });
+      await ctx.db.patch(existing._id, { rating: args.rating, note });
       return existing._id;
     }
     return await ctx.db.insert("agentTraceVerdicts", {
@@ -406,7 +490,7 @@ export const setVerdict = mutation({
       projectId: trace.projectId,
       userId,
       rating: args.rating,
-      note: args.note,
+      note,
     });
   },
 });

@@ -350,6 +350,9 @@ describe("blind comparison campaigns", () => {
       judgments: 6,
     }]);
 
+    await asOwner.mutation(api.comparisonCampaigns.closeCampaign, {
+      campaignId: imported.campaignId,
+    });
     const exported = await asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       campaignId: imported.campaignId,
@@ -363,9 +366,6 @@ describe("blind comparison campaigns", () => {
       reviewers: 1,
     });
 
-    await asOwner.mutation(api.comparisonCampaigns.closeCampaign, {
-      campaignId: imported.campaignId,
-    });
     await expect(asGuest.mutation(api.comparisonCampaigns.submitChoice, {
       sessionToken,
       position: 5,

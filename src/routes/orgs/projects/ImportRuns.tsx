@@ -385,7 +385,13 @@ export function ImportRuns() {
         </CardContent>
       </Card>
 
-      {result && <ImportSummary result={result} tracesHref="../traces" />}
+      {result && (
+        <ImportSummary
+          result={result}
+          createReviewHref="../reviews/new"
+          runsHref="../traces"
+        />
+      )}
 
       <Card className="mt-6 border-amber-500/40 bg-amber-500/5">
         <CardContent className="flex gap-3 pt-6 text-sm text-muted-foreground">
@@ -470,7 +476,15 @@ function CsvMappingEditor({
   );
 }
 
-function ImportSummary({ result, tracesHref }: { readonly result: ImportResult; readonly tracesHref: string }) {
+function ImportSummary({
+  result,
+  createReviewHref,
+  runsHref,
+}: {
+  readonly result: ImportResult;
+  readonly createReviewHref: string;
+  readonly runsHref: string;
+}) {
   const imported = "imported" in result ? result.imported : result.deduped ? 0 : 1;
   const deduped = typeof result.deduped === "number" ? result.deduped : result.deduped ? 1 : 0;
   const summary = result.summary as unknown as Record<string, unknown>;
@@ -518,9 +532,14 @@ function ImportSummary({ result, tracesHref }: { readonly result: ImportResult; 
             </p>
           )}
         </div>
-        <Link to={tracesHref} className={buttonVariants({ size: "sm" })}>
-          Review trajectories
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to={createReviewHref} className={buttonVariants({ size: "sm" })}>
+            Create blind review
+          </Link>
+          <Link to={runsHref} className={buttonVariants({ size: "sm", variant: "outline" })}>
+            Inspect imported runs
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
