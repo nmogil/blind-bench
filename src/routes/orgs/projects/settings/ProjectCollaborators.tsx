@@ -47,11 +47,11 @@ export function ProjectCollaborators() {
           <div>
             <h1 className="text-2xl font-bold">Collaborators</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage who can access this prompt and their roles.
+              Manage who can access this review project and their roles.
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Evaluators can only see blinded outputs and leave feedback. They cannot
-              see versions or know which version produced which output.
+              Blind reviewers see only the task, outcome, and projected steps. Model,
+              harness, and source provenance remain hidden while they judge.
             </p>
           </div>
           <Button onClick={() => setInviteOpen(true)}>

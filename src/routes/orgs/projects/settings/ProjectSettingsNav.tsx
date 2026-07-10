@@ -1,10 +1,11 @@
 import { NavLink, useParams } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import { cn } from "@/lib/utils";
-import { Settings, Users } from "lucide-react";
+import { DatabaseZap, Settings, Users } from "lucide-react";
 
 const links = [
   { label: "General", path: "", icon: Settings, end: true },
+  { label: "Data sources", path: "sources", icon: DatabaseZap, end: false },
   { label: "Collaborators", path: "collaborators", icon: Users, end: false },
 ];
 

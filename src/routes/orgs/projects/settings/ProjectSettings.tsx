@@ -56,7 +56,7 @@ export function ProjectSettings() {
   }
 
   async function handleDelete() {
-    if (!confirm("Delete this prompt? This action cannot be undone.")) return;
+    if (!confirm("Delete this project? This action cannot be undone.")) return;
     setDeleting(true);
     setDeleteError("");
     try {
@@ -65,7 +65,7 @@ export function ProjectSettings() {
     } catch (err) {
       setDeleting(false);
       setDeleteError(
-        friendlyError(err, "Failed to delete prompt. Please try again."),
+        friendlyError(err, "Failed to delete project. Please try again."),
       );
     }
   }
@@ -74,9 +74,9 @@ export function ProjectSettings() {
     <div className="flex">
       <ProjectSettingsNav />
       <div className="p-6 max-w-2xl flex-1">
-      <h1 className="text-2xl font-bold">Prompt settings</h1>
+      <h1 className="text-2xl font-bold">Project settings</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manage prompt details.
+        Manage this review project's details.
       </p>
 
       <form onSubmit={handleSave} className="mt-6 space-y-4">
@@ -94,7 +94,7 @@ export function ProjectSettings() {
             id="project-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What this prompt is about"
+            placeholder="What runs and decisions this project covers"
           />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -116,13 +116,13 @@ export function ProjectSettings() {
             onClick={handleDelete}
             disabled={deleting}
           >
-            {deleting ? "Deleting..." : "Delete prompt"}
+            {deleting ? "Deleting..." : "Delete project"}
           </Button>
           {deleteError && (
             <p className="mt-2 text-sm text-destructive">{deleteError}</p>
           )}
           <p className="mt-2 text-xs text-muted-foreground">
-            This will permanently delete the prompt and all its data.
+            This will permanently delete the project and all its data.
           </p>
         </CardContent>
       </Card>
