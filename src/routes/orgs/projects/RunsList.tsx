@@ -67,7 +67,7 @@ export function RunsList() {
                 Comparing {compareVersionLabels.join(" vs ")}
               </p>
               <p className="text-xs text-muted-foreground">
-                Once runs complete, create a review cycle to get blind
+                Once runs complete, create a blind review to get
                 evaluations.
               </p>
             </div>
@@ -76,7 +76,7 @@ export function RunsList() {
             to={`/orgs/${orgSlug}/projects/${projectId}/cycles/new?primaryVersionId=${compareVersionIds[0]}&controlVersionId=${compareVersionIds[1]}`}
             className={buttonVariants({ size: "sm" })}
           >
-            Create Review Cycle
+            Create blind review
           </Link>
         </div>
       )}

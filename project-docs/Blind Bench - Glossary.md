@@ -153,9 +153,13 @@ A [[#Collaborator]] who can do everything an [[#Editor (role)]] can plus: invite
 
 The predecessor of a [[#Version]] in the linear version sequence. Stored on `promptVersions.parentVersionId`. Every non-initial version has a parent. Distinct from [[#Source version]] which tracks rollback origin.
 
+### Judgment
+
+One human decision made inside a blind [[#Review]]: a Strong / Acceptable / Weak run verdict, a directional paired preference, an annotation, or a comment. Judgment is the normalized product noun; decisions, preferences, verdict rows, and matchup choices are implementation-specific representations.
+
 ### Project
 
-A unit of prompt iteration owned by an [[#Organization]]. Contains versions, variables, test cases, meta context, collaborators, runs, feedback, and optimization requests. One prompt per project (conceptually) — multiple versions of the same prompt, not multiple independent prompts.
+An organization-owned workspace for related [[#Run|runs]], [[#Review|reviews]], and [[#Result|results]]. A project may also contain prompt versions, variables, test cases, meta context, collaborators, and optimization requests, but prompt iteration is a secondary tool rather than the universal project definition.
 
 ### Project variable
 
@@ -172,9 +176,17 @@ Type is set at creation and immutable. See [[Blind Bench - Architecture#Template
 
 An [[#Annotation]] on a specific range of a [[#Version]]'s system message or user template. Distinct from [[#Output feedback]]. Feeds the [[#Optimizer meta-prompt]] alongside output feedback. Evaluators cannot leave prompt feedback (they don't see the prompt).
 
+### Result
+
+The owner/editor aggregate produced by a [[#Review]]. A result reports judgment coverage, verdict or preference distribution, disagreement, comments, and provenance. Once closed and eligible, it is the context for copying evidence, promoting regression cases, or exporting SFT/DPO data. It is not a synonym for an individual model output.
+
+### Review
+
+A bounded request for blind human [[#Judgment|judgment]] over selected [[#Run|runs]]. The two user-facing modes are **Score runs** and **Compare attempts**. Campaigns, cycles, reviewer sessions, items, and matchups are implementation or legacy compatibility terms, not primary navigation nouns.
+
 ### Reviewer
 
-User-facing label for a [[#Collaborator]] with `role === "evaluator"`. Two flavors, distinguished by [[#Blind Mode]]:
+User-facing label for a [[#Collaborator]] with `role === "evaluator"`, or for an anonymous participant entering through an opaque review link. Authenticated legacy review has two flavors, distinguished by [[#Blind Mode]]:
 
 - **Reviewer (open)** — `blindMode === false`. Sees the prompt, model, and peer comments. Primary persona: non-technical stakeholder (PM, legal, domain expert). Lands on `/review/:projectId`. Can leave [[#Prompt feedback]] and [[#Output feedback]] but cannot edit, run, or trigger optimization.
 - **Reviewer (blind)** — `blindMode === true` or absent. Today's `Evaluator (role)` behavior. Sees only A/B/C-labeled outputs in a session. Lands on `/eval`.
@@ -191,7 +203,7 @@ The product boundary in which Blind Bench does not execute arbitrary customer ha
 
 ### Run
 
-One execution of a specific [[#Version]] against a specific [[#Test case]] at a specific model configuration (model, temperature, max tokens). Produces `runCount` [[#Output]]s via [[#Fan-out]]. Runs are the unit of comparison: running the same test case against v1/v2/v3 is the primitive for "is v2 actually better than v1?".
+The universal product noun for one completed AI execution. A run may be a single prompt/response or a multi-step agent execution containing conversation turns, tool calls, and outcomes. It may be imported from an external runtime or produced by the secondary prompt playground. `agentTraces`, prompt `runs`, and paired candidates are storage/execution representations of this product concept.
 
 ### Source version
 

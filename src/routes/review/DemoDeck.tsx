@@ -102,7 +102,7 @@ export function DemoDeck() {
     );
     const pairs = generateRoundRobinMatchups(MOCK_OUTPUTS, dropped);
     if (pairs.length < 1) {
-      toast.error("Need at least 2 non-weak outputs to battle.");
+      toast.error("Need at least 2 non-weak attempts to compare.");
       return;
     }
     setMatchups(
@@ -269,7 +269,7 @@ function DemoHeader({
               onClick={onSubmitPhase1}
               disabled={reviewedCount === 0}
             >
-              Submit Phase 1
+              Finish scoring
               <ArrowRight className="size-3.5" />
             </Button>
           )}
@@ -294,8 +294,8 @@ function DemoHeader({
 
 function PhaseChip({ phase }: { phase: Phase }) {
   const label = {
-    phase1: "Phase 1 · Review",
-    phase2: "Phase 2 · Battle",
+    phase1: "Score attempts",
+    phase2: "Compare attempts",
     complete: "Complete",
   }[phase];
 
@@ -357,7 +357,7 @@ function CompletePhase({
       </div>
 
       <section className="rounded-lg border p-4">
-        <h2 className="text-sm font-medium">Phase 1 · ratings</h2>
+        <h2 className="text-sm font-medium">Scores</h2>
         <div className="mt-2 flex gap-4 text-sm">
           <span className="text-sky-700 dark:text-sky-300">{best} best</span>
           <span className="text-slate-600 dark:text-slate-400">{acc} acceptable</span>
@@ -367,7 +367,7 @@ function CompletePhase({
       </section>
 
       <section className="rounded-lg border p-4">
-        <h2 className="text-sm font-medium">Phase 2 · leaderboard</h2>
+        <h2 className="text-sm font-medium">Comparison leaderboard</h2>
         {leaderboard.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">
             No matchups recorded.

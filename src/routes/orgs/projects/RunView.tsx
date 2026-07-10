@@ -185,7 +185,7 @@ export function RunView() {
               to={`/orgs/${orgSlug}/projects/${projectId}/cycles/new?primaryVersionId=${run.promptVersionId}`}
               className="text-primary hover:underline font-medium"
             >
-              Start a review cycle
+              Create blind review
             </Link>{" "}
             to track evaluator progress and compare versions.
           </p>

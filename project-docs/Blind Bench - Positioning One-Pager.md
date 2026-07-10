@@ -37,10 +37,11 @@ randomized, blinded human tests) is the one no platform ships.
   CX lead for a support agent, the senior engineer for a coding-agent trace.
   No-account, link-based review; plain-language surfaces; minutes, not an
   engineer-mediated CSV export.
-- **The unit of review is the change, not the run.** Review Cycles compare
-  candidate against control on the same cases, blind, and roll preferences up
-  to standings. The question answered is the one that matters: *did it get
-  better?*
+- **One loop for outputs and agents.** A Run is either one response or a
+  multi-step agent execution. Owners create a blind Review to **Score runs** or
+  **Compare attempts**; human Judgment rolls up into a Result with coverage,
+  disagreement, and explicit reuse eligibility. The question stays practical:
+  *is this good enough, and did it get better?*
 - **Judgment flows somewhere.** Ratings and comments re-attach to trace IDs,
   promote to regression sets and training data (SFT/DPO), and feed prompt
   revisions that cite the specific reviewer comments they address — never a

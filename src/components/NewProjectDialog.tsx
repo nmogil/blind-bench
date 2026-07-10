@@ -101,7 +101,7 @@ export function NewProjectDialog({
         `/orgs/${org.slug}/projects/${result.projectId}/versions/${result.versionId}`,
       );
     } catch (err) {
-      setError(friendlyError(err, "Failed to create prompt."));
+      setError(friendlyError(err, "Failed to create project."));
     } finally {
       setSaving(false);
     }

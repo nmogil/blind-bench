@@ -531,7 +531,7 @@ export function CycleDetail() {
         </div>
       </div>
 
-      {/* Phase 2 Battle Results */}
+      {/* Legacy comparison results */}
       <BattleResultsSection stats={matchupStats} />
 
       {/* Reviewer Comments */}
@@ -770,7 +770,7 @@ function BattleResultsSection({ stats }: { stats: MatchupStats | undefined }) {
     <div className="mt-8">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold">
-          Battle Results{" "}
+          Comparison results{" "}
           <span className="font-normal text-muted-foreground">
             — {stats.decidedCount} decided across {stats.phase2Sessions}{" "}
             session{stats.phase2Sessions !== 1 ? "s" : ""}
@@ -781,7 +781,7 @@ function BattleResultsSection({ stats }: { stats: MatchupStats | undefined }) {
       {stats.outputs.length === 0 ? (
         <div className="rounded-lg border border-dashed p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Battle rounds haven't produced decided matchups yet.
+            Comparison rounds haven't produced decided matchups yet.
           </p>
         </div>
       ) : (
@@ -797,7 +797,7 @@ function BattleResultsSection({ stats }: { stats: MatchupStats | undefined }) {
                 <div className="flex items-center gap-3">
                   <BlindLabelBadge label={row.cycleBlindLabel} />
                   <span className="text-xs text-muted-foreground">
-                    {row.battles} battle{row.battles !== 1 ? "s" : ""}
+                    {row.battles} comparison{row.battles !== 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs">

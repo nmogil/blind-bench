@@ -21,6 +21,17 @@ Vocabulary is locked in [[Blind Bench - Glossary]]. If a term here doesn't match
 
 ---
 
+## M34 canonical experience
+
+The owner journey is **Run → Review → Judgment → Result** and the primary project navigation is exactly **Runs · Reviews · Results**.
+
+1. **Runs:** import completed flat outputs or multi-step agent traces. Import success leads with **Create blind review**.
+2. **Reviews:** one builder exposes only **Score runs** and **Compare attempts**, then selected runs, reviewer guidance, blind preview, and share controls. Review cycles, campaigns, sessions, and matchups may remain in URLs or data models for compatibility but are not primary user vocabulary.
+3. **Judgment:** an opaque link lets a reviewer judge blind content without source/model/harness provenance. Run context, outcome, and steps appear before verdict controls.
+4. **Results:** collecting and closed reviews share one owner surface. It reports coverage, verdict/preference distribution, disagreement, and comments. Provenance and evidence/regression/training reuse appear only to authorized owners/editors; unavailable reuse actions state their prerequisites.
+
+Imports, live sources, and Gateway setup are secondary support surfaces. Versions, variables, test cases, prompt execution, and history live under **Tools / Prompt playground**. The standalone Export destination redirects to Results. This section supersedes older prompt-first sitemap and cycle/phase terminology below.
+
 ## Table of contents
 
 1. [Design principles](#1-design-principles)

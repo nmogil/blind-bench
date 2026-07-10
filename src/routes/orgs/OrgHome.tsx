@@ -37,7 +37,7 @@ export function OrgHome() {
                     {s.projectName ? ` — ${s.projectName}` : ""}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {s.phase === "phase1" ? "Phase 1 · Review" : "Phase 2 · Battle"}
+                    {s.phase === "phase1" ? "Scoring runs" : "Comparing attempts"}
                     {" · "}
                     {s.outputCount} outputs
                   </div>

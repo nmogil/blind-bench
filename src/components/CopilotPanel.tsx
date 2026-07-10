@@ -568,7 +568,7 @@ function SuggestionsView({
     },
     {
       id: "start_review_cycle",
-      title: "Start a review cycle",
+      title: "Create a blind review",
       body:
         "Pool runs from different versions and route them blind to evaluators.",
       cta: "New cycle",

@@ -36,6 +36,8 @@ const getBodyFn = async () => FIXTURE_BODY;
 const importPairedComparison = async () => ({ campaignId: "campaign-import-test" });
 const noopMutation = async () => undefined;
 const createVerdictReview = async () => "verdict-review-test";
+const joinVerdictReview = async () => ({ sessionToken: "opaque-verdict-session" });
+const promoteAcceptedRuns = async () => ({ added: 1, alreadyPresent: 0, excluded: 0 });
 const createImportProject = async () => ({ orgSlug: "test-org", projectId: "test-project" });
 const PAGINATED = {
   results: FIXTURE_STEPS,
@@ -50,9 +52,10 @@ export function usePaginatedQuery() {
 
 export function useAction(action?: unknown) {
   try {
-    if (getFunctionName(action as never) === "comparisonCampaigns:importPairedCsv") {
-      return importPairedComparison;
-    }
+    const name = getFunctionName(action as never);
+    if (name === "comparisonCampaigns:importPairedCsv") return importPairedComparison;
+    if (name === "exports:generateExport") return async () => ({ exportId: "export-1", rowCount: 1, excludedCount: 0, manifest: {} });
+    if (name === "exports:downloadExport") return async () => ({ url: "data:application/json,fixture" });
   } catch {
     // Keep unrelated component-test actions on the stable body fixture.
   }
@@ -64,6 +67,8 @@ export function useMutation(mutation?: unknown) {
     const name = getFunctionName(mutation as never);
     if (name === "projects:createForImport") return createImportProject;
     if (name === "verdictReviewCampaigns:create") return createVerdictReview;
+    if (name === "verdictReviewCampaigns:joinCampaign") return joinVerdictReview;
+    if (name === "verdictReviewCampaigns:promoteAcceptedRuns") return promoteAcceptedRuns;
   } catch {
     // Keep unrelated component-test mutations as stable no-ops.
   }
@@ -149,6 +154,40 @@ export const FIXTURE_VERDICT_REVIEWS = [
   },
 ];
 
+export const FIXTURE_OWNER_VERDICT_REVIEW = {
+  _id: "verdict-review-test",
+  projectId: "test-project",
+  name: "Synthetic support review",
+  instructions: "Check whether the run resolved the request.",
+  status: "closed",
+  shareToken: "opaque-share-token",
+  itemCount: 1,
+  judgmentCount: 1,
+  createdAt: 1,
+  openedAt: 2,
+  closedAt: 3,
+  results: {
+    judgments: 1,
+    reviewers: 1,
+    reviewedRuns: 1,
+    best: 1,
+    acceptable: 0,
+    weak: 0,
+    disagreementRuns: 0,
+  },
+  reviewerNames: ["Synthetic reviewer"],
+  regressionCount: 0,
+  runs: [{ traceId: "trace-owner-1", product: "support", harness: "pi", model: "claude-sonnet", judgments: 1 }],
+  comments: [],
+};
+
+export const FIXTURE_REVIEW_DECK = {
+  status: "open",
+  complete: false,
+  instructions: "Check whether the run resolved the request.",
+  progress: { judged: 0, total: 1 },
+};
+
 export const FIXTURE_COMPARISON_REVIEWS = [
   {
     id: "comparison-closed",
@@ -179,6 +218,10 @@ export const FIXTURE_BLIND_TRACE = {
 
 // Branch by function name so each query gets the right fixture; anything
 // unmapped stays undefined (loading), keeping specs independent.
+export function useConvexAuth() {
+  return { isAuthenticated: true, isLoading: false };
+}
+
 export function useQuery(query: unknown) {
   try {
     switch (getFunctionName(query as never)) {
@@ -188,6 +231,10 @@ export function useQuery(query: unknown) {
         return FIXTURE_OWNER_TRACES;
       case "verdictReviewCampaigns:listCampaigns":
         return FIXTURE_VERDICT_REVIEWS;
+      case "verdictReviewCampaigns:getOwnerCampaign":
+        return FIXTURE_OWNER_VERDICT_REVIEW;
+      case "verdictReviewCampaigns:getReview":
+        return FIXTURE_REVIEW_DECK;
       case "comparisonCampaigns:listCampaigns":
         return FIXTURE_COMPARISON_REVIEWS;
       case "agentTraces:getTrace":

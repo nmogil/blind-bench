@@ -287,11 +287,11 @@ export function SessionDeck() {
         if (res.phase === "complete") {
           toast.success("Review complete");
         } else {
-          toast.success(`Phase 2: ${res.matchups} matchups`);
+          toast.success(`${res.matchups} comparisons ready`);
         }
       })
       .catch((err) =>
-        toast.error(friendlyError(err, "Couldn't submit Phase 1.")),
+        toast.error(friendlyError(err, "Couldn't submit scores.")),
       );
   }, [data, submitPhase1, scope]);
 
@@ -485,7 +485,7 @@ function SessionHeader({
               onClick={onSubmitPhase1}
               disabled={reviewedCount === 0}
             >
-              Submit Phase 1
+              Finish scoring
               <ArrowRight className="size-3.5" />
             </Button>
           )}
@@ -522,8 +522,8 @@ function SessionHeader({
 
 function PhaseChip({ phase }: { phase: Phase }) {
   const label = {
-    phase1: "Phase 1 · Review",
-    phase2: "Phase 2 · Battle",
+    phase1: "Score attempts",
+    phase2: "Compare attempts",
     complete: "Complete",
   }[phase];
 
@@ -589,7 +589,7 @@ function CompleteView({
       </div>
 
       <section className="rounded-lg border p-4">
-        <h2 className="text-sm font-medium">Phase 1 · ratings</h2>
+        <h2 className="text-sm font-medium">Scores</h2>
         <div className="mt-2 flex gap-4 text-sm">
           <span className="text-sky-700 dark:text-sky-300">{best} best</span>
           <span className="text-slate-600 dark:text-slate-400">
@@ -602,7 +602,7 @@ function CompleteView({
 
       <section className="rounded-lg border p-4">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-medium">Phase 2 · standings</h2>
+          <h2 className="text-sm font-medium">Comparison standings</h2>
           <span className="text-[11px] text-muted-foreground">
             Bradley-Terry
           </span>
