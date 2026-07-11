@@ -17,6 +17,10 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
 import { blindStepView, blindTraceView } from "./lib/blindProjection";
 import {
+  parseHarborReviewerProjection,
+  type HarborReviewerProjection,
+} from "./lib/harborEvidence";
+import {
   activeVerdictReviewItem,
   resolveVerdictCampaignSession,
 } from "./verdictReviewCampaigns";
@@ -44,7 +48,12 @@ const TARGET = v.union(
   v.object({ kind: v.literal("step"), stepIndex: v.number() }),
   v.object({ kind: v.literal("tool_call"), stepIndex: v.number() }),
 );
-const RATING = v.union(v.literal("best"), v.literal("acceptable"), v.literal("weak"));
+const RATING = v.union(
+  v.literal("best"),
+  v.literal("acceptable"),
+  v.literal("weak"),
+  v.literal("insufficient_evidence"),
+);
 const WINNER = v.union(
   v.literal("left"),
   v.literal("right"),
@@ -227,6 +236,10 @@ export const getTrace = query({
   handler: async (ctx, args) => {
     const { session, trace } = await traceSession(ctx, args.token);
     const project = await ctx.db.get(session.projectId);
+    const fullSpan = await ctx.db
+      .query("fullSpanEvalRuns")
+      .withIndex("by_trace", (q) => q.eq("agentTraceId", trace._id))
+      .unique();
     const projected = blindTraceView({
       _id: "",
       projectName: project?.name ?? "Project",
@@ -254,6 +267,17 @@ export const getTrace = query({
       privacyClass: projected.privacyClass,
       usage: projected.usage,
       hasFinalAnswer: projected.hasFinalAnswer,
+      fullSpan: fullSpan?.status === "ready" ? {
+        runQualification: fullSpan.runQualification,
+        evidenceCompleteness: fullSpan.evidenceCompleteness,
+        canJudgeTaskSuccess: fullSpan.canJudgeTaskSuccess,
+        outcomes: {
+          process: fullSpan.processOutcome,
+          verifier: fullSpan.verifierOutcome,
+          infrastructure: fullSpan.infrastructureOutcome,
+        },
+        hasProjection: fullSpan.reviewerProjectionStorageId !== undefined,
+      } : undefined,
     };
   },
 });
@@ -320,6 +344,39 @@ export const resolveBody = internalQuery({
       )
       .unique();
     return { storageId: step?.blindBodyStorageId ?? null };
+  },
+});
+
+/** Resolve the bounded full-span reviewer projection through an opaque token. */
+export const resolveFullSpanProjection = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, args): Promise<{ storageId: Id<"_storage"> | null }> => {
+    const { trace } = await traceSession(ctx, args.token);
+    const row = await ctx.db
+      .query("fullSpanEvalRuns")
+      .withIndex("by_trace", (q) => q.eq("agentTraceId", trace._id))
+      .unique();
+    return { storageId: row?.status === "ready" ? row.reviewerProjectionStorageId ?? null : null };
+  },
+});
+
+/** Return only the precomputed, bounded reviewer projection; never raw evidence. */
+export const getFullSpanEvidence = action({
+  args: { token: v.string() },
+  handler: async (ctx, args): Promise<HarborReviewerProjection | null> => {
+    const { storageId } = await ctx.runQuery(
+      internal.agentTraceReviewSessions.resolveFullSpanProjection,
+      args,
+    );
+    if (!storageId) return null;
+    const blob = await ctx.storage.get(storageId);
+    if (!blob) return null;
+    try {
+      const decoded: unknown = JSON.parse(await blob.text());
+      return parseHarborReviewerProjection(decoded);
+    } catch {
+      return null;
+    }
   },
 });
 
@@ -437,6 +494,20 @@ export const setVerdict = mutation({
       verdictCampaign,
     } = await traceSession(ctx, args.token);
     const note = args.note?.trim().slice(0, 2_000) || undefined;
+    const fullSpan = await ctx.db
+      .query("fullSpanEvalRuns")
+      .withIndex("by_trace", (q) => q.eq("agentTraceId", trace._id))
+      .unique();
+    if (
+      fullSpan !== null &&
+      !fullSpan.canJudgeTaskSuccess &&
+      args.rating !== "insufficient_evidence"
+    ) {
+      throw new Error("This run has insufficient evidence for a task-success verdict. Add qualitative feedback instead.");
+    }
+    if (args.rating === "insufficient_evidence" && (fullSpan === null || fullSpan.canJudgeTaskSuccess)) {
+      throw new Error("This run is not marked as insufficient evidence.");
+    }
     if (verdictItem && verdictCampaign) {
       const existing = await ctx.db
         .query("verdictReviewDecisions")

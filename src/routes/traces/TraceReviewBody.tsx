@@ -181,7 +181,7 @@ function VerdictControl({ agentTraceId }: { agentTraceId: Id<"agentTraces"> }) {
 
   const current = verdict?.rating;
 
-  async function submit(rating: Rating) {
+  async function submit(rating: Rating | "insufficient_evidence") {
     setBusy(true);
     setError("");
     setSaved(false);

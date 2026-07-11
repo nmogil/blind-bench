@@ -47,11 +47,26 @@ export const createReview = internalMutation({
 
     const traces: Array<Doc<"agentTraces">> = [];
     for (const stableTraceId of args.traceIds) {
-      const trace = await ctx.db
-        .query("agentTraces")
-        .withIndex("by_trace_id", (q) => q.eq("traceId", stableTraceId))
-        .filter((q) => q.eq(q.field("projectId"), tokenRow.projectId))
+      const fullSpan = await ctx.db
+        .query("fullSpanEvalRuns")
+        .withIndex("by_project_and_stable_id", (q) =>
+          q.eq("projectId", tokenRow.projectId).eq("stableRunId", stableTraceId),
+        )
         .unique();
+      let trace: Doc<"agentTraces"> | null = null;
+      if (fullSpan) {
+        if (fullSpan.status !== "ready" || !fullSpan.agentTraceId) return apiError(409, "Every selected run must be ready");
+        trace = await ctx.db.get(fullSpan.agentTraceId);
+        if (!trace || trace.projectId !== tokenRow.projectId || trace.traceId !== `full-span:${stableTraceId}`) {
+          return apiError(409, "Full-span run ownership is inconsistent");
+        }
+      } else {
+        trace = await ctx.db
+          .query("agentTraces")
+          .withIndex("by_trace_id", (q) => q.eq("traceId", stableTraceId))
+          .filter((q) => q.eq(q.field("projectId"), tokenRow.projectId))
+          .unique();
+      }
       if (!trace) return apiError(404, "Run not found in this project");
       if (trace.status !== "ready") return apiError(409, "Every selected run must be ready");
       traces.push(trace);
@@ -113,6 +128,9 @@ async function safeSummary(
       best: decisions.filter((decision) => decision.rating === "best").length,
       acceptable: decisions.filter((decision) => decision.rating === "acceptable").length,
       weak: decisions.filter((decision) => decision.rating === "weak").length,
+      insufficient_evidence: decisions.filter(
+        (decision) => decision.rating === "insufficient_evidence",
+      ).length,
       disagreement: [...ratingsByItem.values()].filter((ratings) => ratings.size > 1).length,
     },
   };

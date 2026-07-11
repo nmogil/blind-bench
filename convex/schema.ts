@@ -804,6 +804,7 @@ const schema = defineSchema({
       v.literal("best"),
       v.literal("acceptable"),
       v.literal("weak"),
+      v.literal("insufficient_evidence"),
     ),
     note: v.optional(v.string()),
     decidedAt: v.number(),
@@ -825,6 +826,62 @@ const schema = defineSchema({
     .index("by_project", ["projectId"])
     .index("by_project_and_trace", ["projectId", "agentTraceId"])
     .index("by_campaign", ["verdictCampaignId"]),
+
+  // #354: strict Mogil/Harbor whole-run evidence linked to the trajectory spine.
+  // Raw source evidence and the bounded reviewer projection are immutable,
+  // separate storage blobs. Objective outcomes remain distinct from human
+  // verdict tables. Stable ids are project-tenanted retry/idempotency keys.
+  fullSpanEvalRuns: defineTable({
+    projectId: v.id("projects"),
+    stableRunId: v.string(),
+    attempt: v.string(),
+    fingerprint: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("staged"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    leaseId: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
+    pendingAgentTraceId: v.optional(v.id("agentTraces")),
+    pendingStorageIds: v.optional(v.array(v.id("_storage"))),
+    agentTraceId: v.optional(v.id("agentTraces")),
+    rawEvidenceStorageId: v.optional(v.id("_storage")),
+    reviewerProjectionStorageId: v.optional(v.id("_storage")),
+    runQualification: v.union(
+      v.literal("quality_eligible"),
+      v.literal("fixture_only"),
+      v.literal("insufficient"),
+    ),
+    evidenceCompleteness: v.union(v.literal("complete"), v.literal("insufficient")),
+    canJudgeTaskSuccess: v.boolean(),
+    processOutcome: v.object({
+      status: v.union(v.literal("succeeded"), v.literal("failed")),
+      summary: v.optional(v.string()),
+    }),
+    verifierOutcome: v.object({
+      status: v.union(v.literal("passed"), v.literal("failed"), v.literal("not_run")),
+      summary: v.optional(v.string()),
+    }),
+    infrastructureOutcome: v.object({
+      status: v.union(v.literal("succeeded"), v.literal("failed")),
+      summary: v.optional(v.string()),
+    }),
+    evidenceMissing: v.array(v.string()),
+    rewards: v.record(v.string(), v.number()),
+    startedAt: v.string(),
+    completedAt: v.string(),
+    terminationStatus: v.string(),
+    terminationReason: v.string(),
+    importedById: v.id("users"),
+    errorMessage: v.optional(v.string()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_stable_id", ["projectId", "stableRunId"])
+    .index("by_project_and_attempt", ["projectId", "attempt"])
+    .index("by_status_and_lease", ["status", "leaseExpiresAt"])
+    .index("by_trace", ["agentTraceId"]),
 
   // #264 (M31 Trajectory Spine): parent row for a normalized agent-run trace.
   // Deliberately tiny — metadata + usage rollups only, NO step content — so it
@@ -980,6 +1037,7 @@ const schema = defineSchema({
       v.literal("best"),
       v.literal("acceptable"),
       v.literal("weak"),
+      v.literal("insufficient_evidence"),
     ),
     note: v.optional(v.string()),
   })

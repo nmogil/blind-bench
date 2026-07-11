@@ -181,7 +181,7 @@ describe("customer reviews HTTP API", () => {
     const status = await t.fetch(`/api/v1/reviews?id=${String(created.review_id)}`, { headers: { "x-blindbench-api-token": readOnly.token } });
     expect(status.status).toBe(200);
     const safe = await json(status);
-    expect(safe).toMatchObject({ status: "open", item_count: 1, judgment_count: 2, reviewed_item_count: 1, aggregate: { best: 1, acceptable: 0, weak: 1, disagreement: 1 } });
+    expect(safe).toMatchObject({ status: "open", item_count: 1, judgment_count: 2, reviewed_item_count: 1, aggregate: { best: 1, acceptable: 0, weak: 1, insufficient_evidence: 0, disagreement: 1 } });
     expect(Object.keys(safe).sort()).toEqual([
       "aggregate",
       "item_count",
@@ -194,6 +194,7 @@ describe("customer reviews HTTP API", () => {
       "acceptable",
       "best",
       "disagreement",
+      "insufficient_evidence",
       "weak",
     ]);
     const serialized = JSON.stringify(safe);

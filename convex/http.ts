@@ -5,6 +5,7 @@ import { auth } from "./auth";
 import { verifyWebhook } from "./lib/polarSignature";
 import { otlpIngestHandler } from "./otlpIngest";
 import { nativeIngestHandler } from "./nativeIngest";
+import { handler as fullSpanIngestHandler } from "./fullSpanIngest";
 import {
   closeReviewHandler,
   createReviewHandler,
@@ -211,6 +212,9 @@ http.route({
     });
   }),
 });
+
+// --- Strict Mogil/Harbor full-span evidence ingest ---
+http.route({ path: "/ingest/v1/eval-runs", method: "POST", handler: fullSpanIngestHandler });
 
 // --- Customer review automation (scoped project token auth; no browser CORS) ---
 http.route({ path: "/api/v1/reviews", method: "POST", handler: createReviewHandler });

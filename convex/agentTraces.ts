@@ -22,7 +22,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { action, internalMutation, internalQuery, query } from "./_generated/server";
-import type { ActionCtx } from "./_generated/server";
+import type { ActionCtx, MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireAuth, requireProjectRole, isBlindReviewer } from "./lib/auth";
@@ -232,7 +232,26 @@ export const insertSteps = internalMutation({
   },
 });
 
-/** Attach final-answer blobs and flip the parent to "ready". */
+/** Attach final-answer blobs while keeping a trace unpublished for batch commit. */
+export const stageTrace = internalMutation({
+  args: {
+    agentTraceId: v.id("agentTraces"),
+    finalAnswerStorageId: v.optional(v.id("_storage")),
+    finalAnswerBlindStorageId: v.optional(v.id("_storage")),
+  },
+  handler: async (ctx, args) => {
+    const trace = await ctx.db.get(args.agentTraceId);
+    if (!trace || trace.status !== "pending") {
+      throw new Error("Pending trace not found while staging import.");
+    }
+    await ctx.db.patch(args.agentTraceId, {
+      finalAnswerStorageId: args.finalAnswerStorageId,
+      finalAnswerBlindStorageId: args.finalAnswerBlindStorageId,
+    });
+  },
+});
+
+/** Attach final-answer blobs and flip a standalone trace to "ready". */
 export const finalizeTrace = internalMutation({
   args: {
     agentTraceId: v.id("agentTraces"),
@@ -260,6 +279,41 @@ export const linkTraceImport = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.agentTraceId, { traceImportId: args.traceImportId });
   },
+});
+
+/** Delete one newly-created trace and every child row/blob. Idempotent. */
+export async function deleteTraceCascade(
+  ctx: MutationCtx,
+  agentTraceId: Id<"agentTraces">,
+): Promise<void> {
+  const trace = await ctx.db.get(agentTraceId);
+  const steps = await ctx.db
+    .query("agentTraceSteps")
+    .withIndex("by_trace_and_index", (q) => q.eq("agentTraceId", agentTraceId))
+    .collect();
+  const storageIds = new Set<Id<"_storage">>();
+  const [sessions, comments, verdicts] = await Promise.all([
+    ctx.db.query("agentTraceReviewSessions").withIndex("by_trace_and_reviewer", (q) => q.eq("agentTraceId", agentTraceId)).collect(),
+    ctx.db.query("agentTraceComments").withIndex("by_trace", (q) => q.eq("agentTraceId", agentTraceId)).collect(),
+    ctx.db.query("agentTraceVerdicts").withIndex("by_trace", (q) => q.eq("agentTraceId", agentTraceId)).collect(),
+  ]);
+  for (const row of [...sessions, ...comments, ...verdicts]) await ctx.db.delete(row._id);
+  for (const step of steps) {
+    if (step.fullBodyStorageId) storageIds.add(step.fullBodyStorageId);
+    if (step.blindBodyStorageId) storageIds.add(step.blindBodyStorageId);
+    await ctx.db.delete(step._id);
+  }
+  if (trace?.finalAnswerStorageId) storageIds.add(trace.finalAnswerStorageId);
+  if (trace?.finalAnswerBlindStorageId) storageIds.add(trace.finalAnswerBlindStorageId);
+  for (const storageId of storageIds) {
+    try { await ctx.storage.delete(storageId); } catch { /* idempotent cleanup */ }
+  }
+  if (trace) await ctx.db.delete(trace._id);
+}
+
+export const deleteTraceCascadeInternal = internalMutation({
+  args: { agentTraceId: v.id("agentTraces") },
+  handler: async (ctx, args) => await deleteTraceCascade(ctx, args.agentTraceId),
 });
 
 /** Mark a partially-imported trace failed with a sanitized message. */
@@ -337,43 +391,66 @@ export async function storeTraceSteps(
   ctx: ActionCtx,
   agentTraceId: Id<"agentTraces">,
   trace: AgentRunTrace,
+  options: {
+    readonly completion?: "ready" | "staged";
+    readonly heartbeat?: () => Promise<void>;
+  } = {},
 ): Promise<void> {
+  const unlinkedStorageIds: Id<"_storage">[] = [];
+  const heartbeat = options.heartbeat ?? (async () => undefined);
   try {
     const rows: Array<Record<string, unknown>> = [];
     let prefixHash = await sha256("");
-    for (const step of trace.steps) {
+    await heartbeat();
+    for (let index = 0; index < trace.steps.length; index++) {
+      const step = trace.steps[index];
+      if (!step) throw new Error("Trace step disappeared while storing evidence.");
       const { row, fullBody, blindBody } = splitStep(step);
       const fullBodyStorageId =
         fullBody === undefined ? undefined : await storeJson(ctx, fullBody);
+      if (fullBodyStorageId) unlinkedStorageIds.push(fullBodyStorageId);
       const blindBodyStorageId =
         blindBody === undefined ? undefined : await storeJson(ctx, blindBody);
+      if (blindBodyStorageId) unlinkedStorageIds.push(blindBodyStorageId);
       rows.push({ ...row, prefixHash, fullBodyStorageId, blindBodyStorageId });
       prefixHash = await sha256(`${prefixHash}:${stableStringify(step)}`);
+      if ((index + 1) % 25 === 0) await heartbeat();
     }
+    await heartbeat();
     for (let i = 0; i < rows.length; i += STEP_INSERT_CHUNK) {
       await ctx.runMutation(internal.agentTraces.insertSteps, {
         agentTraceId,
         steps: rows.slice(i, i + STEP_INSERT_CHUNK) as never,
       });
+      await heartbeat();
     }
     let finalAnswerStorageId: Id<"_storage"> | undefined;
     let finalAnswerBlindStorageId: Id<"_storage"> | undefined;
+    await heartbeat();
     if (trace.final_answer !== undefined) {
       finalAnswerStorageId = await storeJson(ctx, { text: trace.final_answer });
+      unlinkedStorageIds.push(finalAnswerStorageId);
       finalAnswerBlindStorageId = await storeJson(ctx, {
         text: redactValue(trace.final_answer, "blind_view"),
       });
+      unlinkedStorageIds.push(finalAnswerBlindStorageId);
     }
-    await ctx.runMutation(internal.agentTraces.finalizeTrace, {
-      agentTraceId,
-      finalAnswerStorageId,
-      finalAnswerBlindStorageId,
-    });
+    await heartbeat();
+    await ctx.runMutation(
+      options.completion === "staged"
+        ? internal.agentTraces.stageTrace
+        : internal.agentTraces.finalizeTrace,
+      {
+        agentTraceId,
+        finalAnswerStorageId,
+        finalAnswerBlindStorageId,
+      },
+    );
   } catch {
-    await ctx.runMutation(internal.agentTraces.markTraceFailed, {
-      agentTraceId,
-      message: "Trace import failed while persisting steps.",
-    });
+    for (const storageId of unlinkedStorageIds) {
+      try { await ctx.storage.delete(storageId); } catch { /* best-effort rollback */ }
+    }
+    await ctx.runMutation(internal.agentTraces.deleteTraceCascadeInternal, { agentTraceId });
     throw new Error("Trace import failed while persisting steps.");
   }
 }
