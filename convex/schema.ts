@@ -770,6 +770,10 @@ const schema = defineSchema({
       v.literal("closed"),
     ),
     shareToken: v.string(),
+    // Customer API retries are deduplicated within the token's project. Optional
+    // keeps reviews created before the automation API compatible.
+    idempotencyKey: v.optional(v.string()),
+    idempotencyFingerprint: v.optional(v.string()),
     itemCount: v.number(),
     judgmentCount: v.number(),
     createdById: v.id("users"),
@@ -778,7 +782,8 @@ const schema = defineSchema({
     closedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
-    .index("by_share_token", ["shareToken"]),
+    .index("by_share_token", ["shareToken"])
+    .index("by_project_and_idempotency", ["projectId", "idempotencyKey"]),
 
   verdictReviewItems: defineTable({
     campaignId: v.id("verdictReviewCampaigns"),
@@ -1115,6 +1120,17 @@ const schema = defineSchema({
     projectId: v.id("projects"),
     token: v.string(),
     label: v.string(),
+    // Missing means the legacy ingest-only capability. Explicit arrays are a
+    // strict allowlist; no capability is inferred from another capability.
+    scopes: v.optional(
+      v.array(
+        v.union(
+          v.literal("traces:write"),
+          v.literal("reviews:write"),
+          v.literal("reviews:read"),
+        ),
+      ),
+    ),
     createdById: v.id("users"),
     lastUsedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),

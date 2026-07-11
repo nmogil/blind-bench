@@ -55,8 +55,10 @@ export function IngestEndpoint() {
 
   const nativeIngestUrl = deriveNativeIngestUrl();
   const ingestUrl = deriveIngestUrl();
+  const apiBaseUrl = nativeIngestUrl.replace(/\/ingest\/v1\/traces$/, "");
 
   const [label, setLabel] = useState("Gateway token");
+  const [preset, setPreset] = useState<"ingest" | "automation">("ingest");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<IssueResult | null>(null);
@@ -68,7 +70,10 @@ export function IngestEndpoint() {
     // A prior full-token card is stale once a new token is issued — clear it.
     setIssued(null);
     try {
-      const res = await issueToken({ projectId, label: label.trim() });
+      const scopes = preset === "automation"
+        ? (["traces:write", "reviews:write", "reviews:read"] as const)
+        : (["traces:write"] as const);
+      const res = await issueToken({ projectId, label: label.trim(), scopes: [...scopes] });
       setIssued(res);
     } catch (err) {
       setError(
@@ -125,7 +130,7 @@ export function IngestEndpoint() {
         </h2>
 
         <form onSubmit={handleIssue} className="flex flex-wrap items-end gap-2">
-          <div className="flex-1 space-y-1.5">
+          <div className="min-w-48 flex-1 space-y-1.5">
             <Label htmlFor="token-label">Label</Label>
             <Input
               id="token-label"
@@ -135,9 +140,26 @@ export function IngestEndpoint() {
               maxLength={80}
             />
           </div>
+          <div className="min-w-52 space-y-1.5">
+            <Label htmlFor="token-preset">Access preset</Label>
+            <select
+              id="token-preset"
+              value={preset}
+              onChange={(event) => setPreset(event.target.value === "automation" ? "automation" : "ingest")}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <option value="ingest">Ingest only (default)</option>
+              <option value="automation">Automation (ingest + manage reviews)</option>
+            </select>
+          </div>
           <Button type="submit" disabled={busy}>
             {busy ? "Issuing…" : "Issue token"}
           </Button>
+          <p className="w-full text-xs text-muted-foreground">
+            {preset === "automation"
+              ? "Scopes: traces:write, reviews:write, reviews:read."
+              : "Scope: traces:write. This token cannot manage reviews."}
+          </p>
         </form>
 
         {error && (
@@ -161,9 +183,62 @@ export function IngestEndpoint() {
       {/* Native JSON — the default path */}
       <NativeIngestCard nativeUrl={nativeIngestUrl} />
 
+      {/* Customer automation API — available without repository access */}
+      <AutomationApiCard apiBaseUrl={apiBaseUrl} />
+
       {/* Gateway / OTLP adapter */}
       <GatewaySetupCard ingestUrl={ingestUrl} />
     </div>
+  );
+}
+
+function AutomationApiCard({ apiBaseUrl }: { apiBaseUrl: string }) {
+  const createExample = [
+    `curl -X POST ${apiBaseUrl}/api/v1/reviews \\`,
+    `  -H "Authorization: Bearer <automation-token>" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -d '{`,
+    `    "name": "Release candidate review",`,
+    `    "trace_ids": ["native-case-123"],`,
+    `    "idempotency_key": "release-2026-07-11"`,
+    `  }'`,
+  ].join("\n");
+
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <KeyRound aria-hidden="true" className="h-4 w-4 text-primary" />
+          Automate blind review cycles
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <p>
+          Issue an <strong className="text-foreground">Automation</strong> token,
+          upload records, then create an open blind review from their stable trace
+          IDs. The API returns an opaque reviewer URL you can share immediately.
+        </p>
+        <div className="relative">
+          <pre className="overflow-x-auto rounded-lg border bg-muted/30 p-3 pr-12 font-mono text-xs text-foreground">
+            {createExample}
+          </pre>
+          <CopyButton text={createExample} label="Copy curl" variant="overlay" />
+        </div>
+        <div className="grid gap-2 rounded-lg border p-3 font-mono text-xs text-foreground">
+          <span>POST /api/v1/reviews — create and open</span>
+          <span>GET /api/v1/reviews?id=&lt;review_id&gt; — safe aggregate status</span>
+          <span>POST /api/v1/reviews/close — close and preserve judgments</span>
+        </div>
+        <p>
+          Prefix the record ID emitted by your harness with{" "}
+          <code className="text-foreground">native-</code>. For example, record{" "}
+          <code className="text-foreground">case-123</code> becomes trace ID{" "}
+          <code className="text-foreground">native-case-123</code>. Review status
+          never returns prompts, outputs, reviewer identities, comments, or model
+          provenance.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -340,7 +415,7 @@ function TokenRow({ token }: { token: IngestToken }) {
           </span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Created {formatTimestamp(token.createdAt)} · Last used{" "}
+          Created {formatTimestamp(token.createdAt)} · {token.scopes.join(", ")} · Last used{" "}
           {token.lastUsedAt ? formatTimestamp(token.lastUsedAt) : "never"}
         </p>
         {error && (

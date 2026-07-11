@@ -12,8 +12,20 @@ import type { Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
 import { generateToken } from "./lib/crypto";
 
+export const tokenScopeValidator = v.union(
+  v.literal("traces:write"),
+  v.literal("reviews:write"),
+  v.literal("reviews:read"),
+);
+
+export type TokenScope = "traces:write" | "reviews:write" | "reviews:read";
+
 export const issueIngestToken = mutation({
-  args: { projectId: v.id("projects"), label: v.string() },
+  args: {
+    projectId: v.id("projects"),
+    label: v.string(),
+    scopes: v.optional(v.array(tokenScopeValidator)),
+  },
   handler: async (
     ctx,
     args,
@@ -21,10 +33,14 @@ export const issueIngestToken = mutation({
     const { userId } = await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
     const label = args.label.trim() || "Ingest token";
     const token = generateToken();
+    const scopes = args.scopes === undefined
+      ? undefined
+      : [...new Set<TokenScope>(args.scopes)];
     const tokenId = await ctx.db.insert("ingestTokens", {
       projectId: args.projectId,
       token,
       label,
+      scopes,
       createdById: userId,
     });
     // Full token returned ONCE — never surfaced again.
@@ -57,6 +73,7 @@ export const listIngestTokens = query({
       // Masked — the full token is only ever shown at creation.
       preview: `${r.token.slice(0, 6)}…${r.token.slice(-4)}`,
       createdAt: r._creationTime,
+      scopes: r.scopes ?? ["traces:write" as const],
       lastUsedAt: r.lastUsedAt,
       revoked: r.revokedAt !== undefined,
     }));
