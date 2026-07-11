@@ -28,6 +28,9 @@ export const nativeIngestHandler = httpAction(async (ctx, req) => {
   if (!token) return json({ error: "Missing ingest token" }, 401);
   const resolved = await ctx.runQuery(internal.otlpIngest.resolveIngestToken, { token });
   if (!resolved) return json({ error: "Invalid or revoked ingest token" }, 401);
+  if (!resolved.scopes.includes("traces:write")) {
+    return json({ error: "Token lacks traces:write scope" }, 403);
+  }
 
   const body = await req.text();
   // UTF-8 byte length, not JS string length (which undercounts multibyte content).

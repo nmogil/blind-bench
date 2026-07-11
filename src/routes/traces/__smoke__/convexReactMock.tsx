@@ -237,6 +237,8 @@ export function useQuery(query: unknown) {
         return FIXTURE_REVIEW_DECK;
       case "comparisonCampaigns:listCampaigns":
         return FIXTURE_COMPARISON_REVIEWS;
+      case "ingestTokens:listIngestTokens":
+        return [];
       case "agentTraces:getTrace":
       case "agentTraceReviewSessions:getTrace":
         return FIXTURE_BLIND_TRACE;

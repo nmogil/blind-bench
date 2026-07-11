@@ -14,6 +14,7 @@ import type { Id } from "./_generated/dataModel";
 import { mapOtlpToTraces } from "./lib/otelGenAI";
 import { storeTraceSteps } from "./agentTraces";
 import type { AgentRunTrace } from "./lib/agentTrace";
+import type { TokenScope } from "./ingestTokens";
 
 export const MAX_BYTES = 8 * 1024 * 1024;
 
@@ -26,7 +27,11 @@ export const json = (body: unknown, status: number): Response =>
 export const readToken = (req: Request): string | undefined => {
   const auth = req.headers.get("authorization");
   if (auth?.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
-  return req.headers.get("x-blindbench-ingest-token")?.trim() || undefined;
+  return (
+    req.headers.get("x-blindbench-api-token")?.trim() ||
+    req.headers.get("x-blindbench-ingest-token")?.trim() ||
+    undefined
+  );
 };
 
 export const resolveIngestToken = internalQuery({
@@ -34,13 +39,22 @@ export const resolveIngestToken = internalQuery({
   handler: async (
     ctx,
     args,
-  ): Promise<{ projectId: Id<"projects">; createdById: Id<"users"> } | null> => {
+  ): Promise<{
+    projectId: Id<"projects">;
+    createdById: Id<"users">;
+    scopes: ReadonlyArray<TokenScope>;
+  } | null> => {
     const row = await ctx.db
       .query("ingestTokens")
       .withIndex("by_token", (q) => q.eq("token", args.token))
       .unique();
     if (!row || row.revokedAt !== undefined) return null;
-    return { projectId: row.projectId, createdById: row.createdById };
+    // Tokens issued before scopes existed remain ingest-only.
+    return {
+      projectId: row.projectId,
+      createdById: row.createdById,
+      scopes: row.scopes ?? ["traces:write"],
+    };
   },
 });
 
@@ -99,6 +113,9 @@ export const otlpIngestHandler = httpAction(async (ctx, req) => {
   if (!token) return json({ error: "Missing ingest token" }, 401);
   const resolved = await ctx.runQuery(internal.otlpIngest.resolveIngestToken, { token });
   if (!resolved) return json({ error: "Invalid or revoked ingest token" }, 401);
+  if (!resolved.scopes.includes("traces:write")) {
+    return json({ error: "Token lacks traces:write scope" }, 403);
+  }
 
   const body = await req.text();
   if (new TextEncoder().encode(body).byteLength > MAX_BYTES) return json({ error: "Payload too large" }, 413);

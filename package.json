@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "blindbench": "tsx scripts/blindbench.ts",
+    "test:blindbench-cli": "vitest run scripts/blindbench.test.ts",
     "launch:customer-test-packet": "npx tsx scripts/customer-test-launch-packet.ts",
     "build:deploy": "node scripts/vercel-build.mjs",
     "readiness:customer-testing": "npx tsx scripts/customer-testing-readiness.ts",

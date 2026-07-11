@@ -5,6 +5,11 @@ import { auth } from "./auth";
 import { verifyWebhook } from "./lib/polarSignature";
 import { otlpIngestHandler } from "./otlpIngest";
 import { nativeIngestHandler } from "./nativeIngest";
+import {
+  closeReviewHandler,
+  createReviewHandler,
+  getReviewHandler,
+} from "./reviewsHttp";
 
 const http = httpRouter();
 
@@ -206,5 +211,10 @@ http.route({
     });
   }),
 });
+
+// --- Customer review automation (scoped project token auth; no browser CORS) ---
+http.route({ path: "/api/v1/reviews", method: "POST", handler: createReviewHandler });
+http.route({ path: "/api/v1/reviews", method: "GET", handler: getReviewHandler });
+http.route({ path: "/api/v1/reviews/close", method: "POST", handler: closeReviewHandler });
 
 export default http;
