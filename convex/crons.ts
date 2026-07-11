@@ -11,4 +11,10 @@ crons.daily(
   internal.anonCleanup.cleanupAnonUsers,
 );
 
+crons.interval(
+  "cleanup stale full-span ingest reservations",
+  { hours: 1 },
+  internal.fullSpanIngest.cleanupExpiredReservations,
+);
+
 export default crons;

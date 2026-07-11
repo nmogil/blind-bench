@@ -1,6 +1,6 @@
 # Blind Bench customer automation API
 
-Use this API to upload completed `eval-record` v1 artifacts and automate blind verdict reviews without access to the Blind Bench backend repository.
+Use this API to upload completed `eval-record` v1 artifacts or strict Harbor/Pi coding-run evidence and automate blind verdict reviews without access to the Blind Bench backend repository.
 
 ## Prerequisite and authentication
 
@@ -26,7 +26,7 @@ Tokens are project-scoped and use an exact capability allowlist:
 
 | Scope | Allows |
 |---|---|
-| `traces:write` | Upload native `eval-record` v1 or OTLP traces |
+| `traces:write` | Upload native `eval-record` v1, strict full-span eval runs, or OTLP traces |
 | `reviews:write` | Create/open and close verdict reviews |
 | `reviews:read` | Read management-safe review status |
 
@@ -59,6 +59,19 @@ The endpoint accepts one record, a JSON array, or `{ "records": [...] }`. Its re
 ```
 
 Keep the stable record/trace IDs used by your artifacts. Review creation resolves the resulting `agentTraces.traceId` values, not Blind Bench database IDs. For native records with `id: "case-123"`, the stable trace ID is `native-case-123`.
+
+## Upload a Harbor/Pi full-span coding run
+
+```bash
+curl -X POST "$BLINDBENCH_URL/ingest/v1/eval-runs" \
+  -H "Authorization: Bearer $BLINDBENCH_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @harbor-evidence.json
+```
+
+This endpoint accepts exactly `{ "runs": [artifact, ...] }` with 1–50 strict `mogil.harbor-evidence` `1.0` artifacts and returns `{complete, imported, deduped, invalid}` counts. It validates chronological stable events, tool call/result linkage, termination, objective outcomes, reference/hash bindings, and coding evidence before reserving the batch. Raw evidence is retained privately and separately from the bounded blinded reviewer projection. See [`full-span-ingest.md`](./full-span-ingest.md) for the complete contract.
+
+Keep `run.id` stable. Unlike native eval records, review creation uses this ID directly (for example `harbor-task-42`, not a prefixed ID).
 
 ## Create and open a review
 
@@ -111,12 +124,13 @@ curl "$BLINDBENCH_URL/api/v1/reviews?id=k57..." \
     "best": 1,
     "acceptable": 1,
     "weak": 1,
+    "insufficient_evidence": 0,
     "disagreement": 1
   }
 }
 ```
 
-`aggregate.disagreement` counts reviewed runs that received more than one distinct verdict. This management projection never includes prompts, outputs, instructions, comments, reviewer names, model/harness/source provenance, source IDs, run IDs, or the share token.
+`aggregate.insufficient_evidence` counts explicit evidence-limitation judgments; these are separate from task-success verdicts. `aggregate.disagreement` counts reviewed runs that received more than one distinct verdict. This management projection never includes prompts, outputs, instructions, comments, reviewer names, model/harness/source provenance, source IDs, run IDs, or the share token.
 
 ## Close a review
 

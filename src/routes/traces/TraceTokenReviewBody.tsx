@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { Link } from "react-router-dom";
 import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { friendlyError } from "@/lib/errors";
 import { StepBody, StepList } from "./traceSteps";
+import { FullSpanReviewEvidence } from "./FullSpanReviewEvidence";
+import type { HarborReviewerProjection } from "@/lib/evals/harborEvidence";
 import { ArrowLeft, EyeOff, Route } from "lucide-react";
 
 const RATINGS = [
@@ -32,6 +34,20 @@ export function TraceTokenReviewBody({
 }) {
   const trace = useQuery(api.agentTraceReviewSessions.getTrace, { token });
   const comments = useQuery(api.agentTraceReviewSessions.listComments, { token });
+  const loadFullSpan = useAction(api.agentTraceReviewSessions.getFullSpanEvidence);
+  const [fullSpanEvidence, setFullSpanEvidence] = useState<HarborReviewerProjection | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!trace?.fullSpan?.hasProjection) {
+      setFullSpanEvidence(null);
+      return () => { cancelled = true; };
+    }
+    void loadFullSpan({ token })
+      .then((value) => { if (!cancelled) setFullSpanEvidence(value); })
+      .catch(() => { if (!cancelled) setFullSpanEvidence(null); });
+    return () => { cancelled = true; };
+  }, [loadFullSpan, token, trace?.fullSpan?.hasProjection]);
 
   if (trace === undefined) {
     return (
@@ -78,24 +94,43 @@ export function TraceTokenReviewBody({
         </CardContent>
       </Card>
 
-      {trace.hasFinalAnswer && (
-        <Card className="mt-6">
-          <CardHeader><CardTitle className="text-base">Final answer</CardTitle></CardHeader>
-          <CardContent><StepBody reviewToken={token} field="text" /></CardContent>
-        </Card>
+      {trace.fullSpan ? (
+        <div className="mt-6">
+          {fullSpanEvidence === undefined ? (
+            <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-64 w-full" /></div>
+          ) : fullSpanEvidence ? (
+            <FullSpanReviewEvidence evidence={fullSpanEvidence} />
+          ) : (
+            <p className="text-sm text-destructive" role="alert">Couldn’t load this run’s reviewer evidence. Refresh the page to try again.</p>
+          )}
+        </div>
+      ) : (
+        <>
+          {trace.hasFinalAnswer && (
+            <Card className="mt-6">
+              <CardHeader><CardTitle className="text-base">Final answer</CardTitle></CardHeader>
+              <CardContent><StepBody reviewToken={token} field="text" /></CardContent>
+            </Card>
+          )}
+          <section className="mt-6">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Steps</h2>
+            <StepList reviewToken={token} comments={comments} />
+          </section>
+        </>
       )}
 
-      <section className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Steps</h2>
-        <StepList reviewToken={token} comments={comments} />
-      </section>
-
-      <TokenVerdict token={token} />
+      <TokenVerdict token={token} canJudgeTaskSuccess={trace.fullSpan?.canJudgeTaskSuccess} />
     </div>
   );
 }
 
-function TokenVerdict({ token }: { readonly token: string }) {
+function TokenVerdict({
+  token,
+  canJudgeTaskSuccess,
+}: {
+  readonly token: string;
+  readonly canJudgeTaskSuccess?: boolean;
+}) {
   const verdict = useQuery(api.agentTraceReviewSessions.myVerdict, { token });
   const setVerdict = useMutation(api.agentTraceReviewSessions.setVerdict);
   const [note, setNote] = useState("");
@@ -111,7 +146,7 @@ function TokenVerdict({ token }: { readonly token: string }) {
     }
   }, [verdict, noteInit]);
 
-  async function submit(rating: Rating) {
+  async function submit(rating: Rating | "insufficient_evidence") {
     setBusy(true);
     setError("");
     setSaved(false);
@@ -129,25 +164,43 @@ function TokenVerdict({ token }: { readonly token: string }) {
     <Card className="mt-4">
       <CardHeader><CardTitle className="text-base">Your verdict</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">How did this agent handle the task overall?</p>
-        <div className="flex flex-wrap gap-2">
-          {RATINGS.map((rating) => {
-            const selected = verdict?.rating === rating.value;
-            return (
-              <Button
-                key={rating.value}
-                type="button"
-                variant={selected ? "default" : "outline"}
-                size="sm"
-                onClick={() => void submit(rating.value)}
-                disabled={busy}
-                className={cn(selected && "ring-2 ring-primary/40")}
-              >
-                {rating.label}
-              </Button>
-            );
-          })}
-        </div>
+        {canJudgeTaskSuccess === false ? (
+          <>
+            <p className="text-sm text-muted-foreground">Task success cannot be judged from this upload. You can still leave qualitative feedback and mark the evidence limitation.</p>
+            <Button
+              type="button"
+              variant={verdict?.rating === "insufficient_evidence" ? "default" : "outline"}
+              size="sm"
+              onClick={() => void submit("insufficient_evidence")}
+              disabled={busy}
+              className={cn(verdict?.rating === "insufficient_evidence" && "ring-2 ring-primary/40")}
+            >
+              Mark insufficient evidence
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">How did this agent handle the task overall?</p>
+            <div className="flex flex-wrap gap-2">
+              {RATINGS.map((rating) => {
+                const selected = verdict?.rating === rating.value;
+                return (
+                  <Button
+                    key={rating.value}
+                    type="button"
+                    variant={selected ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => void submit(rating.value)}
+                    disabled={busy}
+                    className={cn(selected && "ring-2 ring-primary/40")}
+                  >
+                    {rating.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </>
+        )}
         <Textarea
           value={note}
           onChange={(event) => { setNote(event.target.value); setSaved(false); }}

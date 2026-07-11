@@ -37,7 +37,12 @@ const TARGET = v.union(
   v.object({ kind: v.literal("step"), stepIndex: v.number() }),
   v.object({ kind: v.literal("tool_call"), stepIndex: v.number() }),
 );
-const RATING = v.union(v.literal("best"), v.literal("acceptable"), v.literal("weak"));
+const RATING = v.union(
+  v.literal("best"),
+  v.literal("acceptable"),
+  v.literal("weak"),
+  v.literal("insufficient_evidence"),
+);
 const WINNER = v.union(
   v.literal("left"),
   v.literal("right"),
@@ -140,6 +145,16 @@ export const setVerdict = mutation({
   },
   handler: async (ctx, args) => {
     const { trace, userId } = await traceForReview(ctx, args.agentTraceId);
+    const fullSpan = await ctx.db
+      .query("fullSpanEvalRuns")
+      .withIndex("by_trace", (q) => q.eq("agentTraceId", trace._id))
+      .unique();
+    if (fullSpan !== null && !fullSpan.canJudgeTaskSuccess && args.rating !== "insufficient_evidence") {
+      throw new Error("This run has insufficient evidence for a task-success verdict.");
+    }
+    if (args.rating === "insufficient_evidence" && (fullSpan === null || fullSpan.canJudgeTaskSuccess)) {
+      throw new Error("This run is not marked as insufficient evidence.");
+    }
     const existing = await ctx.db
       .query("agentTraceVerdicts")
       .withIndex("by_trace_and_user", (q) =>

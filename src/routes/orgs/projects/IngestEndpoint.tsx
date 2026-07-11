@@ -183,12 +183,51 @@ export function IngestEndpoint() {
       {/* Native JSON — the default path */}
       <NativeIngestCard nativeUrl={nativeIngestUrl} />
 
+      {/* Harbor/Pi full-span coding evidence */}
+      <FullSpanIngestCard apiBaseUrl={apiBaseUrl} />
+
       {/* Customer automation API — available without repository access */}
       <AutomationApiCard apiBaseUrl={apiBaseUrl} />
 
       {/* Gateway / OTLP adapter */}
       <GatewaySetupCard ingestUrl={ingestUrl} />
     </div>
+  );
+}
+
+function FullSpanIngestCard({ apiBaseUrl }: { apiBaseUrl: string }) {
+  const curl = [
+    `curl -X POST ${apiBaseUrl}/ingest/v1/eval-runs \\`,
+    `  -H "Authorization: Bearer <automation-token>" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  --data-binary @harbor-evidence.json`,
+  ].join("\n");
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Braces aria-hidden="true" className="h-4 w-4 text-primary" />
+          Upload Harbor/Pi full-span evidence
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm text-muted-foreground">
+        <p>
+          For coding agents, upload strict <code className="text-foreground">mogil.harbor-evidence</code>{" "}
+          <code className="text-foreground">1.0</code> in a <code className="text-foreground">{"{ runs: [...] }"}</code> batch. It preserves ordered messages,
+          linked tool activity, workspace changes, verifier evidence, termination, and
+          objective outcomes for blind whole-run review.
+        </p>
+        <div className="relative">
+          <pre className="overflow-x-auto rounded-lg border bg-muted/30 p-3 pr-12 font-mono text-xs text-foreground">{curl}</pre>
+          <CopyButton text={curl} label="Copy curl" variant="overlay" />
+        </div>
+        <p>
+          Keep <code className="text-foreground">run.id</code> stable for retries and review creation.
+          Raw evidence stays private; reviewers receive a bounded sanitized projection. Do not
+          include credentials, host paths, hidden verifier source, or canaries in reviewer-safe fields.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -275,6 +275,9 @@ export const getOwnerCampaign = query({
         best: decisions.filter((decision) => decision.rating === "best").length,
         acceptable: decisions.filter((decision) => decision.rating === "acceptable").length,
         weak: decisions.filter((decision) => decision.rating === "weak").length,
+        insufficientEvidence: decisions.filter(
+          (decision) => decision.rating === "insufficient_evidence",
+        ).length,
         disagreementRuns,
       },
     };
