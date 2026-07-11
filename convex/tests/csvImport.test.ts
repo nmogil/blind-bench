@@ -124,13 +124,11 @@ describe("mapped CSV import through the trajectory spine", () => {
     });
     await asReviewer.mutation(api.agentTraceReviewSessions.setVerdict, { token, rating: "best" });
 
-    const exported = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       source: "trajectory",
       format: "sft",
-    });
-    expect(exported.rowCount).toBe(1);
-    expect(exported.manifest).toMatchObject({ format: "sft", source_units: 1, reviewers: 1 });
+    })).rejects.toThrow(/training approval/i);
   });
 
   test("persists valid rows and deduplicates a repeated upload", async () => {

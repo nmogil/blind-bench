@@ -28,6 +28,9 @@ export function ComparisonCampaignDetail() {
   // SAFETY: Convex validates the route value as a table ID at the RPC boundary.
   const id = campaignId as Id<"comparisonCampaigns">;
   const campaign = useQuery(api.comparisonCampaigns.getOwnerCampaign, { campaignId: id });
+  const trainingApproval = useQuery(api.trainingApprovals.getForComparisonCampaign, { campaignId: id });
+  const approveTraining = useAction(api.trainingApprovals.approveComparisonCampaign);
+  const revokeTraining = useMutation(api.trainingApprovals.revoke);
   const openCampaign = useMutation(api.comparisonCampaigns.openCampaign);
   const closeCampaign = useMutation(api.comparisonCampaigns.closeCampaign);
   const generateExport = useAction(api.exports.generateExport);
@@ -68,7 +71,41 @@ export function ComparisonCampaignDetail() {
     }
   }
 
+  async function approveForTraining() {
+    setBusy(true);
+    setError("");
+    setReuseMessage("");
+    try {
+      const result = await approveTraining({ campaignId: id });
+      setReuseMessage(`Training approval granted for ${result.eligibleCount} comparable pair${result.eligibleCount === 1 ? "" : "s"}; ${result.excludedCount} excluded.`);
+    } catch (cause: unknown) {
+      setError(friendlyError(cause, "Could not grant training approval for this comparison."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeTrainingApproval() {
+    const approvalId = trainingApproval?.approval?.id;
+    if (approvalId === undefined || !window.confirm("Revoke training approval? Future exports and downloads from this approval will be blocked.")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await revokeTraining({ approvalId });
+      setReuseMessage("Training approval revoked. Future exports and downloads are blocked.");
+    } catch (cause: unknown) {
+      setError(friendlyError(cause, "Could not revoke this training approval."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function download() {
+    const approvalId = trainingApproval?.approval?.status === "active" ? trainingApproval.approval.id : undefined;
+    if (approvalId === undefined) {
+      setError("Grant a separate training approval before exporting DPO data.");
+      return;
+    }
     setBusy(true);
     setError("");
     setReuseMessage("");
@@ -76,6 +113,7 @@ export function ComparisonCampaignDetail() {
       const data = await generateExport({
         projectId,
         campaignId: id,
+        trainingApprovalId: approvalId,
         source: "trajectory",
         format: "dpo",
       });
@@ -83,12 +121,12 @@ export function ComparisonCampaignDetail() {
         setReuseMessage(`No DPO rows were eligible. ${data.excludedCount} pairs were explicitly excluded for ties, disagreement, or comparability.`);
         return;
       }
-      const { url } = await downloadExport({ exportId: data.exportId });
+      const { url, manifestUrl } = await downloadExport({ exportId: data.exportId });
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = `${currentCampaign.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-dpo.jsonl`;
       anchor.click();
-      setReuseMessage(`${data.rowCount} DPO rows ready; ${data.excludedCount} excluded.`);
+      setReuseMessage(`${data.rowCount} DPO rows ready; ${data.excludedCount} excluded. Keep the manifest with the JSONL: ${manifestUrl}`);
     } catch (cause: unknown) {
       setError(friendlyError(cause, "Could not export this comparison."));
     } finally {
@@ -152,9 +190,14 @@ export function ComparisonCampaignDetail() {
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void copyEvidence()}><ClipboardCopy className="h-4 w-4" /> Copy evidence summary</Button>
-              <Button variant="outline" onClick={() => void download()} disabled={busy || currentCampaign.results.judgments === 0}><Download className="h-4 w-4" /> Export eligible DPO</Button>
+              {trainingApproval?.approval?.status === "active" ? (
+                <Button variant="outline" onClick={() => void revokeTrainingApproval()} disabled={busy || !trainingApproval.canApprove}>Revoke training approval</Button>
+              ) : (
+                <Button variant="outline" onClick={() => void approveForTraining()} disabled={busy || currentCampaign.results.judgments === 0 || !trainingApproval?.canApprove}>Approve for training</Button>
+              )}
+              <Button variant="outline" onClick={() => void download()} disabled={busy || trainingApproval?.approval?.status !== "active"}><Download className="h-4 w-4" /> Export eligible DPO</Button>
             </div>
-            <p className="text-xs text-muted-foreground">DPO includes only directional choices with a verified shared prefix. Ties, neither, cannot-judge, disagreement, and prefix mismatch are reported as exclusions.</p>
+            <p className="text-xs text-muted-foreground">A positive preference is not training consent. An owner must separately approve this closed result. DPO then includes only quality-eligible full-span pairs with a verified shared prefix and reviewer-safe next actions; ties, disagreement, private data, hidden reasoning, and prefix mismatch are explicit exclusions.</p>
             {reuseMessage && <p className="text-sm text-muted-foreground" role="status">{reuseMessage}</p>}
           </CardContent>
         </Card>

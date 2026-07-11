@@ -1,10 +1,13 @@
 import { describe, expect, test } from "vitest";
-import fixture from "../../../convex/tests/fixtures/mogil-harbor-evidence-v1.json";
+import dockerFixture from "../../../convex/tests/fixtures/mogil-harbor-evidence-v1.json";
+import isolatedSandboxFixture from "../../../convex/tests/fixtures/daytona-reviewer-contract.json";
 import { parseHarborEvidenceV1 } from "./harborEvidence";
 
-// Static sanitized contract fixture generated through Mogil Bench's authoritative
-// HarborEvidence Pydantic model in mogil-bench-trajectory/src/mogil_bench/evidence.py.
-const artifact = (): Record<string, unknown> => JSON.parse(JSON.stringify(fixture)) as Record<string, unknown>;
+// Static sanitized contracts generated through Mogil Bench's authoritative
+// HarborEvidence Pydantic model. daytona-reviewer-contract.json is copied
+// byte-for-byte from mogil-bench-daytona/tests/fixtures and must not be edited
+// locally; update it only by recopying the producer contract fixture.
+const artifact = (): Record<string, unknown> => JSON.parse(JSON.stringify(dockerFixture)) as Record<string, unknown>;
 const row = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("object expected");
   return value as Record<string, unknown>;
@@ -38,6 +41,37 @@ describe("authoritative mogil.harbor-evidence v1.0 contract", () => {
     for (const hidden of ["analysis_metadata", "fictional-provider", "fictional-model", "harbor/pi", "agent/pi.txt", "call-1"]) {
       expect(serialized).not.toContain(hidden);
     }
+  });
+
+  test.each([
+    ["docker", dockerFixture],
+    ["isolated-sandbox", isolatedSandboxFixture],
+  ])("accepts the copied %s producer contract without exposing environment/provider provenance", async (environmentClass, producerFixture) => {
+    const parsed = await parseHarborEvidenceV1(JSON.parse(JSON.stringify(producerFixture)) as unknown);
+    expect(parsed.projection.runQualification).toBe("quality_eligible");
+    const serialized = JSON.stringify(parsed.projection);
+    expect(serialized).not.toContain(environmentClass);
+    expect(serialized).not.toMatch(/daytona|provider|fictional-provider|harness/i);
+  });
+
+  test.each(["host", "sandbox", "daytona", "isolated_sandbox", ""])(
+    "rejects unsupported reviewer environment class %j",
+    async (environmentClass) => {
+      const body = artifact();
+      row(body.reviewer).environment_class = environmentClass;
+      await expect(parseHarborEvidenceV1(body)).rejects.toThrow(/environment_class/i);
+    },
+  );
+
+  test("training task hash binds reviewer-safe prompt and producer revision", async () => {
+    const first = artifact();
+    const revised = artifact();
+    row(row(revised.reviewer).task).revision = "2";
+    const changedPrompt = artifact();
+    row(row(changedPrompt.reviewer).task).prompt = "A different task.";
+    const [baseline, revision, prompt] = await Promise.all([parseHarborEvidenceV1(first), parseHarborEvidenceV1(revised), parseHarborEvidenceV1(changedPrompt)]);
+    expect(revision.trainingTaskHash).not.toBe(baseline.trainingTaskHash);
+    expect(prompt.trainingTaskHash).not.toBe(baseline.trainingTaskHash);
   });
 
   test("accepts bounded producer stop reasons only on assistant emissions", async () => {

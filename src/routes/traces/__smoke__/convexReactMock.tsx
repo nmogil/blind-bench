@@ -38,6 +38,7 @@ const noopMutation = async () => undefined;
 const createVerdictReview = async () => "verdict-review-test";
 const joinVerdictReview = async () => ({ sessionToken: "opaque-verdict-session" });
 const promoteAcceptedRuns = async () => ({ added: 1, alreadyPresent: 0, excluded: 0 });
+const approveTraining = async () => ({ approvalId: "approval-test", eligibleCount: 1, excludedCount: 0 });
 const createImportProject = async () => ({ orgSlug: "test-org", projectId: "test-project" });
 const PAGINATED = {
   results: FIXTURE_STEPS,
@@ -55,7 +56,8 @@ export function useAction(action?: unknown) {
     const name = getFunctionName(action as never);
     if (name === "comparisonCampaigns:importPairedCsv") return importPairedComparison;
     if (name === "exports:generateExport") return async () => ({ exportId: "export-1", rowCount: 1, excludedCount: 0, manifest: {} });
-    if (name === "exports:downloadExport") return async () => ({ url: "data:application/json,fixture" });
+    if (name === "exports:downloadExport") return async () => ({ url: "data:application/json,fixture", manifestUrl: "data:application/json,manifest" });
+    if (name === "trainingApprovals:approveVerdictCampaign" || name === "trainingApprovals:approveComparisonCampaign") return approveTraining;
   } catch {
     // Keep unrelated component-test actions on the stable body fixture.
   }
@@ -235,8 +237,16 @@ export function useQuery(query: unknown) {
         return FIXTURE_OWNER_VERDICT_REVIEW;
       case "verdictReviewCampaigns:getReview":
         return FIXTURE_REVIEW_DECK;
+      case "trainingApprovals:getForVerdictCampaign":
+      case "trainingApprovals:getForComparisonCampaign":
+        return { canApprove: true, approval: null };
       case "comparisonCampaigns:listCampaigns":
         return FIXTURE_COMPARISON_REVIEWS;
+      case "exports:listExports":
+        return [
+          { _id: "export-revoked", source: "trajectory", format: "sft", rowCount: 1, excludedCount: 0, manifest: null, createdAt: 2, expired: false, availability: "revoked" },
+          { _id: "export-legacy", source: "trajectory", format: "dpo", rowCount: 1, excludedCount: 0, manifest: null, createdAt: 1, expired: false, availability: "legacy_unapproved" },
+        ];
       case "ingestTokens:listIngestTokens":
         return [];
       case "agentTraces:getTrace":

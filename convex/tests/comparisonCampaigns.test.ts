@@ -353,18 +353,15 @@ describe("blind comparison campaigns", () => {
     await asOwner.mutation(api.comparisonCampaigns.closeCampaign, {
       campaignId: imported.campaignId,
     });
-    const exported = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       campaignId: imported.campaignId,
       source: "trajectory",
       format: "dpo",
-    });
-    expect(exported).toMatchObject({ rowCount: 3, excludedCount: 3 });
-    expect(exported.manifest).toMatchObject({
-      format: "dpo",
-      source_units: 6,
-      reviewers: 1,
-    });
+    })).rejects.toThrow(/training approval/i);
+    await expect(asOwner.action(api.trainingApprovals.approveComparisonCampaign, {
+      campaignId: imported.campaignId,
+    })).rejects.toThrow(/no quality-eligible/i);
 
     await expect(asGuest.mutation(api.comparisonCampaigns.submitChoice, {
       sessionToken,

@@ -2,6 +2,10 @@ import { describe, expect, test } from "vitest";
 import {
   buildExportManifest,
   gateRows,
+  TRAINING_EXPORT_LIMITS,
+  trainingExportSizeViolation,
+  serializeAgentObservableEvent,
+  serializeAgentObservableTrajectoryContext,
   toJsonl,
   type ClassifiedRow,
   type ExportRow,
@@ -13,6 +17,54 @@ const dpo = (over: Partial<Record<string, string>> = {}): ExportRow => ({
   chosen: over.chosen ?? "escalated appropriately",
   rejected: over.rejected ?? "ignored the request",
   metadata: { evaluator_count: 2 },
+});
+
+describe("#287 bounded export limits", () => {
+  test.each([
+    ["candidates", "maxCandidates"],
+    ["projectionBytes", "maxProjectionBytes"],
+    ["rowBytes", "maxRowBytes"],
+    ["jsonlBytes", "maxJsonlBytes"],
+    ["manifestBytes", "maxManifestBytes"],
+  ] as const)("accepts %s exactly at its cap and rejects one byte/item above", (field, limitField) => {
+    const limit = TRAINING_EXPORT_LIMITS[limitField];
+    expect(trainingExportSizeViolation({ [field]: limit })).toBeNull();
+    expect(trainingExportSizeViolation({ [field]: limit + 1 })).toBe(field);
+  });
+});
+
+describe("#287 agent-observable trajectory serialization", () => {
+  test("allowlists inference-time context and cuts chronology at terminal final output", () => {
+    const context = serializeAgentObservableTrajectoryContext({
+      taskPrompt: "Fix the widget.",
+      events: [
+        { sequence: 0, kind: "user_message", role: "user", content: "Fix it." },
+        { sequence: 1, kind: "assistant_reasoning", content: "private reasoning" },
+        { sequence: 2, kind: "assistant_message", role: "assistant", content: "I will inspect." },
+        { sequence: 3, kind: "tool_call", callId: "operation-1", toolName: "read_file", arguments: { path: "widget.ts" } },
+        { sequence: 4, kind: "tool_result", callId: "operation-1", toolName: "read_file", result: { text: "source" } },
+        { sequence: 5, kind: "workspace_change", content: "post-hoc changed files" },
+        { sequence: 6, kind: "verifier_result", content: "oracle passed" },
+        { sequence: 7, kind: "reward", content: "reward=1" },
+        { sequence: 8, kind: "policy_event", content: "post-hoc policy" },
+        { sequence: 9, kind: "final_output", content: "Fixed." },
+        { sequence: 10, kind: "user_message", role: "user", content: "must not appear after final" },
+        { sequence: 11, kind: "termination", content: "completed" },
+      ],
+    });
+    expect(context).toContain("Fix the widget.");
+    expect(context).toContain("I will inspect.");
+    expect(context).toContain("read_file");
+    expect(context).toContain("source");
+    expect(context).not.toContain("operation-1");
+    expect(context).not.toMatch(/private reasoning|workspace_change|changed files|verifier|oracle|reward|policy|final_output|must not appear|termination/);
+    expect(context).not.toMatch(/objective_outcomes|infrastructure|succeeded|passed/);
+  });
+
+  test.each(["assistant_reasoning", "verifier_result", "workspace_change", "policy_event", "outcome", "reward", "lifecycle", "termination", "final_output"])(
+    "rejects %s as a DPO chosen/rejected action",
+    (kind) => expect(serializeAgentObservableEvent({ sequence: 1, kind, content: "oracle" })).toBeNull(),
+  );
 });
 
 describe("#53 training-export data-boundary gate", () => {
@@ -39,6 +91,15 @@ describe("#53 training-export data-boundary gate", () => {
     const { included, excluded } = gateRows(rows);
     expect(included).toHaveLength(1);
     expect(excluded.every((e) => e.reason === "pii_leak")).toBe(true);
+  });
+
+  test("canary or private provenance markers are excluded even from public rows", () => {
+    const { included, excluded } = gateRows([
+      { row: dpo({ chosen: "HIDDEN_VERIFIER_CANARY_BLOCKING_123" }), privacyClass: "public" },
+      { row: dpo({ chosen: "analysis_metadata: private" }), privacyClass: "public" },
+    ]);
+    expect(included).toHaveLength(0);
+    expect(excluded.map((row) => row.reason)).toEqual(["canary_or_private_leak", "canary_or_private_leak"]);
   });
 
   test("degenerate DPO pairs (chosen === rejected) are excluded — no training signal", () => {
@@ -102,7 +163,7 @@ describe("#53 JSONL serializers produce valid, parseable output", () => {
     const lines = out.split("\n");
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0]!)).not.toHaveProperty("metadata");
-    expect(JSON.parse(lines[1]!).metadata).toEqual({ preference: "best" });
+    expect(JSON.parse(lines[1]!)).not.toHaveProperty("metadata");
     // valid JSONL: every line parses
     for (const l of lines) expect(() => JSON.parse(l)).not.toThrow();
   });
@@ -127,7 +188,7 @@ describe("#288 export manifest (Fireworks handoff report)", () => {
     });
 
     expect(manifest.schema).toBe("blindbench.training-export");
-    expect(manifest.version).toBe(1);
+    expect(manifest.version).toBe(2);
     expect(manifest).toMatchObject({ source: "output_preference", format: "dpo" });
     expect(manifest.row_count).toBe(included.length);
     expect(manifest.excluded_count).toBe(excluded.length);

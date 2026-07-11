@@ -836,6 +836,7 @@ const schema = defineSchema({
     stableRunId: v.string(),
     attempt: v.string(),
     fingerprint: v.string(),
+    trainingTaskHash: v.string(),
     status: v.union(
       v.literal("pending"),
       v.literal("staged"),
@@ -1143,10 +1144,70 @@ const schema = defineSchema({
     .index("by_matchup", ["matchupId"])
     .index("by_matchup_and_user", ["matchupId", "userId"]),
 
-  // #53 (export bridge): a generated training-data export. The JSONL is in
-  // storage; this row tracks provenance + counts and gates the download to a
-  // 1-hour window (AC6). `excludedCount` reflects rows dropped by the
-  // data-boundary gate (reported to the user, never silently lost).
+  // #287: an owner-issued, revocable training approval over one immutable,
+  // closed human-review result. Candidate child rows snapshot the exact
+  // reviewer-safe evidence fingerprint and aggregate judgment that was approved;
+  // exporters never fall back to mutable/raw trace discovery.
+  trainingApprovals: defineTable({
+    projectId: v.id("projects"),
+    kind: v.union(v.literal("verdict_campaign"), v.literal("comparison_campaign")),
+    verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
+    comparisonCampaignId: v.optional(v.id("comparisonCampaigns")),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    policyVersion: v.string(),
+    candidateCount: v.number(),
+    reviewerCount: v.number(),
+    eligibleCount: v.number(),
+    excludedCount: v.number(),
+    approvedById: v.id("users"),
+    approvedAt: v.number(),
+    revokedById: v.optional(v.id("users")),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_verdict_campaign", ["verdictCampaignId"])
+    .index("by_comparison_campaign", ["comparisonCampaignId"]),
+
+  trainingApprovalItems: defineTable({
+    approvalId: v.id("trainingApprovals"),
+    projectId: v.id("projects"),
+    sortOrder: v.number(),
+    agentTraceId: v.optional(v.id("agentTraces")),
+    matchupId: v.optional(v.id("agentTraceMatchups")),
+    winner: v.optional(v.union(v.literal("left"), v.literal("right"))),
+    divergenceStepIndex: v.optional(v.number()),
+    sharedPrefixHash: v.optional(v.string()),
+    taskHash: v.optional(v.string()),
+    leftTaskHash: v.optional(v.string()),
+    rightTaskHash: v.optional(v.string()),
+    projectionStorageId: v.optional(v.id("_storage")),
+    projectionSha256: v.optional(v.string()),
+    leftProjectionStorageId: v.optional(v.id("_storage")),
+    leftProjectionSha256: v.optional(v.string()),
+    rightProjectionStorageId: v.optional(v.id("_storage")),
+    rightProjectionSha256: v.optional(v.string()),
+    privacyClass: v.union(
+      v.literal("public"), v.literal("internal"), v.literal("confidential"),
+      v.literal("pii"), v.literal("phi"),
+    ),
+    reviewerCount: v.number(),
+    eligibility: v.union(v.literal("eligible"), v.literal("excluded")),
+    exclusionReason: v.optional(v.union(
+      v.literal("not_full_span"),
+      v.literal("fixture_only"),
+      v.literal("insufficient_evidence"),
+      v.literal("sensitive"),
+      v.literal("no_approved_verdict"),
+      v.literal("review_disagreement"),
+      v.literal("non_comparable_prefix"),
+      v.literal("no_preference"),
+      v.literal("task_mismatch"),
+    )),
+  }).index("by_approval_and_order", ["approvalId", "sortOrder"]),
+
+  // #53/#287: a generated training-data export. Both JSONL and its safe
+  // manifest are storage-backed. Every new export is bound to an active,
+  // revocable approval; legacy unapproved rows cannot be downloaded.
   trainingExports: defineTable({
     projectId: v.id("projects"),
     source: v.union(
@@ -1159,6 +1220,8 @@ const schema = defineSchema({
       v.literal("sft"),
     ),
     storageId: v.id("_storage"),
+    manifestStorageId: v.optional(v.id("_storage")),
+    trainingApprovalId: v.optional(v.id("trainingApprovals")),
     rowCount: v.number(),
     excludedCount: v.number(),
     // #288: JSON-serialized ExportManifest (Fireworks handoff report). Optional
@@ -1166,7 +1229,9 @@ const schema = defineSchema({
     manifest: v.optional(v.string()),
     createdById: v.id("users"),
     createdAt: v.number(),
-  }).index("by_project", ["projectId"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_approval", ["trainingApprovalId"]),
 
   // #263: per-project ingest tokens for the OTLP push endpoint. Opaque 128-bit
   // bearer token (generateToken), stored plaintext with a by_token index — the

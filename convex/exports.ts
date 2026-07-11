@@ -24,12 +24,19 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
 import { readMessages } from "./lib/messages";
 import {
+  parseHarborReviewerProjection,
+  type HarborReviewerProjection,
+} from "../src/lib/evals/harborEvidence";
+import {
   buildExportManifest,
   gateRows,
   toJsonl,
-  renderStep,
-  renderTranscript,
   moreSensitive,
+  serializeAgentObservableEvent,
+  serializeAgentObservableTrajectoryContext,
+  TRAINING_EXPORT_LIMITS,
+  trainingExportSizeViolation,
+  utf8Bytes,
   type ClassifiedRow,
   type ExcludedRow,
   type ExportFormat,
@@ -44,6 +51,16 @@ const FORMAT = v.union(v.literal("dpo"), v.literal("annotated"), v.literal("sft"
 
 const DOWNLOAD_TTL_MS = 60 * 60 * 1000; // AC6: download expires after 1 hour
 const MAX_PAIRS_PER_RUN = 20; // cap best×weak explosion per run
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Buffer(value: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", value);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 // {{word}} substitution — mirrors convex/runsActions.ts substituteVariables.
 const substitute = (t: string, vars: Record<string, string>): string =>
@@ -391,6 +408,42 @@ export const gatherTrajectoryPlan = internalQuery({
   },
 });
 
+// --- approved immutable source plan ------------------------------------------
+
+type ApprovedPlanRow =
+  | { readonly eligibility: "excluded"; readonly reason: ExcludedRow["reason"]; readonly privacyClass: PrivacyClass; readonly reviewerCount: number }
+  | { readonly eligibility: "eligible"; readonly format: "sft"; readonly privacyClass: PrivacyClass; readonly reviewerCount: number; readonly projectionStorageId: Id<"_storage">; readonly projectionSha256: string; readonly taskHash: string }
+  | { readonly eligibility: "eligible"; readonly format: "dpo"; readonly privacyClass: PrivacyClass; readonly reviewerCount: number; readonly winner: "left" | "right"; readonly divergenceStepIndex: number; readonly sharedPrefixHash: string; readonly taskHash: string; readonly leftProjectionStorageId: Id<"_storage">; readonly leftProjectionSha256: string; readonly rightProjectionStorageId: Id<"_storage">; readonly rightProjectionSha256: string };
+
+/** Resolve only immutable approval snapshot references; never rediscover spans/matchups. */
+export const gatherApprovedPlan = internalQuery({
+  args: { projectId: v.id("projects"), approvalId: v.id("trainingApprovals"), format: FORMAT, campaignId: v.optional(v.id("comparisonCampaigns")), verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")) },
+  handler: async (ctx, args): Promise<{ readonly plan: ApprovedPlanRow[]; readonly policyVersion: string; readonly candidateCount: number; readonly reviewers: number }> => {
+    await requireProjectRole(ctx, args.projectId, ["owner", "editor"]);
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval || approval.projectId !== args.projectId) throw new Error("Training approval not found for this project.");
+    if (approval.status !== "active") throw new Error("Training approval is revoked; grant a new approval before exporting.");
+    if (args.format === "sft" && (approval.kind !== "verdict_campaign" || approval.verdictCampaignId !== args.verdictCampaignId)) throw new Error("This training approval does not cover the selected run review.");
+    if (args.format === "dpo" && (approval.kind !== "comparison_campaign" || approval.comparisonCampaignId !== args.campaignId)) throw new Error("This training approval does not cover the selected comparison review.");
+    if (trainingExportSizeViolation({ candidates: approval.candidateCount })) throw new Error("Approved candidate count exceeds the export limit.");
+    const items = await ctx.db.query("trainingApprovalItems").withIndex("by_approval_and_order", (q) => q.eq("approvalId", approval._id)).take(TRAINING_EXPORT_LIMITS.maxCandidates + 1);
+    if (items.length !== approval.candidateCount || trainingExportSizeViolation({ candidates: items.length })) throw new Error("Training approval snapshot is incomplete or oversized.");
+    const plan: ApprovedPlanRow[] = [];
+    for (const item of items) {
+      if (item.eligibility === "excluded") {
+        plan.push({ eligibility: "excluded", reason: item.exclusionReason ?? "insufficient_evidence", privacyClass: item.privacyClass, reviewerCount: item.reviewerCount });
+      } else if (args.format === "sft" && item.projectionStorageId && item.projectionSha256 && item.taskHash) {
+        plan.push({ eligibility: "eligible", format: "sft", privacyClass: item.privacyClass, reviewerCount: item.reviewerCount, projectionStorageId: item.projectionStorageId, projectionSha256: item.projectionSha256, taskHash: item.taskHash });
+      } else if (args.format === "dpo" && item.winner && item.divergenceStepIndex !== undefined && item.sharedPrefixHash && item.taskHash && item.leftTaskHash === item.taskHash && item.rightTaskHash === item.taskHash && item.leftProjectionStorageId && item.leftProjectionSha256 && item.rightProjectionStorageId && item.rightProjectionSha256) {
+        plan.push({ eligibility: "eligible", format: "dpo", privacyClass: item.privacyClass, reviewerCount: item.reviewerCount, winner: item.winner, divergenceStepIndex: item.divergenceStepIndex, sharedPrefixHash: item.sharedPrefixHash, taskHash: item.taskHash, leftProjectionStorageId: item.leftProjectionStorageId, leftProjectionSha256: item.leftProjectionSha256, rightProjectionStorageId: item.rightProjectionStorageId, rightProjectionSha256: item.rightProjectionSha256 });
+      } else {
+        throw new Error("Training approval snapshot is invalid for the requested format.");
+      }
+    }
+    return { plan, policyVersion: approval.policyVersion, candidateCount: approval.candidateCount, reviewers: approval.reviewerCount };
+  },
+});
+
 // --- record + list -----------------------------------------------------------
 
 export const recordExport = internalMutation({
@@ -399,14 +452,27 @@ export const recordExport = internalMutation({
     source: SOURCE,
     format: FORMAT,
     storageId: v.id("_storage"),
+    manifestStorageId: v.id("_storage"),
+    trainingApprovalId: v.id("trainingApprovals"),
+    campaignId: v.optional(v.id("comparisonCampaigns")),
+    verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
     rowCount: v.number(),
     excludedCount: v.number(),
     manifest: v.string(),
     createdById: v.id("users"),
     createdAt: v.number(),
   },
-  handler: async (ctx, args): Promise<Id<"trainingExports">> =>
-    await ctx.db.insert("trainingExports", args),
+  handler: async (ctx, args): Promise<Id<"trainingExports">> => {
+    const approval = await ctx.db.get(args.trainingApprovalId);
+    if (!approval || approval.status !== "active" || approval.projectId !== args.projectId) throw new Error("Training approval is no longer active for this project.");
+    const verdictBound = approval.kind === "verdict_campaign" && approval.verdictCampaignId === args.verdictCampaignId && args.campaignId === undefined && args.format === "sft";
+    const comparisonBound = approval.kind === "comparison_campaign" && approval.comparisonCampaignId === args.campaignId && args.verdictCampaignId === undefined && args.format === "dpo";
+    if (!verdictBound && !comparisonBound) throw new Error("Training approval campaign binding changed before export was recorded.");
+    const existing = await ctx.db.query("trainingExports").withIndex("by_approval", (q) => q.eq("trainingApprovalId", approval._id)).take(TRAINING_EXPORT_LIMITS.maxExportsPerApproval);
+    if (existing.length >= TRAINING_EXPORT_LIMITS.maxExportsPerApproval) throw new Error("Training approval export limit reached.");
+    const { campaignId: _campaignId, verdictCampaignId: _verdictCampaignId, ...row } = args;
+    return await ctx.db.insert("trainingExports", row);
+  },
 });
 
 export const listExports = query({
@@ -418,16 +484,28 @@ export const listExports = query({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .order("desc")
       .take(50);
-    return rows.map((r) => ({
-      _id: r._id,
-      source: r.source,
-      format: r.format,
-      rowCount: r.rowCount,
-      excludedCount: r.excludedCount,
-      // Parsed ExportManifest, or null for exports created before #288.
-      manifest: r.manifest ? (JSON.parse(r.manifest) as ExportManifest) : null,
-      createdAt: r.createdAt,
-      expired: Date.now() - r.createdAt > DOWNLOAD_TTL_MS,
+    return await Promise.all(rows.map(async (r) => {
+      const expired = Date.now() - r.createdAt > DOWNLOAD_TTL_MS;
+      const approval = r.trainingApprovalId ? await ctx.db.get(r.trainingApprovalId) : null;
+      const availability = r.trainingApprovalId === undefined
+        ? "legacy_unapproved" as const
+        : !approval || approval.status === "revoked"
+          ? "revoked" as const
+          : expired
+            ? "expired" as const
+            : "available" as const;
+      return {
+        _id: r._id,
+        source: r.source,
+        format: r.format,
+        rowCount: r.rowCount,
+        excludedCount: r.excludedCount,
+        // Parsed legacy sidecar; never used as authorization evidence.
+        manifest: r.manifest ? (JSON.parse(r.manifest) as ExportManifest) : null,
+        createdAt: r.createdAt,
+        expired,
+        availability,
+      };
     }));
   },
 });
@@ -439,161 +517,174 @@ export const generateExport = action({
     projectId: v.id("projects"),
     source: SOURCE,
     format: FORMAT,
-    // Explicit consent to include prod-sensitive (confidential/pii/phi) rows.
+    // Retained in the RPC shape for explicit rejection of legacy clients.
     allowSensitive: v.optional(v.boolean()),
     campaignId: v.optional(v.id("comparisonCampaigns")),
     verdictCampaignId: v.optional(v.id("verdictReviewCampaigns")),
+    trainingApprovalId: v.optional(v.id("trainingApprovals")),
   },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{
+  handler: async (ctx, args): Promise<{
     exportId: Id<"trainingExports">;
     rowCount: number;
     excludedCount: number;
     manifest: ExportManifest;
   }> => {
-    if (
-      (args.campaignId !== undefined || args.verdictCampaignId !== undefined) &&
-      args.source !== "trajectory"
-    ) {
-      throw new Error("Review exports use the trajectory source.");
-    }
-    if (args.campaignId !== undefined && args.verdictCampaignId !== undefined) {
-      throw new Error("Export one review at a time.");
-    }
-    if (args.verdictCampaignId !== undefined && args.format !== "sft") {
-      throw new Error("Run verdict reviews export as SFT.");
-    }
-    if (args.format === "annotated") {
-      throw new Error("Annotated export isn’t available yet — use DPO or SFT.");
-    }
-    const userId = await ctx.runQuery(internal.exports.whoAmIForExport, {
+    // Authenticate/authorize before revealing approval state to the caller.
+    const userId = await ctx.runQuery(internal.exports.whoAmIForExport, { projectId: args.projectId });
+    if (args.trainingApprovalId === undefined) throw new Error("A separate active training approval is required before export.");
+    if (args.allowSensitive === true) throw new Error("Sensitive/private rows cannot be authorized for training export.");
+    if (args.source !== "trajectory") throw new Error("Approved review exports use the trajectory source.");
+    if ((args.campaignId === undefined) === (args.verdictCampaignId === undefined)) throw new Error("Export exactly one approved review result.");
+    if (args.verdictCampaignId !== undefined && args.format !== "sft") throw new Error("Run verdict reviews export as SFT.");
+    if (args.campaignId !== undefined && args.format !== "dpo") throw new Error("Comparison reviews export as DPO.");
+    if (args.format === "annotated") throw new Error("Annotated export isn’t available yet — use DPO or SFT.");
+
+    const approved = await ctx.runQuery(internal.exports.gatherApprovedPlan, {
       projectId: args.projectId,
+      approvalId: args.trainingApprovalId,
+      format: args.format,
+      campaignId: args.campaignId,
+      verdictCampaignId: args.verdictCampaignId,
     });
-
-    let classified: ClassifiedRow[];
-    let sourceExcluded: ExcludedRow[] = [];
-    let stats: ExportSourceStats;
-    if (args.source === "output_preference") {
-      const res = await ctx.runQuery(internal.exports.gatherOutputPrefRows, {
-        projectId: args.projectId,
-        format: args.format,
-      });
-      classified = res.rows;
-      stats = res.stats;
-    } else {
-      const res = await ctx.runQuery(internal.exports.gatherTrajectoryPlan, {
-        projectId: args.projectId,
-        format: args.format,
-        campaignId: args.campaignId,
-        verdictCampaignId: args.verdictCampaignId,
-      });
-      const hydrated = await hydrateTrajectory(ctx, res.plan, args.format);
-      classified = hydrated.rows;
-      sourceExcluded = hydrated.excluded;
-      stats = res.stats;
-    }
-
-    const gated = gateRows(classified, {
-      allowSensitive: args.allowSensitive,
-    });
+    const hydrated = await hydrateApprovedPlan(ctx, approved.plan);
+    const gated = gateRows(hydrated.rows, { allowSensitive: false });
     const included = gated.included;
-    const excluded = [...sourceExcluded, ...gated.excluded];
+    const excluded = [...hydrated.excluded, ...gated.excluded];
     const jsonl = toJsonl(args.format as ExportFormat, included);
+    const lines = jsonl ? jsonl.split("\n") : [];
+    if (lines.some((line) => trainingExportSizeViolation({ rowBytes: utf8Bytes(line) }) !== null)) throw new Error("A training export row exceeds the serialized row limit.");
+    if (trainingExportSizeViolation({ jsonlBytes: utf8Bytes(jsonl) })) throw new Error("Training export JSONL exceeds the total artifact limit.");
+    const rowHashes = await Promise.all(lines.map(sha256));
+    const datasetHash = await sha256(jsonl);
     const createdAt = Date.now();
     const manifest = buildExportManifest({
-      source: args.source,
+      source: "trajectory",
       format: args.format as ExportFormat,
       included,
       excluded,
-      allowSensitive: args.allowSensitive ?? false,
-      stats,
+      allowSensitive: false,
+      stats: { sourceUnits: approved.candidateCount, reviewers: approved.reviewers },
       generatedAt: createdAt,
+      approvalPolicyVersion: approved.policyVersion,
+      rowHashes,
+      datasetHash,
+      candidateCount: approved.candidateCount,
     });
+    if (!manifest.integrity.reconciled) throw new Error("Training export counts did not reconcile.");
+    const manifestText = JSON.stringify(manifest, null, 2) + "\n";
+    if (trainingExportSizeViolation({ manifestBytes: utf8Bytes(manifestText) })) throw new Error("Training export manifest exceeds the artifact limit.");
 
-    const storageId = await ctx.storage.store(
-      new Blob([jsonl], { type: "application/jsonl" }),
-    );
-    const exportId = await ctx.runMutation(internal.exports.recordExport, {
-      projectId: args.projectId,
-      source: args.source,
-      format: args.format,
-      storageId,
-      rowCount: included.length,
-      excludedCount: excluded.length,
-      manifest: JSON.stringify(manifest),
-      createdById: userId,
-      createdAt,
-    });
-    return {
-      exportId,
-      rowCount: included.length,
-      excludedCount: excluded.length,
-      manifest,
-    };
+    let storageId: Id<"_storage"> | undefined;
+    let manifestStorageId: Id<"_storage"> | undefined;
+    try {
+      storageId = await ctx.storage.store(new Blob([jsonl], { type: "application/jsonl" }));
+      manifestStorageId = await ctx.storage.store(new Blob([manifestText], { type: "application/json" }));
+      const exportId = await ctx.runMutation(internal.exports.recordExport, {
+        projectId: args.projectId,
+        source: "trajectory",
+        format: args.format,
+        storageId,
+        manifestStorageId,
+        trainingApprovalId: args.trainingApprovalId,
+        campaignId: args.campaignId,
+        verdictCampaignId: args.verdictCampaignId,
+        rowCount: included.length,
+        excludedCount: excluded.length,
+        manifest: JSON.stringify(manifest),
+        createdById: userId,
+        createdAt,
+      });
+      return { exportId, rowCount: included.length, excludedCount: excluded.length, manifest };
+    } catch (cause: unknown) {
+      for (const id of [storageId, manifestStorageId]) {
+        if (id !== undefined) {
+          try { await ctx.storage.delete(id); } catch { /* best-effort idempotent cleanup */ }
+        }
+      }
+      throw cause;
+    }
   },
 });
 
-// Read trajectory bodies from storage and assemble ExportRows.
-async function hydrateTrajectory(
+async function hydrateApprovedPlan(
   ctx: { storage: { get: (id: Id<"_storage">) => Promise<Blob | null> } },
-  plan: TrajectoryPlanRow[],
-  format: "dpo" | "sft" | "annotated",
+  plan: ReadonlyArray<ApprovedPlanRow>,
 ): Promise<{ rows: ClassifiedRow[]; excluded: ExcludedRow[] }> {
-  const cache = new Map<string, unknown>();
-  const read = async (id?: Id<"_storage">): Promise<unknown> => {
-    if (!id) return undefined;
-    if (cache.has(id)) return cache.get(id);
-    const blob = await ctx.storage.get(id);
-    let body: unknown = undefined;
-    if (blob) {
-      try {
-        body = JSON.parse(await blob.text());
-      } catch {
-        body = undefined;
-      }
-    }
-    cache.set(id, body);
-    return body;
+  if (trainingExportSizeViolation({ candidates: plan.length })) throw new Error("Approved candidate count exceeds the export limit.");
+  const readProjection = async (storageId: Id<"_storage">, expectedSha256: string): Promise<HarborReviewerProjection> => {
+    const blob = await ctx.storage.get(storageId);
+    if (!blob) throw new Error("Approved reviewer projection is unavailable.");
+    if (trainingExportSizeViolation({ projectionBytes: blob.size })) throw new Error("Approved reviewer projection exceeds the byte limit.");
+    const bytes = await blob.arrayBuffer();
+    if (await sha256Buffer(bytes) !== expectedSha256) throw new Error("Approved reviewer projection hash mismatch.");
+    const raw: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return parseHarborReviewerProjection(raw);
   };
-
-  const out: ClassifiedRow[] = [];
+  const rows: ClassifiedRow[] = [];
   const excluded: ExcludedRow[] = [];
-  for (const r of plan) {
-    if (r.excludeReason !== undefined) {
-      excluded.push({ reason: r.excludeReason, privacyClass: r.privacyClass });
+  let hydratedJsonlBytes = 0;
+  const appendBounded = (classified: ClassifiedRow): void => {
+    const format = classified.row.kind === "sft" ? "sft" : "dpo";
+    const rowBytes = utf8Bytes(toJsonl(format, [classified.row]));
+    if (trainingExportSizeViolation({ rowBytes })) throw new Error("A training export row exceeds the serialized row limit.");
+    hydratedJsonlBytes += rowBytes + (rows.length > 0 ? 1 : 0);
+    if (trainingExportSizeViolation({ jsonlBytes: hydratedJsonlBytes })) throw new Error("Training export JSONL exceeds the total artifact limit while hydrating.");
+    rows.push(classified);
+  };
+  for (const candidate of plan) {
+    if (candidate.eligibility === "excluded") {
+      excluded.push({ reason: candidate.reason, privacyClass: candidate.privacyClass });
       continue;
     }
-    if (format === "dpo" && r.chosen && r.rejected) {
-      const prefix = await Promise.all(
-        (r.prefix ?? []).map(async (s) => ({ meta: s.meta, body: await read(s.storageId) })),
-      );
-      const chosen = renderStep(r.chosen.meta, await read(r.chosen.storageId));
-      const rejected = renderStep(r.rejected.meta, await read(r.rejected.storageId));
-      out.push({
-        privacyClass: r.privacyClass,
-        row: { kind: "dpo", prompt: renderTranscript(prefix), chosen, rejected, metadata: r.metadata },
+    if (candidate.format === "sft") {
+      const projection = await readProjection(candidate.projectionStorageId, candidate.projectionSha256);
+      appendBounded({
+        privacyClass: candidate.privacyClass,
+        row: { kind: "sft", messages: [
+          { role: "user", content: serializeAgentObservableTrajectoryContext(projection) },
+          { role: "assistant", content: projection.finalOutput },
+        ] },
       });
-    } else if (format === "sft" && r.messages) {
-      const msgs = await Promise.all(
-        r.messages.map(async (s) => ({
-          role: s.meta.role ?? "assistant",
-          content: String(((await read(s.storageId)) as Record<string, unknown> | undefined)?.content ?? ""),
-        })),
-      );
-      const finalBody = (await read(r.finalAnswer)) as Record<string, unknown> | undefined;
-      if (finalBody?.text) {
-        const finalText = String(finalBody.text);
-        const last = msgs[msgs.length - 1];
-        if (last?.role !== "assistant" || last.content !== finalText) {
-          msgs.push({ role: "assistant", content: finalText });
-        }
-      }
-      out.push({ privacyClass: r.privacyClass, row: { kind: "sft", messages: msgs, metadata: r.metadata } });
+      continue;
     }
+    const [left, right] = await Promise.all([
+      readProjection(candidate.leftProjectionStorageId, candidate.leftProjectionSha256),
+      readProjection(candidate.rightProjectionStorageId, candidate.rightProjectionSha256),
+    ]);
+    const leftSteps = left.events.filter((event) => event.kind !== "final_output" && event.kind !== "termination");
+    const rightSteps = right.events.filter((event) => event.kind !== "final_output" && event.kind !== "termination");
+    const leftNext = leftSteps[candidate.divergenceStepIndex];
+    const rightNext = rightSteps[candidate.divergenceStepIndex];
+    if (!leftNext || !rightNext) {
+      excluded.push({ reason: "insufficient_evidence", privacyClass: candidate.privacyClass });
+      continue;
+    }
+    if (leftNext.kind === "assistant_reasoning" || rightNext.kind === "assistant_reasoning") {
+      excluded.push({ reason: "hidden_reasoning", privacyClass: candidate.privacyClass });
+      continue;
+    }
+    const chosen = candidate.winner === "left" ? leftNext : rightNext;
+    const rejected = candidate.winner === "left" ? rightNext : leftNext;
+    const serializedChosen = serializeAgentObservableEvent(chosen);
+    const serializedRejected = serializeAgentObservableEvent(rejected);
+    if (serializedChosen === null || serializedRejected === null) {
+      excluded.push({ reason: "post_hoc_or_non_observable", privacyClass: candidate.privacyClass });
+      continue;
+    }
+    const prefixProjection = candidate.winner === "left" ? left : right;
+    const prefixEvents = (candidate.winner === "left" ? leftSteps : rightSteps).slice(0, candidate.divergenceStepIndex);
+    appendBounded({
+      privacyClass: candidate.privacyClass,
+      row: {
+        kind: "dpo",
+        prompt: serializeAgentObservableTrajectoryContext({ taskPrompt: prefixProjection.taskPrompt, events: prefixEvents }),
+        chosen: serializedChosen,
+        rejected: serializedRejected,
+        metadata: { reviewer_count: candidate.reviewerCount, shared_prefix_sha256_verified: true, serialization: "agent-observable-trajectory-v1" },
+      },
+    });
   }
-  return { rows: out, excluded };
+  return { rows, excluded };
 }
 
 // Actions have no ctx.db; resolve the owner/editor caller via an internal query.
@@ -609,16 +700,19 @@ export const whoAmIForExport = internalQuery({
 
 export const downloadExport = action({
   args: { exportId: v.id("trainingExports") },
-  handler: async (ctx, args): Promise<{ url: string }> => {
+  handler: async (ctx, args): Promise<{ url: string; manifestUrl: string }> => {
     const meta = await ctx.runQuery(internal.exports.exportForDownload, {
       exportId: args.exportId,
     });
     if (Date.now() - meta.createdAt > DOWNLOAD_TTL_MS) {
       throw new Error("This export link has expired. Generate a fresh export.");
     }
-    const url = await ctx.storage.getUrl(meta.storageId);
-    if (!url) throw new Error("Export file is no longer available.");
-    return { url };
+    const [url, manifestUrl] = await Promise.all([
+      ctx.storage.getUrl(meta.storageId),
+      meta.manifestStorageId ? ctx.storage.getUrl(meta.manifestStorageId) : Promise.resolve(null),
+    ]);
+    if (!url || !manifestUrl) throw new Error("Export artifact or manifest is no longer available.");
+    return { url, manifestUrl };
   },
 });
 
@@ -627,10 +721,13 @@ export const exportForDownload = internalQuery({
   handler: async (
     ctx,
     args,
-  ): Promise<{ storageId: Id<"_storage">; createdAt: number }> => {
+  ): Promise<{ storageId: Id<"_storage">; manifestStorageId?: Id<"_storage">; createdAt: number }> => {
     const row = await ctx.db.get(args.exportId);
     if (!row) throw new Error("Export not found.");
     await requireProjectRole(ctx, row.projectId, ["owner", "editor"]);
-    return { storageId: row.storageId, createdAt: row.createdAt };
+    if (row.trainingApprovalId === undefined) throw new Error("This legacy export has no training approval and cannot be downloaded.");
+    const approval = await ctx.db.get(row.trainingApprovalId);
+    if (!approval || approval.status !== "active") throw new Error("Training approval is revoked; this export can no longer be downloaded.");
+    return { storageId: row.storageId, manifestStorageId: row.manifestStorageId, createdAt: row.createdAt };
   },
 });

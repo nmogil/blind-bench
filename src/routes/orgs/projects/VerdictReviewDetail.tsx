@@ -22,6 +22,9 @@ export function VerdictReviewDetail() {
   const campaign = useQuery(api.verdictReviewCampaigns.getOwnerCampaign, {
     campaignId: id,
   });
+  const trainingApproval = useQuery(api.trainingApprovals.getForVerdictCampaign, { campaignId: id });
+  const approveTraining = useAction(api.trainingApprovals.approveVerdictCampaign);
+  const revokeTraining = useMutation(api.trainingApprovals.revoke);
   const openCampaign = useMutation(api.verdictReviewCampaigns.openCampaign);
   const closeCampaign = useMutation(api.verdictReviewCampaigns.closeCampaign);
   const promoteRuns = useMutation(api.verdictReviewCampaigns.promoteAcceptedRuns);
@@ -79,7 +82,41 @@ export function VerdictReviewDetail() {
     }
   }
 
+  async function approveForTraining() {
+    setBusy(true);
+    setError("");
+    setReuseMessage("");
+    try {
+      const result = await approveTraining({ campaignId: id });
+      setReuseMessage(`Training approval granted for ${result.eligibleCount} eligible run${result.eligibleCount === 1 ? "" : "s"}; ${result.excludedCount} excluded.`);
+    } catch (cause: unknown) {
+      setError(friendlyError(cause, "Could not grant training approval for this review."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeTrainingApproval() {
+    const approvalId = trainingApproval?.approval?.id;
+    if (approvalId === undefined || !window.confirm("Revoke training approval? Future exports and downloads from this approval will be blocked.")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await revokeTraining({ approvalId });
+      setReuseMessage("Training approval revoked. Future exports and downloads are blocked.");
+    } catch (cause: unknown) {
+      setError(friendlyError(cause, "Could not revoke this training approval."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function exportSft() {
+    const approvalId = trainingApproval?.approval?.status === "active" ? trainingApproval.approval.id : undefined;
+    if (approvalId === undefined) {
+      setError("Grant a separate training approval before exporting SFT data.");
+      return;
+    }
     setBusy(true);
     setError("");
     setReuseMessage("");
@@ -87,6 +124,7 @@ export function VerdictReviewDetail() {
       const result = await generateExport({
         projectId,
         verdictCampaignId: id,
+        trainingApprovalId: approvalId,
         source: "trajectory",
         format: "sft",
       });
@@ -94,9 +132,9 @@ export function VerdictReviewDetail() {
         setReuseMessage(`No SFT rows were eligible. ${result.excludedCount} runs were explicitly excluded by review or data-boundary gates.`);
         return;
       }
-      const { url } = await downloadExport({ exportId: result.exportId });
+      const { url, manifestUrl } = await downloadExport({ exportId: result.exportId });
       window.open(url, "_blank", "noopener,noreferrer");
-      setReuseMessage(`${result.rowCount} approved SFT rows ready; ${result.excludedCount} excluded.`);
+      setReuseMessage(`${result.rowCount} approved SFT rows ready; ${result.excludedCount} excluded. Keep the manifest with the JSONL: ${manifestUrl}`);
     } catch (cause: unknown) {
       setError(friendlyError(cause, "Could not export approved runs."));
     } finally {
@@ -172,10 +210,15 @@ export function VerdictReviewDetail() {
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void copyEvidence()} disabled={busy}><ClipboardCopy className="h-4 w-4" /> Copy evidence summary</Button>
               <Button variant="outline" onClick={() => void promote()} disabled={busy || currentCampaign.results.judgments === 0}><Database className="h-4 w-4" /> Add approved runs to regression set</Button>
-              <Button variant="outline" onClick={() => void exportSft()} disabled={busy || currentCampaign.results.judgments === 0}><Download className="h-4 w-4" /> Export approved SFT</Button>
+              {trainingApproval?.approval?.status === "active" ? (
+                <Button variant="outline" onClick={() => void revokeTrainingApproval()} disabled={busy || !trainingApproval.canApprove}>Revoke training approval</Button>
+              ) : (
+                <Button variant="outline" onClick={() => void approveForTraining()} disabled={busy || currentCampaign.results.judgments === 0 || !trainingApproval?.canApprove}>Approve for training</Button>
+              )}
+              <Button variant="outline" onClick={() => void exportSft()} disabled={busy || trainingApproval?.approval?.status !== "active"}><Download className="h-4 w-4" /> Export approved SFT</Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Regression promotion uses majority non-weak verdicts. SFT requires at least one Strong verdict and excludes any run with a Weak verdict; every exclusion is reported.
+              Review verdicts and objective quality eligibility do not grant training use. An owner must separately approve this closed result. SFT then includes only immutable reviewer-safe full-span evidence with a Strong verdict, and revocation blocks later export/download.
             </p>
             {reuseMessage && <p className="text-sm text-muted-foreground" role="status">{reuseMessage}</p>}
           </CardContent>

@@ -427,6 +427,14 @@ function RecentExportRow({
 
   const sourceLabel = SOURCE_LABELS[row.source as Source] ?? row.source;
   const formatLabel = FORMAT_LABELS[row.format as Format] ?? row.format.toUpperCase();
+  const unavailable = row.availability !== "available";
+  const availabilityLabel = row.availability === "revoked"
+    ? "Revoked"
+    : row.availability === "legacy_unapproved"
+      ? "Unavailable"
+      : row.availability === "expired"
+        ? "Expired"
+        : "Download";
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
@@ -450,11 +458,11 @@ function RecentExportRow({
         variant="outline"
         size="sm"
         onClick={handleDownload}
-        disabled={row.expired || busy}
-        className={cn(row.expired && "text-muted-foreground")}
+        disabled={unavailable || busy}
+        className={cn(unavailable && "text-muted-foreground")}
       >
         <Download aria-hidden="true" className="h-3.5 w-3.5" />
-        {row.expired ? "Expired" : busy ? "Preparing…" : "Download"}
+        {busy ? "Preparing…" : availabilityLabel}
       </Button>
     </div>
   );

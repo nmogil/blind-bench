@@ -15,6 +15,7 @@ const EVENT_KINDS = new Set([
   "tool_result", "tool_error", "final_output", "termination",
 ]);
 const RUN_STATUSES = new Set(["quality_eligible", "fixture_complete", "insufficient"]);
+const REVIEWER_ENVIRONMENT_CLASSES = new Set(["docker", "isolated-sandbox"]);
 const PROCESS_STATUSES = new Set(["succeeded", "failed"]);
 const VERIFIER_STATUSES = new Set(["passed", "failed", "not_run"]);
 const INFRASTRUCTURE_STATUSES = new Set(["succeeded", "failed"]);
@@ -80,6 +81,8 @@ export type ParsedHarborEvidence = {
   };
   readonly trace: AgentRunTrace;
   readonly projection: HarborReviewerProjection;
+  /** SHA-256 of the reviewer-safe task prompt + producer task revision. */
+  readonly trainingTaskHash: string;
   readonly objective: {
     readonly process: OutcomeStatus;
     readonly verifier: OutcomeStatus;
@@ -377,12 +380,15 @@ export async function parseHarborEvidenceV1(raw: unknown): Promise<ParsedHarborE
 
   const reviewer = rec(root.reviewer, "reviewer");
   exact(reviewer, ["task", "environment_class", "harness_schema", "events", "outcomes", "rewards", "evidence"], "reviewer");
-  if (reviewer.environment_class !== "docker") throw new Error('reviewer.environment_class must be "docker"');
+  const environmentClass = text(reviewer.environment_class, "reviewer.environment_class", 32);
+  if (!REVIEWER_ENVIRONMENT_CLASSES.has(environmentClass)) {
+    throw new Error('reviewer.environment_class must be "docker" or "isolated-sandbox"');
+  }
   if (reviewer.harness_schema !== "harbor/pi-jsonl@0.18.0") throw new Error("reviewer.harness_schema is unsupported");
   const task = rec(reviewer.task, "reviewer.task");
   exact(task, ["id", "revision", "privacy_class", "prompt"], "reviewer.task");
   text(task.id, "reviewer.task.id", 200);
-  text(task.revision, "reviewer.task.revision", 200);
+  const taskRevision = text(task.revision, "reviewer.task.revision", 200);
   const privacy = text(task.privacy_class, "reviewer.task.privacy_class", 30);
   if (!PRIVACY.has(privacy)) throw new Error("reviewer.task.privacy_class is unsupported");
   const taskPrompt = sanitizeString(text(task.prompt, "reviewer.task.prompt"));
@@ -391,7 +397,7 @@ export async function parseHarborEvidenceV1(raw: unknown): Promise<ParsedHarborE
 
   const hiddenProvenance = [
     ...Object.values(harness).filter((item): item is string => typeof item === "string"),
-    reviewer.environment_class,
+    environmentClass,
     reviewer.harness_schema,
     rawReference.path,
     ...collectPrivateStrings(analysis),
@@ -637,6 +643,7 @@ export async function parseHarborEvidenceV1(raw: unknown): Promise<ParsedHarborE
     run: { stableId, attempt, status: runStatus as ParsedHarborEvidence["run"]["status"] },
     trace,
     projection: safeProjection,
+    trainingTaskHash: await sha256Text(stableStringify({ prompt: safeProjection.taskPrompt, revision: taskRevision })),
     objective: {
       process: { status: topOutcomes.process },
       verifier: { status: topOutcomes.verifier },
