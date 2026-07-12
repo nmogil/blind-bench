@@ -5,6 +5,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
 import { TRAINING_EXPORT_LIMITS, trainingExportSizeViolation } from "./lib/trainingExport";
+import { deriveTrainingTaskHash, parseHarborReviewerProjection } from "./lib/harborEvidence";
 
 export const TRAINING_POLICY_VERSION = "full-span-training-v2";
 
@@ -36,7 +37,7 @@ type ApprovalResult = { readonly approvalId: Id<"trainingApprovals">; readonly e
 type PreparedResult = { readonly existing: ApprovalResult | null; readonly projectId: Id<"projects">; readonly reviewerCount: number; readonly candidates: PreparedCandidate[] };
 
 const PRIVACY = v.union(v.literal("public"), v.literal("internal"), v.literal("confidential"), v.literal("pii"), v.literal("phi"));
-const EXCLUSION = v.union(v.literal("not_full_span"), v.literal("fixture_only"), v.literal("insufficient_evidence"), v.literal("sensitive"), v.literal("no_approved_verdict"), v.literal("review_disagreement"), v.literal("non_comparable_prefix"), v.literal("no_preference"), v.literal("task_mismatch"));
+const EXCLUSION = v.union(v.literal("not_full_span"), v.literal("fixture_only"), v.literal("insufficient_evidence"), v.literal("sensitive"), v.literal("no_approved_verdict"), v.literal("review_disagreement"), v.literal("non_comparable_prefix"), v.literal("no_preference"), v.literal("task_mismatch"), v.literal("invalid_task_hash"));
 const SNAPSHOT = v.object({ storageId: v.id("_storage"), sha256: v.string(), taskHash: v.string(), privacyClass: PRIVACY });
 const CANDIDATE = v.object({
   agentTraceId: v.optional(v.id("agentTraces")), matchupId: v.optional(v.id("agentTraceMatchups")),
@@ -45,6 +46,8 @@ const CANDIDATE = v.object({
   leftProjection: v.optional(SNAPSHOT), rightProjection: v.optional(SNAPSHOT), privacyClass: PRIVACY,
   reviewerCount: v.number(), eligibility: v.union(v.literal("eligible"), v.literal("excluded")), exclusionReason: v.optional(EXCLUSION),
 });
+
+const SHA256 = /^[0-9a-f]{64}$/;
 
 function sensitive(value: PrivacyClass): boolean { return value === "confidential" || value === "pii" || value === "phi"; }
 function combinedPrivacy(left: PrivacyClass, right: PrivacyClass): PrivacyClass {
@@ -61,6 +64,7 @@ async function projectionRef(ctx: QueryCtx, trace: Doc<"agentTraces"> | null): P
   if (!span || span.status !== "ready") return { eligible: false, reason: "not_full_span", privacyClass };
   if (span.runQualification === "fixture_only") return { eligible: false, reason: "fixture_only", privacyClass };
   if (span.runQualification !== "quality_eligible" || !span.canJudgeTaskSuccess || span.evidenceCompleteness !== "complete" || !span.reviewerProjectionStorageId) return { eligible: false, reason: "insufficient_evidence", privacyClass };
+  if (!span.trainingTaskHash || !SHA256.test(span.trainingTaskHash)) return { eligible: false, reason: "invalid_task_hash", privacyClass };
   return { eligible: true, ref: { storageId: span.reviewerProjectionStorageId, taskHash: span.trainingTaskHash, privacyClass } };
 }
 
@@ -73,7 +77,18 @@ async function snapshotRef(storage: { get: (id: Id<"_storage">) => Promise<Blob 
   const blob = await storage.get(ref.storageId);
   if (!blob) throw new Error("Reviewer projection is unavailable for approval.");
   if (trainingExportSizeViolation({ projectionBytes: blob.size })) throw new Error("Reviewer projection exceeds the training approval byte limit.");
-  return { ...ref, sha256: await sha256Bytes(await blob.arrayBuffer()) };
+  const bytes = await blob.arrayBuffer();
+  let projection: ReturnType<typeof parseHarborReviewerProjection>;
+  try {
+    const raw: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    projection = parseHarborReviewerProjection(raw);
+  } catch {
+    throw new Error("Reviewer projection is malformed for training approval.");
+  }
+  if (!projection.taskRevision) throw new Error("Reviewer projection lacks the task revision required for training approval.");
+  const derivedTaskHash = await deriveTrainingTaskHash(projection.taskPrompt, projection.taskRevision);
+  if (derivedTaskHash !== ref.taskHash) throw new Error("Reviewer projection task hash mismatch.");
+  return { ...ref, sha256: await sha256Bytes(bytes) };
 }
 
 export const prepareVerdictApproval = internalQuery({

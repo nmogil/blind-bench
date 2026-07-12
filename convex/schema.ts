@@ -836,7 +836,9 @@ const schema = defineSchema({
     stableRunId: v.string(),
     attempt: v.string(),
     fingerprint: v.string(),
-    trainingTaskHash: v.string(),
+    // Transitional rollout: legacy #354 rows omit this. Approval/export fail
+    // closed until the reviewer-safe projection hash has been backfilled.
+    trainingTaskHash: v.optional(v.string()),
     status: v.union(
       v.literal("pending"),
       v.literal("staged"),
@@ -1202,6 +1204,7 @@ const schema = defineSchema({
       v.literal("non_comparable_prefix"),
       v.literal("no_preference"),
       v.literal("task_mismatch"),
+      v.literal("invalid_task_hash"),
     )),
   }).index("by_approval_and_order", ["approvalId", "sortOrder"]),
 

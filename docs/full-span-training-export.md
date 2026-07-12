@@ -14,6 +14,7 @@ A `quality_eligible` objective result and a positive human verdict/preference ar
 
 Approval is default-deny:
 
+- `fullSpanEvalRuns.trainingTaskHash` is transitional/optional while legacy rows are migrated; a missing, malformed, or projection-mismatched hash makes the row ineligible for approval and unusable for export;
 - approval snapshots the exact reviewer-projection storage ID and SHA-256 of its exact bytes; DPO snapshots both sides, winner, divergence index, persisted shared-prefix hash, and reviewer-safe task prompt/revision hash;
 - generation reads only those immutable snapshot references and rejects missing, oversized, or hash-mismatched blobs—it never rediscovers the current span or matchup;
 - only strict full-span evidence with `runQualification=quality_eligible`, complete integrity-bound reviewer evidence, and a positive human judgment is eligible;
@@ -83,6 +84,80 @@ Convex storage is blob-oriented rather than a true streaming writer, so export f
 | Exports retained per active approval | 20 |
 
 Exact-limit values are accepted; one byte/item above is rejected before artifact handoff. Candidate count is checked during both approval and generation.
+
+## Staged production migration for `trainingTaskHash`
+
+Do not combine these stages into one deploy. Do not make the schema field required until the final verification below is clean.
+
+### Stage 1 — deploy the compatibility release
+
+1. Confirm the release has `trainingTaskHash: v.optional(v.string())` in `fullSpanEvalRuns`.
+2. Run the repository gates from a clean checkout.
+3. Deploy only the compatibility release:
+
+   ```bash
+   npx convex deploy
+   ```
+
+   This release accepts pre-#356 rows. New ingests store `taskRevision` inside the immutable reviewer-safe projection and write the canonical lowercase SHA-256 task hash. Training approval and export remain fail-closed for missing, malformed, or mismatched hashes.
+
+### Stage 2 — dry-run every production project in bounded pages
+
+Obtain each project ID from the authenticated owner/admin surface. For each project, run the privileged internal action in pages of at most 100 (25 below). The action reads only `reviewerProjectionStorageId`; it never reads `rawEvidenceStorageId`, trace bodies, or unrestricted producer artifacts.
+
+```bash
+export PROJECT_ID='<production Convex projects document ID>'
+export CURSOR=''
+while true; do
+  ARGS=$(jq -nc \
+    --arg projectId "$PROJECT_ID" \
+    --arg cursor "$CURSOR" \
+    '{projectId:$projectId,dryRun:true,batchSize:25} + (if $cursor == "" then {} else {cursor:$cursor} end)')
+  RESULT=$(npx convex run --prod \
+    migrations/backfillFullSpanTrainingTaskHash:backfillProjectBatchInternal \
+    "$ARGS") || exit 1
+  printf '%s\n' "$RESULT" | jq .
+  test "$(printf '%s' "$RESULT" | jq '.issues | length')" -eq 0 || exit 1
+  test "$(printf '%s' "$RESULT" | jq -r '.isDone')" = true && break
+  CURSOR=$(printf '%s' "$RESULT" | jq -r '.continueCursor')
+done
+```
+
+Record the summed `scanned`, `wouldPatch`, `alreadyValid`, and issue counts per project. `issues` must be empty before apply. Meanings are intentionally fail-closed:
+
+- `missing_projection` / `projection_unavailable` / `malformed_projection` / `projection_oversized`: the immutable reviewer projection cannot safely establish task identity;
+- `missing_task_revision`: the legacy projection predates reviewer-safe revision storage;
+- `invalid_existing_hash`: a present hash does not equal the canonical hash of that exact projection;
+- `changed_during_backfill`: the immutable pointer/hash changed between read and patch.
+
+**Stop on any issue.** Never recover a revision from `rawEvidenceStorageId`, unrestricted trace steps, `attempt`, filenames, or guessed defaults. In particular, the original #354 projection shape did not persist `taskRevision`; those rows are not safely derivable and must remain denied until a separately reviewed, authoritative reviewer-safe reprojection path exists. Do not harden the schema while any such row remains.
+
+### Stage 3 — apply, then verify idempotency
+
+Repeat the same loop with `dryRun:false`. Keep the same project list and page size. `patched + alreadyValid` must reconcile with the issue-free dry-run's `scanned`, and every page must have zero issues.
+
+Then run the Stage 2 dry-run loop again from an empty cursor. Across every project it must report:
+
+```text
+wouldPatch = 0
+patched = 0
+issues = []
+alreadyValid = scanned
+```
+
+Also verify that approval of a known closed legacy result was denied before its row was patched and succeeds only after this clean backfill; generate and verify one non-sensitive synthetic export through the normal owner flow. Do not use customer/private rows for this check.
+
+### Stage 4 — later final hardening release
+
+Only after Stage 3 is recorded clean for every production project:
+
+1. In a separate reviewed change, replace `trainingTaskHash: v.optional(v.string())` with `trainingTaskHash: v.string()`.
+2. Keep all approval/export recomputation checks; schema requiredness does not replace them.
+3. Run the full Convex/eval/component/build gates.
+4. Deploy that separate hardening release with `npx convex deploy`.
+5. Re-run one dry-run page per project. It must still report only `alreadyValid` rows and zero issues.
+
+If any deploy, page, reconciliation, or synthetic approval/export verification fails, stop at the current compatible schema and investigate. Do not wipe, guess hashes, bypass approval, or use `--push` on a migration command.
 
 ## Operator steps
 

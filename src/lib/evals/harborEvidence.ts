@@ -46,6 +46,8 @@ export type HarborReviewerEvent = {
 };
 export type HarborReviewerProjection = {
   readonly taskPrompt: string;
+  /** Reviewer-safe producer revision. Legacy projections may not contain it. */
+  readonly taskRevision?: string;
   readonly timing: { readonly startedAt: string; readonly completedAt: string; readonly durationMs: number };
   readonly events: ReadonlyArray<HarborReviewerEvent>;
   readonly finalOutput: string;
@@ -235,11 +237,12 @@ function toolAlias(name: string): string {
 export function parseHarborReviewerProjection(raw: unknown): HarborReviewerProjection {
   const row = rec(raw, "reviewer projection");
   exact(row, [
-    "taskPrompt", "timing", "events", "finalOutput", "termination", "outcomes",
+    "taskPrompt", "taskRevision", "timing", "events", "finalOutput", "termination", "outcomes",
     "runQualification", "evidenceCompleteness", "evidenceWarning", "canJudgeTaskSuccess",
     "changedFiles", "patch", "patchTruncated", "verifierEvidence", "integrity",
   ], "reviewer projection");
   text(row.taskPrompt, "reviewer projection.taskPrompt");
+  optionalText(row.taskRevision, "reviewer projection.taskRevision", 200);
   text(row.finalOutput, "reviewer projection.finalOutput");
   const timing = rec(row.timing, "reviewer projection.timing");
   exact(timing, ["startedAt", "completedAt", "durationMs"], "reviewer projection.timing");
@@ -317,6 +320,11 @@ async function sha256Text(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+
+/** Derive the canonical training task hash from reviewer-safe task identity. */
+export async function deriveTrainingTaskHash(taskPrompt: string, taskRevision: string): Promise<string> {
+  return await sha256Text(stableStringify({ prompt: taskPrompt, revision: taskRevision }));
+}
 function collectPrivateStrings(value: unknown): string[] {
   if (typeof value === "string") return value.length >= 2 ? [value] : [];
   if (Array.isArray(value)) return value.flatMap(collectPrivateStrings);
@@ -388,7 +396,7 @@ export async function parseHarborEvidenceV1(raw: unknown): Promise<ParsedHarborE
   const task = rec(reviewer.task, "reviewer.task");
   exact(task, ["id", "revision", "privacy_class", "prompt"], "reviewer.task");
   text(task.id, "reviewer.task.id", 200);
-  const taskRevision = text(task.revision, "reviewer.task.revision", 200);
+  const taskRevision = sanitizeString(text(task.revision, "reviewer.task.revision", 200));
   const privacy = text(task.privacy_class, "reviewer.task.privacy_class", 30);
   if (!PRIVACY.has(privacy)) throw new Error("reviewer.task.privacy_class is unsupported");
   const taskPrompt = sanitizeString(text(task.prompt, "reviewer.task.prompt"));
@@ -587,6 +595,7 @@ export async function parseHarborEvidenceV1(raw: unknown): Promise<ParsedHarborE
 
   const projection: HarborReviewerProjection = {
     taskPrompt,
+    taskRevision,
     timing: { startedAt, completedAt: endedAt, durationMs: Date.parse(endedAt) - Date.parse(startedAt) },
     events: projectionEvents,
     finalOutput,
@@ -643,7 +652,7 @@ export async function parseHarborEvidenceV1(raw: unknown): Promise<ParsedHarborE
     run: { stableId, attempt, status: runStatus as ParsedHarborEvidence["run"]["status"] },
     trace,
     projection: safeProjection,
-    trainingTaskHash: await sha256Text(stableStringify({ prompt: safeProjection.taskPrompt, revision: taskRevision })),
+    trainingTaskHash: await deriveTrainingTaskHash(safeProjection.taskPrompt, taskRevision),
     objective: {
       process: { status: topOutcomes.process },
       verifier: { status: topOutcomes.verifier },
