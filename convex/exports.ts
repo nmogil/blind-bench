@@ -24,6 +24,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
 import { readMessages } from "./lib/messages";
 import {
+  deriveTrainingTaskHash,
   parseHarborReviewerProjection,
   type HarborReviewerProjection,
 } from "../src/lib/evals/harborEvidence";
@@ -611,14 +612,17 @@ async function hydrateApprovedPlan(
   plan: ReadonlyArray<ApprovedPlanRow>,
 ): Promise<{ rows: ClassifiedRow[]; excluded: ExcludedRow[] }> {
   if (trainingExportSizeViolation({ candidates: plan.length })) throw new Error("Approved candidate count exceeds the export limit.");
-  const readProjection = async (storageId: Id<"_storage">, expectedSha256: string): Promise<HarborReviewerProjection> => {
+  const readProjection = async (storageId: Id<"_storage">, expectedSha256: string, expectedTaskHash: string): Promise<HarborReviewerProjection> => {
     const blob = await ctx.storage.get(storageId);
     if (!blob) throw new Error("Approved reviewer projection is unavailable.");
     if (trainingExportSizeViolation({ projectionBytes: blob.size })) throw new Error("Approved reviewer projection exceeds the byte limit.");
     const bytes = await blob.arrayBuffer();
     if (await sha256Buffer(bytes) !== expectedSha256) throw new Error("Approved reviewer projection hash mismatch.");
     const raw: unknown = JSON.parse(new TextDecoder().decode(bytes));
-    return parseHarborReviewerProjection(raw);
+    const projection = parseHarborReviewerProjection(raw);
+    if (!projection.taskRevision) throw new Error("Approved reviewer projection lacks its task revision.");
+    if (await deriveTrainingTaskHash(projection.taskPrompt, projection.taskRevision) !== expectedTaskHash) throw new Error("Approved reviewer projection task hash mismatch.");
+    return projection;
   };
   const rows: ClassifiedRow[] = [];
   const excluded: ExcludedRow[] = [];
@@ -637,7 +641,7 @@ async function hydrateApprovedPlan(
       continue;
     }
     if (candidate.format === "sft") {
-      const projection = await readProjection(candidate.projectionStorageId, candidate.projectionSha256);
+      const projection = await readProjection(candidate.projectionStorageId, candidate.projectionSha256, candidate.taskHash);
       appendBounded({
         privacyClass: candidate.privacyClass,
         row: { kind: "sft", messages: [
@@ -648,8 +652,8 @@ async function hydrateApprovedPlan(
       continue;
     }
     const [left, right] = await Promise.all([
-      readProjection(candidate.leftProjectionStorageId, candidate.leftProjectionSha256),
-      readProjection(candidate.rightProjectionStorageId, candidate.rightProjectionSha256),
+      readProjection(candidate.leftProjectionStorageId, candidate.leftProjectionSha256, candidate.taskHash),
+      readProjection(candidate.rightProjectionStorageId, candidate.rightProjectionSha256, candidate.taskHash),
     ]);
     const leftSteps = left.events.filter((event) => event.kind !== "final_output" && event.kind !== "termination");
     const rightSteps = right.events.filter((event) => event.kind !== "final_output" && event.kind !== "termination");

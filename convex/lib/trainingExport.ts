@@ -120,6 +120,7 @@ export interface ExcludedRow {
     | "hidden_reasoning"
     | "post_hoc_or_non_observable"
     | "task_mismatch"
+    | "invalid_task_hash"
     | "canary_or_private_leak";
   privacyClass: PrivacyClass;
 }

@@ -7,6 +7,7 @@ import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import isolatedSandboxFixture from "./fixtures/daytona-reviewer-contract.json";
 import { TRAINING_EXPORT_LIMITS, verifyApprovedExportArtifact } from "../lib/trainingExport";
+import { deriveTrainingTaskHash } from "../lib/harborEvidence";
 
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/mogil-harbor-evidence-v1.json", import.meta.url), "utf8")) as unknown;
 const headers = (token: string) => ({ authorization: `Bearer ${token}`, "content-type": "application/json" });
@@ -70,6 +71,97 @@ async function exportText(t: ReturnType<typeof convexTest>, exportId: Id<"traini
 }
 
 describe("#287 approved full-span training export", () => {
+  test("legacy rows without a task hash remain readable but approval fails closed before backfill", async () => {
+    const { t, owner, campaignId } = await setup();
+    const legacy = await t.run(async (ctx) => {
+      const span = await ctx.db.query("fullSpanEvalRuns").unique();
+      if (!span) throw new Error("span missing");
+      await ctx.db.patch(span._id, { trainingTaskHash: undefined });
+      return await ctx.db.get(span._id);
+    });
+    expect(legacy?.trainingTaskHash).toBeUndefined();
+    await expect(owner.action(api.trainingApprovals.approveVerdictCampaign, { campaignId })).rejects.toThrow(/no quality-eligible/i);
+  });
+
+  test("owner backfill is dry-runnable, exact, bounded, and idempotent", async () => {
+    const { t, owner, guest, ids } = await setup();
+    await t.run(async (ctx) => {
+      const span = await ctx.db.query("fullSpanEvalRuns").unique();
+      if (!span) throw new Error("span missing");
+      await ctx.db.patch(span._id, { trainingTaskHash: undefined });
+    });
+    const dryRun = await owner.action(api.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatch, {
+      projectId: ids.projectId, dryRun: true, batchSize: 1,
+    });
+    expect(dryRun).toMatchObject({ scanned: 1, patched: 0, wouldPatch: 1, alreadyValid: 0, issues: [], isDone: true, dryRun: true });
+    expect((await t.run(async (ctx) => await ctx.db.query("fullSpanEvalRuns").unique()))?.trainingTaskHash).toBeUndefined();
+
+    const applied = await owner.action(api.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatch, {
+      projectId: ids.projectId, dryRun: false, batchSize: 1,
+    });
+    expect(applied).toMatchObject({ scanned: 1, patched: 1, wouldPatch: 0, alreadyValid: 0, issues: [], isDone: true, dryRun: false });
+    const expected = await deriveTrainingTaskHash("Fix fictional widget arithmetic.", "1");
+    expect((await t.run(async (ctx) => await ctx.db.query("fullSpanEvalRuns").unique()))?.trainingTaskHash).toBe(expected);
+
+    const replay = await owner.action(api.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatch, {
+      projectId: ids.projectId, dryRun: false, batchSize: 1,
+    });
+    expect(replay).toMatchObject({ scanned: 1, patched: 0, wouldPatch: 0, alreadyValid: 1, issues: [], isDone: true });
+    await expect(t.action(internal.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatchInternal, {
+      projectId: ids.projectId, dryRun: true, batchSize: 1,
+    })).resolves.toMatchObject({ scanned: 1, alreadyValid: 1, issues: [], isDone: true });
+    await expect(owner.action(api.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatch, {
+      projectId: ids.projectId, dryRun: true, batchSize: 101,
+    })).rejects.toThrow(/1 to 100/i);
+    await expect(guest.action(api.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatch, {
+      projectId: ids.projectId, dryRun: true, batchSize: 1,
+    })).rejects.toThrow(/permission denied/i);
+  });
+
+  test.each([
+    ["missing projection", "missing_projection"],
+    ["missing blob", "projection_unavailable"],
+    ["malformed projection", "malformed_projection"],
+    ["legacy projection without revision", "missing_task_revision"],
+    ["invalid existing hash", "invalid_existing_hash"],
+  ] as const)("backfill reports %s without patching", async (scenario, reason) => {
+    const { t, owner, ids } = await setup();
+    await t.run(async (ctx) => {
+      const span = await ctx.db.query("fullSpanEvalRuns").unique();
+      if (!span) throw new Error("span missing");
+      if (scenario === "missing projection") {
+        await ctx.db.patch(span._id, { trainingTaskHash: undefined, reviewerProjectionStorageId: undefined });
+        return;
+      }
+      if (scenario === "missing blob") {
+        const storageId = span.reviewerProjectionStorageId;
+        if (!storageId) throw new Error("projection missing");
+        await ctx.storage.delete(storageId);
+        await ctx.db.patch(span._id, { trainingTaskHash: undefined });
+        return;
+      }
+      if (scenario === "malformed projection") {
+        const storageId = await ctx.storage.store(new Blob(["not-json"]));
+        await ctx.db.patch(span._id, { trainingTaskHash: undefined, reviewerProjectionStorageId: storageId });
+        return;
+      }
+      if (scenario === "invalid existing hash") {
+        await ctx.db.patch(span._id, { trainingTaskHash: "0".repeat(64) });
+        return;
+      }
+      const prior = span.reviewerProjectionStorageId ? await ctx.storage.get(span.reviewerProjectionStorageId) : null;
+      if (!prior) throw new Error("projection missing");
+      const projection = JSON.parse(await prior.text()) as Record<string, unknown>;
+      delete projection.taskRevision;
+      const storageId = await ctx.storage.store(new Blob([JSON.stringify(projection)]));
+      await ctx.db.patch(span._id, { trainingTaskHash: undefined, reviewerProjectionStorageId: storageId });
+    });
+    const report = await owner.action(api.migrations.backfillFullSpanTrainingTaskHash.backfillProjectBatch, {
+      projectId: ids.projectId, dryRun: false, batchSize: 1,
+    });
+    expect(report).toMatchObject({ scanned: 1, patched: 0, wouldPatch: 0, alreadyValid: 0, issues: [{ reason }] });
+  });
+
   test("quality eligibility and a positive verdict remain denied until owner approval; revocation denies later export", async () => {
     const { owner, guest, ids, campaignId } = await setup();
     await expect(guest.action(api.trainingApprovals.approveVerdictCampaign, { campaignId })).rejects.toThrow(/Permission denied/);
@@ -220,6 +312,19 @@ describe("#287 approved full-span training export", () => {
     await expect(owner.action(api.exports.generateExport, { projectId: ids.projectId, verdictCampaignId: campaignId, trainingApprovalId: approval.approvalId, source: "trajectory", format: "sft" })).rejects.toThrow(/hash mismatch/i);
   });
 
+  test.each([undefined, "0".repeat(64)])("generation rejects approval snapshots with a missing or unvalidated task hash", async (taskHash) => {
+    const { t, owner, ids, campaignId } = await setup();
+    const approval = await owner.action(api.trainingApprovals.approveVerdictCampaign, { campaignId });
+    await t.run(async (ctx) => {
+      const item = await ctx.db.query("trainingApprovalItems").withIndex("by_approval_and_order", (q) => q.eq("approvalId", approval.approvalId)).unique();
+      if (!item) throw new Error("approval item missing");
+      await ctx.db.patch(item._id, { taskHash });
+    });
+    await expect(owner.action(api.exports.generateExport, {
+      projectId: ids.projectId, verdictCampaignId: campaignId, trainingApprovalId: approval.approvalId, source: "trajectory", format: "sft",
+    })).rejects.toThrow(/snapshot is invalid|task hash mismatch/i);
+  });
+
   test("record mutation atomically rejects active approvals with the wrong campaign binding", async () => {
     const { t, owner, ids, campaignId } = await setup();
     const approval = await owner.action(api.trainingApprovals.approveVerdictCampaign, { campaignId });
@@ -295,8 +400,36 @@ describe("#287 approved full-span training export", () => {
       const state = await setup();
       await state.t.run(async (ctx) => {
         const span = await ctx.db.query("fullSpanEvalRuns").unique();
-        if (!span) throw new Error("span missing");
-        const projection = await ctx.storage.store(new Blob(["x".repeat(size)]));
+        if (!span?.reviewerProjectionStorageId) throw new Error("span projection missing");
+        let text: string;
+        if (!allowed) {
+          text = "x".repeat(size);
+        } else {
+          const prior = await ctx.storage.get(span.reviewerProjectionStorageId);
+          if (!prior) throw new Error("projection blob missing");
+          const projection = JSON.parse(await prior.text()) as Record<string, unknown>;
+          const events = projection.events as Array<Record<string, unknown>>;
+          const verifier = projection.verifierEvidence as Record<string, unknown>;
+          projection.finalOutput = "x";
+          if (!events[0]) throw new Error("projection event missing");
+          events[0].content = "x";
+          projection.patch = "x";
+          verifier.stdout = "x";
+          verifier.stderr = "x";
+          const fields: Array<[Record<string, unknown>, string, number]> = [
+            [projection, "finalOutput", 256_000], [events[0], "content", 256_000],
+            [projection, "patch", 65_536], [verifier, "stdout", 8_192], [verifier, "stderr", 8_192],
+          ];
+          for (const [target, key, max] of fields) {
+            const current = String(target[key]);
+            const deficit = size - new TextEncoder().encode(JSON.stringify(projection)).byteLength;
+            if (deficit <= 0) break;
+            target[key] = current + "x".repeat(Math.min(deficit, max - current.length));
+          }
+          text = JSON.stringify(projection);
+          expect(new TextEncoder().encode(text).byteLength).toBe(size);
+        }
+        const projection = await ctx.storage.store(new Blob([text]));
         await ctx.db.patch(span._id, { reviewerProjectionStorageId: projection });
       });
       const approval = state.owner.action(api.trainingApprovals.approveVerdictCampaign, { campaignId: state.campaignId });
