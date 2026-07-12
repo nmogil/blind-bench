@@ -23,6 +23,39 @@
  */
 
 export type ExportFormat = "dpo" | "annotated" | "sft";
+
+/** Conservative Convex-safe hard caps for approved export generation. */
+export const TRAINING_EXPORT_LIMITS = {
+  maxCandidates: 50,
+  maxProjectionBytes: 512 * 1024,
+  maxRowBytes: 768 * 1024,
+  maxJsonlBytes: 4 * 1024 * 1024,
+  maxManifestBytes: 512 * 1024,
+  maxExportsPerApproval: 20,
+} as const;
+
+/** UTF-8 byte length used by every export size gate. */
+export function utf8Bytes(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+export type TrainingExportSizeInput = {
+  readonly candidates?: number;
+  readonly projectionBytes?: number;
+  readonly rowBytes?: number;
+  readonly jsonlBytes?: number;
+  readonly manifestBytes?: number;
+};
+
+/** Return the first exceeded hard cap; exact-limit values are accepted. */
+export function trainingExportSizeViolation(input: TrainingExportSizeInput): keyof TrainingExportSizeInput | null {
+  if (input.candidates !== undefined && input.candidates > TRAINING_EXPORT_LIMITS.maxCandidates) return "candidates";
+  if (input.projectionBytes !== undefined && input.projectionBytes > TRAINING_EXPORT_LIMITS.maxProjectionBytes) return "projectionBytes";
+  if (input.rowBytes !== undefined && input.rowBytes > TRAINING_EXPORT_LIMITS.maxRowBytes) return "rowBytes";
+  if (input.jsonlBytes !== undefined && input.jsonlBytes > TRAINING_EXPORT_LIMITS.maxJsonlBytes) return "jsonlBytes";
+  if (input.manifestBytes !== undefined && input.manifestBytes > TRAINING_EXPORT_LIMITS.maxManifestBytes) return "manifestBytes";
+  return null;
+}
 export type PrivacyClass = "public" | "internal" | "confidential" | "pii" | "phi";
 
 export interface Annotation {
@@ -79,7 +112,15 @@ export interface ExcludedRow {
     | "review_disagreement"
     | "no_preference"
     | "no_approved_verdict"
-    | "invalid_sft_shape";
+    | "invalid_sft_shape"
+    | "not_full_span"
+    | "fixture_only"
+    | "insufficient_evidence"
+    | "sensitive"
+    | "hidden_reasoning"
+    | "post_hoc_or_non_observable"
+    | "task_mismatch"
+    | "canary_or_private_leak";
   privacyClass: PrivacyClass;
 }
 
@@ -97,6 +138,7 @@ const SENSITIVE_CLASSES: ReadonlySet<PrivacyClass> = new Set([
 // Belt-and-suspenders leak scan: email + common secret-key prefixes.
 const EMAIL = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
 const API_KEY = /\b(sk-[a-z0-9]{16,}|xox[baprs]-[a-z0-9-]{10,}|AKIA[0-9A-Z]{12,}|ghp_[a-z0-9]{20,})\b/i;
+const PRIVATE_OR_CANARY = /HIDDEN_VERIFIER_CANARY_|analysis_metadata|assistant_reasoning|(?:provider|model|harness)[_-]?(?:id|name)?\s*[:=]/i;
 
 const rowText = (row: ExportRow): string => {
   switch (row.kind) {
@@ -159,12 +201,88 @@ export function gateRows(
       excluded.push({ reason: "pii_leak", privacyClass });
       continue;
     }
+    if (PRIVATE_OR_CANARY.test(text)) {
+      excluded.push({ reason: "canary_or_private_leak", privacyClass });
+      continue;
+    }
     included.push(row);
   }
   return { included, excluded };
 }
 
-// --- trajectory rendering (steps → readable text for DPO prompt/answers) -----
+// --- reviewer-safe training trajectory serialization -------------------------
+
+/** Agent-observable event shape accepted by the safe training serializer. */
+export interface AgentObservableEvent {
+  readonly sequence: number;
+  readonly kind: string;
+  readonly role?: string;
+  readonly content?: string;
+  readonly callId?: string;
+  readonly toolName?: string;
+  readonly status?: string;
+  readonly arguments?: unknown;
+  readonly result?: unknown;
+  readonly error?: string;
+}
+
+const AGENT_OBSERVABLE_KINDS: ReadonlySet<string> = new Set([
+  "user_message",
+  "assistant_message",
+  "tool_call",
+  "tool_result",
+  "tool_error",
+]);
+
+/** True only for context/action events the agent could observe at inference. */
+export function isAgentObservableTrainingEvent(event: AgentObservableEvent): boolean {
+  return AGENT_OBSERVABLE_KINDS.has(event.kind);
+}
+
+/** Serialize one allowlisted event without timestamps or provenance. */
+export function serializeAgentObservableEvent(event: AgentObservableEvent): string | null {
+  if (!isAgentObservableTrainingEvent(event)) return null;
+  return JSON.stringify({
+    sequence: event.sequence,
+    kind: event.kind,
+    ...(event.role ? { role: event.role } : {}),
+    ...(event.content ? { content: event.content } : {}),
+    ...(event.toolName ? { tool: event.toolName } : {}),
+    ...(event.status ? { status: event.status } : {}),
+    ...(event.arguments !== undefined ? { arguments: event.arguments } : {}),
+    ...(event.result !== undefined ? { result: event.result } : {}),
+    ...(event.error ? { error: event.error } : {}),
+  });
+}
+
+/**
+ * Serialize task + agent-observable chronology only. Iteration stops at the
+ * first final output even if malformed/post-hoc events follow it. Objective
+ * outcomes, rewards, verifier/workspace/policy events, reasoning, final output,
+ * lifecycle, and termination are never included in model input.
+ */
+export function serializeAgentObservableTrajectoryContext(input: {
+  readonly taskPrompt: string;
+  readonly events: ReadonlyArray<AgentObservableEvent>;
+}): string {
+  const observedEvents: unknown[] = [];
+  for (const event of input.events) {
+    if (event.kind === "final_output") break;
+    const serialized = serializeAgentObservableEvent(event);
+    if (serialized !== null) {
+      const parsed: unknown = JSON.parse(serialized);
+      observedEvents.push(parsed);
+    }
+  }
+  return JSON.stringify({
+    schema: "blindbench.agent-observable-trajectory",
+    version: 1,
+    task: input.taskPrompt,
+    observed_events: observedEvents,
+  });
+}
+
+// --- legacy trajectory rendering (steps → readable text) ---------------------
 
 export interface StepMeta {
   kind: "message" | "tool_call" | "tool_result" | "state" | "policy_event";
@@ -236,7 +354,7 @@ export interface ExportSourceStats {
  */
 export interface ExportManifest {
   schema: "blindbench.training-export";
-  version: 1;
+  version: 2;
   generated_at: number;
   source: "trajectory" | "output_preference";
   format: ExportFormat;
@@ -249,6 +367,21 @@ export interface ExportManifest {
   };
   source_units: number;
   reviewers: number;
+  policy: {
+    training_approval_required: true;
+    approval_status: "active";
+    policy_version: string;
+    privacy_policy: "public_or_internal_only";
+    safe_trajectory_serialization: "agent-observable-trajectory-v1";
+  };
+  integrity: {
+    candidate_count: number;
+    included_count: number;
+    excluded_count: number;
+    reconciled: boolean;
+    row_hashes: string[];
+    dataset_hash: string;
+  };
   fireworks: { compatible: boolean; row_shape: string };
   notes: string[];
 }
@@ -261,6 +394,10 @@ export function buildExportManifest(input: {
   allowSensitive: boolean;
   stats: ExportSourceStats;
   generatedAt: number;
+  approvalPolicyVersion?: string;
+  rowHashes?: string[];
+  datasetHash?: string;
+  candidateCount?: number;
 }): ExportManifest {
   const { source, format, included, excluded, allowSensitive, stats, generatedAt } = input;
 
@@ -311,7 +448,7 @@ export function buildExportManifest(input: {
 
   return {
     schema: "blindbench.training-export",
-    version: 1,
+    version: 2,
     generated_at: generatedAt,
     source,
     format,
@@ -324,6 +461,21 @@ export function buildExportManifest(input: {
     },
     source_units: stats.sourceUnits,
     reviewers: stats.reviewers,
+    policy: {
+      training_approval_required: true,
+      approval_status: "active",
+      policy_version: input.approvalPolicyVersion ?? "legacy-test-only",
+      privacy_policy: "public_or_internal_only",
+      safe_trajectory_serialization: "agent-observable-trajectory-v1",
+    },
+    integrity: {
+      candidate_count: input.candidateCount ?? included.length + excluded.length,
+      included_count: included.length,
+      excluded_count: excluded.length,
+      reconciled: (input.candidateCount ?? included.length + excluded.length) === included.length + excluded.length,
+      row_hashes: input.rowHashes ?? [],
+      dataset_hash: input.datasetHash ?? "",
+    },
     fireworks: {
       compatible: true,
       row_shape: format === "sft" ? "messages[]" : "prompt/chosen/rejected",
@@ -361,7 +513,46 @@ export function toJsonl(format: ExportFormat, rows: ExportRow[]): string {
   return jsonl(
     rows.map((r) => {
       const s = r as SftRow;
-      return s.metadata ? { messages: s.messages, metadata: s.metadata } : { messages: s.messages };
+      return { messages: s.messages };
     }),
   );
+}
+
+async function digest(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Verify an approved export artifact against its v2 manifest without logging
+ * row content. This is the same local/no-network seam used by synthetic Convex
+ * integration tests before an operator handoff.
+ */
+export async function verifyApprovedExportArtifact(
+  jsonl: string,
+  manifest: ExportManifest,
+): Promise<{ readonly ready: boolean; readonly reasons: string[] }> {
+  const reasons: string[] = [];
+  const lines = jsonl === "" ? [] : jsonl.split("\n");
+  if (manifest.schema !== "blindbench.training-export" || manifest.version !== 2) reasons.push("unsupported_manifest");
+  if (!manifest.integrity.reconciled) reasons.push("counts_not_reconciled");
+  if (manifest.row_count !== lines.length || manifest.integrity.included_count !== lines.length) reasons.push("row_count_mismatch");
+  if (manifest.integrity.excluded_count !== manifest.excluded_count) reasons.push("excluded_count_mismatch");
+  if (manifest.integrity.candidate_count !== manifest.row_count + manifest.excluded_count) reasons.push("candidate_count_mismatch");
+  const actualHashes: string[] = [];
+  for (const line of lines) {
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) reasons.push("invalid_row_shape");
+      else if (manifest.format === "sft" && (Object.keys(parsed).length !== 1 || !("messages" in parsed))) reasons.push("invalid_sft_shape");
+      else if (manifest.format === "dpo" && !("prompt" in parsed && "chosen" in parsed && "rejected" in parsed)) reasons.push("invalid_dpo_shape");
+    } catch {
+      reasons.push("invalid_jsonl");
+    }
+    actualHashes.push(await digest(line));
+  }
+  if (JSON.stringify(actualHashes) !== JSON.stringify(manifest.integrity.row_hashes)) reasons.push("row_hash_mismatch");
+  if (await digest(jsonl) !== manifest.integrity.dataset_hash) reasons.push("dataset_hash_mismatch");
+  return { ready: reasons.length === 0, reasons: [...new Set(reasons)] };
 }

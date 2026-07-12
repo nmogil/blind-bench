@@ -176,26 +176,22 @@ describe("opaque trajectory review sessions", () => {
     expect((await asReviewer1.query(api.agentTraceReviewSessions.getMatchup, { token: token1 })).winner).toBe("left");
     expect((await asReviewer2.query(api.agentTraceReviewSessions.getMatchup, { token: token2 })).winner).toBe("right");
 
-    const exported = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       source: "trajectory",
       format: "dpo",
-    });
-    expect(exported.rowCount).toBe(0);
-    expect(exported.manifest.excluded_by_reason.review_disagreement).toBe(1);
+    })).rejects.toThrow(/training approval/i);
 
     await asReviewer2.mutation(api.agentTraceReviewSessions.decideMatchup, {
       token: token2,
       winner: "tie",
       reasonTags: [],
     });
-    const tieExport = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       source: "trajectory",
       format: "dpo",
-    });
-    expect(tieExport.rowCount).toBe(0);
-    expect(tieExport.manifest.excluded_by_reason.no_preference).toBe(1);
+    })).rejects.toThrow(/training approval/i);
   });
 
   test("mismatched prefixes are persisted invalid and excluded with an explicit manifest reason", async () => {
@@ -215,12 +211,10 @@ describe("opaque trajectory review sessions", () => {
     expect(matchup?.invalidReason).toBe("prefix_mismatch");
     expect((await asReviewer1.query(api.agentTraceReviewSessions.listMine, {})).filter((session) => session.kind === "matchup")).toHaveLength(0);
 
-    const exported = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       source: "trajectory",
       format: "dpo",
-    });
-    expect(exported.rowCount).toBe(0);
-    expect(exported.manifest.excluded_by_reason.non_comparable_prefix).toBe(1);
+    })).rejects.toThrow(/training approval/i);
   });
 });

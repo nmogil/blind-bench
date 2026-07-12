@@ -1,6 +1,8 @@
 # Training export artifact verifier
 
-Use this local verifier before handing Fireworks-ready JSONL artifacts to Fireworks or to a customer. It checks that the compiler output is internally consistent and preserves the data-boundary contract.
+Use this local verifier before handing Fireworks-ready JSONL artifacts to Fireworks or to a customer. It checks that the legacy local compiler output is internally consistent and preserves the data-boundary contract.
+
+For product-generated, explicitly approved strict full-span SFT/DPO artifacts, use the v2 manifest verifier and operator flow in [`full-span-training-export.md`](./full-span-training-export.md). That verifier checks exact line hashes, exact dataset bytes, approval/policy state, row shape, and count reconciliation against the static sanitized Mogil producer fixture.
 
 ```bash
 npm run dataset:demo

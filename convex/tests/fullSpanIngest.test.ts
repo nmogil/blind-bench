@@ -5,6 +5,7 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import producerFixture from "./fixtures/mogil-harbor-evidence-v1.json";
+import isolatedSandboxProducerFixture from "./fixtures/daytona-reviewer-contract.json";
 
 // Sanitized static fixture generated through the authoritative Mogil Bench
 // HarborEvidence Pydantic model; copied here so BlindBench has no runtime
@@ -37,6 +38,7 @@ function reservation(stableRunId: string, attempt: string) {
     stableRunId,
     attempt,
     fingerprint: `fingerprint-${stableRunId}`,
+    trainingTaskHash: `task-hash-${stableRunId}`,
     runQualification: "quality_eligible" as const,
     evidenceCompleteness: "complete" as const,
     canJudgeTaskSuccess: true,
@@ -115,6 +117,32 @@ describe("POST /ingest/v1/eval-runs authoritative batch contract", () => {
     expect(stored.traces).toHaveLength(3);
     expect(stored.spans.every((row) => row.status === "ready" && row.runQualification === "quality_eligible" && row.canJudgeTaskSuccess)).toBe(true);
     expect(stored.spans.every((row) => row.rawEvidenceStorageId && row.reviewerProjectionStorageId && row.rawEvidenceStorageId !== row.reviewerProjectionStorageId)).toBe(true);
+  });
+
+  test("ingests copied Docker and provider-neutral isolated-sandbox producer contracts without projecting environment provenance", async () => {
+    const { t, ids, owner } = await setup();
+    const automation = await issueAutomation(owner, ids.project);
+    const isolated = JSON.parse(JSON.stringify(isolatedSandboxProducerFixture)) as Record<string, unknown>;
+    const response = await t.fetch("/ingest/v1/eval-runs", {
+      method: "POST",
+      headers: headers(automation.token),
+      body: envelope([artifact(), isolated]),
+    });
+    expect(response.status).toBe(200);
+    expect(await responseBody(response)).toEqual({ complete: 2, imported: 2, deduped: 0, invalid: 0 });
+    const stored = await t.run(async (ctx) => {
+      const spans = await ctx.db.query("fullSpanEvalRuns").collect();
+      return await Promise.all(spans.map(async (span) => ({
+        raw: span.rawEvidenceStorageId ? await (await ctx.storage.get(span.rawEvidenceStorageId))?.text() : undefined,
+        projection: span.reviewerProjectionStorageId ? await (await ctx.storage.get(span.reviewerProjectionStorageId))?.text() : undefined,
+      })));
+    });
+    expect(stored.some((row) => row.raw?.includes('"environment_class":"docker"'))).toBe(true);
+    expect(stored.some((row) => row.raw?.includes('"environment_class":"isolated-sandbox"'))).toBe(true);
+    for (const row of stored) {
+      expect(row.projection).not.toMatch(/docker|isolated-sandbox|daytona/i);
+      expect(row.projection).not.toContain("fictional-provider");
+    }
   });
 
   test("replays and mixed batches deterministically, while conflicts reserve nothing", async () => {
@@ -218,6 +246,7 @@ describe("POST /ingest/v1/eval-runs authoritative batch contract", () => {
           stableRunId: `crash-${stage}`,
           attempt: `attempt-${stage}`,
           fingerprint: `fingerprint-${stage}`,
+          trainingTaskHash: `task-hash-${stage}`,
           status: "pending",
           leaseId: `lease-${stage}`,
           leaseExpiresAt: 1,

@@ -1,6 +1,11 @@
 # Mogil Harbor/Pi full-span evidence ingest
 
-This endpoint consumes the artifact produced by Mogil Bench's authoritative `HarborEvidence` Pydantic model (`mogil_bench/evidence.py`). BlindBench does not import Mogil Bench at runtime; a sanitized Pydantic-generated fixture is pinned at `convex/tests/fixtures/mogil-harbor-evidence-v1.json`.
+This endpoint consumes the artifact produced by Mogil Bench's authoritative `HarborEvidence` Pydantic model (`mogil_bench/evidence.py`). BlindBench does not import Mogil Bench at runtime. Two explicit static consumer contracts are pinned:
+
+- `convex/tests/fixtures/mogil-harbor-evidence-v1.json` — existing Docker producer contract.
+- `convex/tests/fixtures/daytona-reviewer-contract.json` — byte-for-byte copy of `/root/github_repos/ventures/mogil-bench-daytona/tests/fixtures/daytona-reviewer-contract.json` (SHA-256 `9b13f2e540885198db736ae55930d0f5da9d03d38e4adc748e0553acc288e316` at copy time).
+
+The Daytona contract fixture must never be locally synthesized or edited. Synchronize it only by recopying the producer fixture, reviewing its schema diff, and updating the recorded hash.
 
 ## Endpoint, auth, and envelope
 
@@ -71,7 +76,7 @@ Each `runs[]` member has exactly these top-level fields:
   "analysis_metadata": { "provider": "private", "model": "private" },
   "reviewer": {
     "task": { "id": "task", "revision": "1", "privacy_class": "internal", "prompt": "Reviewer-safe prompt" },
-    "environment_class": "docker",
+    "environment_class": "docker | isolated-sandbox",
     "harness_schema": "harbor/pi-jsonl@0.18.0",
     "events": [],
     "outcomes": {},
@@ -81,7 +86,7 @@ Each `runs[]` member has exactly these top-level fields:
 }
 ```
 
-`reviewer.outcomes` and `reviewer.rewards` have the same strict shapes as their top-level counterparts and must agree with them.
+`reviewer.outcomes` and `reviewer.rewards` have the same strict shapes as their top-level counterparts and must agree with them. `reviewer.environment_class` accepts exactly `docker` for existing Docker artifacts or the provider-neutral `isolated-sandbox` value for externally isolated runners. Vendor/backend names are not accepted in that field and the environment class remains private provenance—it is omitted from reviewer UI and training exports.
 
 ### Canonical events
 
@@ -130,3 +135,5 @@ Reservations carry an ownership lease that is renewed before each run and throug
 Internal trace IDs are namespaced as `full-span:{run.id}`. Review creation resolves full-span runs through `fullSpanEvalRuns.stableRunId`; it does not share the legacy/native/OTLP trace-ID namespace.
 
 The exact producer artifact—including `analysis_metadata`, raw reference, and private harness metadata—is retained only in a private raw storage blob. The separately serialized reviewer projection omits private metadata, raw path/hash, original event/call/source/session IDs, model/provider/harness provenance, credentials, canaries, and absolute host paths. The complete serialized projection is checked against the leakage policy before storage.
+
+Training use is a separate, revocable owner decision after a closed human review; objective eligibility or a positive verdict never grants it automatically. See [`full-span-training-export.md`](./full-span-training-export.md).

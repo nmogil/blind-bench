@@ -58,6 +58,9 @@ test("create review, judge blind, inspect result, and reuse evidence", async ({ 
   await expect(component).toContainText("support · pi · claude-sonnet");
   await component.getByRole("button", { name: "Add approved runs to regression set" }).click();
   await expect(component).toContainText("1 added to the regression set");
+  await expect(component.getByRole("button", { name: "Export approved SFT" })).toBeDisabled();
+  await component.getByRole("button", { name: "Approve for training" }).click();
+  await expect(component).toContainText("Training approval granted for 1 eligible run");
 
   await component.update(
     <MemoryRouter initialEntries={[`/orgs/demo/projects/${projectId}/results`]}>

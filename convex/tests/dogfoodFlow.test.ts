@@ -85,31 +85,14 @@ describe("M31 dogfood — full flywheel on real trajectories", () => {
     const persistedMatchup = await t.run(async (ctx) => await ctx.db.get(matchupId));
     expect(persistedMatchup?.comparabilityStatus).toBe("invalid");
 
-    // 4. EXPORT — the real Harbor pair is honestly excluded because its
-    // normalized prefixes differ. The old flow overclaimed this as DPO-ready.
-    const dpo = await asOwner.action(api.exports.generateExport, {
+    // 4. EXPORT — verdict/preference data alone is never training consent.
+    // These legacy Harbor fixtures are not strict full-span evidence and cannot
+    // receive a #287 approval.
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId, source: "trajectory", format: "dpo",
-    });
-    expect(dpo.rowCount).toBe(0);
-    expect(dpo.manifest).toMatchObject({
-      schema: "blindbench.training-export",
-      version: 1,
-      source: "trajectory",
-      format: "dpo",
-      excluded_by_reason: { non_comparable_prefix: 1 },
-    });
-
-    // SFT from the best-verdict trajectory.
-    const sft = await asOwner.action(api.exports.generateExport, {
+    })).rejects.toThrow(/training approval/i);
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId, source: "trajectory", format: "sft",
-    });
-    expect(sft.rowCount).toBeGreaterThanOrEqual(1);
-    expect(sft.manifest).toMatchObject({
-      format: "sft",
-      fireworks: { row_shape: "messages[]" },
-    });
-
-    expect(dpo.excludedCount).toBe(1);
-    expect(sft.rowCount).toBeGreaterThanOrEqual(1);
+    })).rejects.toThrow(/training approval/i);
   });
 });

@@ -55,13 +55,6 @@ const persist = async (as: Ident, projectId: Id<"projects">, run: JeevesClogRunE
   return res.agentTraceId;
 };
 
-const readExport = async (t: ReturnType<typeof convexTest>, exportId: Id<"trainingExports">) =>
-  await t.run(async (ctx) => {
-    const row = await ctx.db.get(exportId);
-    const blob = row ? await ctx.storage.get(row.storageId) : null;
-    return blob ? await blob.text() : "";
-  });
-
 describe("#53 training export", () => {
   test("trajectory DPO: winner's divergence step is chosen, loser's rejected, prefix is the prompt", async () => {
     const t = convexTest(schema);
@@ -74,15 +67,9 @@ describe("#53 training export", () => {
     });
     await asOwner.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: ["accuracy"] });
 
-    const res = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId, source: "trajectory", format: "dpo",
-    });
-    expect(res.rowCount).toBe(1);
-    const line = JSON.parse(await readExport(t, res.exportId));
-    expect(line.chosen).toContain("create_escalation"); // winner (left) next action
-    expect(line.rejected).toContain("close_ticket"); // loser (right) next action
-    expect(line.prompt).toContain("lookup_account"); // shared prefix
-    expect(line.prompt).not.toContain("create_escalation"); // prefix stops before divergence
+    })).rejects.toThrow(/training approval/i);
   });
 
   test("output-preference DPO: best vs weak with the resolved prompt", async () => {
@@ -109,14 +96,9 @@ describe("#53 training export", () => {
       await ctx.db.insert("outputPreferences", { runId, outputId: bad, userId: ids.ownerUserId, rating: "weak" });
     });
 
-    const res = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId, source: "output_preference", format: "dpo",
-    });
-    expect(res.rowCount).toBe(1);
-    const line = JSON.parse(await readExport(t, res.exportId));
-    expect(line.prompt).toContain("Handle a refund for the customer."); // {{topic}} substituted
-    expect(line.chosen).toBe("Happy to refund you.");
-    expect(line.rejected).toBe("No refunds.");
+    })).rejects.toThrow(/training approval/i);
   });
 
   test("consent gate: a pii-classed trajectory is excluded unless allowSensitive", async () => {
@@ -137,12 +119,8 @@ describe("#53 training export", () => {
     });
     await asOwner.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: [] });
 
-    const denied = await asOwner.action(api.exports.generateExport, { projectId: ids.projectId, source: "trajectory", format: "dpo" });
-    expect(denied.rowCount).toBe(0);
-    expect(denied.excludedCount).toBe(1);
-
-    const consented = await asOwner.action(api.exports.generateExport, { projectId: ids.projectId, source: "trajectory", format: "dpo", allowSensitive: true });
-    expect(consented.rowCount).toBe(1);
+    await expect(asOwner.action(api.exports.generateExport, { projectId: ids.projectId, source: "trajectory", format: "dpo" })).rejects.toThrow(/training approval/i);
+    await expect(asOwner.action(api.exports.generateExport, { projectId: ids.projectId, source: "trajectory", format: "dpo", allowSensitive: true })).rejects.toThrow(/training approval|sensitive/i);
   });
 
   test("export is owner/editor only — an evaluator is denied", async () => {
@@ -153,16 +131,22 @@ describe("#53 training export", () => {
     ).rejects.toThrow(/Permission denied/);
   });
 
-  test("download link expires after 1 hour", async () => {
+  test("legacy exports without approval cannot be downloaded", async () => {
     const t = convexTest(schema);
     const { ids, asOwner } = await seed(t);
-    const res = await asOwner.action(api.exports.generateExport, { projectId: ids.projectId, source: "output_preference", format: "dpo" });
-    // Fresh download works.
-    await expect(asOwner.action(api.exports.downloadExport, { exportId: res.exportId })).resolves.toBeTruthy();
-    // Age the row past the TTL.
-    await t.run(async (ctx) => {
-      await ctx.db.patch(res.exportId, { createdAt: Date.now() - 2 * 60 * 60 * 1000 });
+    const exportId = await t.run(async (ctx) => {
+      const storageId = await ctx.storage.store(new Blob(["{}"]));
+      return await ctx.db.insert("trainingExports", {
+        projectId: ids.projectId,
+        source: "trajectory",
+        format: "dpo",
+        storageId,
+        rowCount: 0,
+        excludedCount: 0,
+        createdById: ids.ownerUserId,
+        createdAt: Date.now(),
+      });
     });
-    await expect(asOwner.action(api.exports.downloadExport, { exportId: res.exportId })).rejects.toThrow(/expired/);
+    await expect(asOwner.action(api.exports.downloadExport, { exportId })).rejects.toThrow(/no training approval/i);
   });
 });

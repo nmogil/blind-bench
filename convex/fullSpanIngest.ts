@@ -32,6 +32,7 @@ const reservationValidator = v.object({
   stableRunId: v.string(),
   attempt: v.string(),
   fingerprint: v.string(),
+  trainingTaskHash: v.string(),
   runQualification: qualificationValidator,
   evidenceCompleteness: v.union(v.literal("complete"), v.literal("insufficient")),
   canJudgeTaskSuccess: v.boolean(),
@@ -49,6 +50,7 @@ type ReservationInput = {
   readonly stableRunId: string;
   readonly attempt: string;
   readonly fingerprint: string;
+  readonly trainingTaskHash: string;
   readonly runQualification: "quality_eligible" | "fixture_only" | "insufficient";
   readonly evidenceCompleteness: "complete" | "insufficient";
   readonly canJudgeTaskSuccess: boolean;
@@ -438,6 +440,7 @@ function reservationInput(parsed: ParsedHarborEvidence, fingerprint: string): Re
     stableRunId: parsed.run.stableId,
     attempt: parsed.run.attempt,
     fingerprint,
+    trainingTaskHash: parsed.trainingTaskHash,
     runQualification: parsed.projection.runQualification,
     evidenceCompleteness: parsed.projection.evidenceCompleteness,
     canJudgeTaskSuccess: parsed.projection.canJudgeTaskSuccess,

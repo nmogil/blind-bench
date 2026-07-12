@@ -232,18 +232,15 @@ describe("verdict review campaigns", () => {
       campaignId,
     })).toEqual({ added: 0, alreadyPresent: 1, excluded: 0 });
 
-    const exported = await asOwner.action(api.exports.generateExport, {
+    await expect(asOwner.action(api.exports.generateExport, {
       projectId: ids.projectId,
       verdictCampaignId: campaignId,
       source: "trajectory",
       format: "sft",
-    });
-    expect(exported).toMatchObject({ rowCount: 1, excludedCount: 0 });
-    expect(exported.manifest).toMatchObject({
-      format: "sft",
-      source_units: 1,
-      reviewers: 2,
-    });
+    })).rejects.toThrow(/training approval/i);
+    await expect(asOwner.action(api.trainingApprovals.approveVerdictCampaign, {
+      campaignId,
+    })).rejects.toThrow(/no quality-eligible/i);
   });
 
   test("rejects owner self-review, closes submissions, and resumes a guest idempotently", async () => {
