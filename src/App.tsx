@@ -146,8 +146,9 @@ export function App() {
           <Route path="/eval" element={<EvalLayout />}>
             <Route index element={<InvitesInbox />} />
             <Route path="traces" element={<TraceReviewList />} />
-            <Route path="traces/:agentTraceId" element={<TraceReview />} />
-            <Route path="matchups/:matchupId" element={<TraceMatchupReview />} />
+            {/* #310: blind routes take opaque review tokens, never real ids. */}
+            <Route path="traces/:handle" element={<TraceReview />} />
+            <Route path="matchups/:handle" element={<TraceMatchupReview />} />
           </Route>
           <Route path="/denied" element={<Denied />} />
           <Route path="*" element={<NotFound />} />

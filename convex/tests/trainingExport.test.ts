@@ -51,6 +51,22 @@ describe("#53 training-export data-boundary gate", () => {
     expect(excluded[0]?.reason).toBe("degenerate");
   });
 
+  test("#312: DPO pairs flagged prefix_mismatch are excluded — not comparable", () => {
+    const flagged: ExportRow = {
+      kind: "dpo",
+      prompt: "prefix as the winner saw it",
+      chosen: "better",
+      rejected: "worse",
+      metadata: { prefix_mismatch: true },
+    };
+    const { included, excluded } = gateRows([
+      { row: flagged, privacyClass: "public" },
+      { row: dpo(), privacyClass: "public" },
+    ]);
+    expect(included).toHaveLength(1);
+    expect(excluded[0]?.reason).toBe("prefix_mismatch");
+  });
+
   test("empty rows are excluded with a reason, never silently dropped", () => {
     const rows: ClassifiedRow[] = [
       { row: dpo({ chosen: "   " }), privacyClass: "public" },

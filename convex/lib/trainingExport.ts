@@ -70,7 +70,7 @@ export interface ClassifiedRow {
 }
 
 export interface ExcludedRow {
-  reason: "prod_sensitive" | "pii_leak" | "empty" | "degenerate";
+  reason: "prod_sensitive" | "pii_leak" | "empty" | "degenerate" | "prefix_mismatch";
   privacyClass: PrivacyClass;
 }
 
@@ -130,6 +130,13 @@ export function gateRows(
       excluded.push({ reason: "prod_sensitive", privacyClass });
       continue;
     }
+    // #312: DPO is a preference over the next action given an IDENTICAL
+    // prefix. The export action compares both traces' rendered prefixes and
+    // flags mismatches; a mismatched pair is not valid DPO signal.
+    if (row.kind === "dpo" && row.metadata["prefix_mismatch"] === true) {
+      excluded.push({ reason: "prefix_mismatch", privacyClass });
+      continue;
+    }
     // A DPO pair with identical chosen/rejected carries no preference signal —
     // it pollutes the dataset. Drop it (e.g. the matchup's divergence index
     // landed on a shared-prefix step). Surfaced by the M31 dogfood pass.
@@ -182,6 +189,20 @@ export function renderStep(meta: StepMeta, body: unknown): string {
 /** Ordered (meta, body) pairs → a transcript string (DPO prefix / SFT turns). */
 export function renderTranscript(steps: Array<{ meta: StepMeta; body: unknown }>): string {
   return steps.map((s) => renderStep(s.meta, s.body)).join("\n");
+}
+
+/**
+ * #312: cheap stable content hash (FNV-1a, hex) recorded as `prefix_hash` on
+ * every exported DPO row — the persisted proof that chosen and rejected were
+ * built on the same rendered prefix. Not cryptographic; equality proof only.
+ */
+export function contentHash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
 }
 
 /** The more-sensitive of two privacy classes (for a matchup spanning two traces). */
@@ -253,8 +274,12 @@ export function buildExportManifest(input: {
   const notes: string[] = [];
   if (format === "dpo") {
     notes.push(
-      "DPO rows are emitted only for comparable chosen/rejected pairs; a pair whose chosen and rejected text are identical carries no preference signal and is excluded (degenerate) rather than written.",
+      "DPO rows are emitted only for verified-comparable pairs: chosen and rejected must be built on an identical rendered prefix (recorded as prefix_hash in row metadata); pairs whose prefixes differ are excluded (prefix_mismatch), and a pair whose chosen and rejected text are identical is excluded (degenerate).",
     );
+    if ((byReason.prefix_mismatch ?? 0) > 0)
+      notes.push(
+        `${byReason.prefix_mismatch} pair(s) excluded because the two trajectories' prefixes did not match at export time — their preference signal is not valid DPO.`,
+      );
     if (included.length === 0)
       notes.push(
         "No comparable preference pairs were found, so no DPO rows were written. Decide more A/B matchups (trajectories) or add best+weak ratings on the same run (prompt outputs).",

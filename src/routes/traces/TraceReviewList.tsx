@@ -62,9 +62,9 @@ export function TraceReviewList() {
                 Boolean,
               );
               return (
-                <li key={t._id}>
+                <li key={t.handle}>
                   <Link
-                    to={`/eval/traces/${t._id}`}
+                    to={`/eval/traces/${t.handle}`}
                     className="flex items-center justify-between gap-4 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted/50"
                   >
                     <div className="min-w-0">

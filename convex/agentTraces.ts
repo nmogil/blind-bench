@@ -26,6 +26,7 @@ import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { requireAuth, requireProjectRole, isBlindReviewer } from "./lib/auth";
+import { generateToken } from "./lib/crypto";
 import type { AgentRunTrace } from "./lib/agentTrace";
 import { redactValue } from "./lib/agentTrace";
 import { splitStep } from "./lib/agentTraceStorage";
@@ -138,6 +139,7 @@ export const insertTraceParent = internalMutation({
       durationMs: args.durationMs,
       totalTokens: args.totalTokens,
       importedById: userId,
+      reviewToken: generateToken(),
     });
     return { agentTraceId, deduped: false };
   },
@@ -185,6 +187,7 @@ export const insertTraceParentForIngest = internalMutation({
       source: "agent_harness",
       status: "pending",
       importedById,
+      reviewToken: generateToken(),
     });
     return { agentTraceId, deduped: false };
   },
@@ -486,7 +489,9 @@ export const listReviewableTraces = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     const out: Array<{
-      _id: Id<"agentTraces">;
+      // #310: opaque review handle — the reviewToken, falling back to the raw
+      // id only for pre-fix rows that backfillReviewTokens hasn't stamped yet.
+      handle: string;
       projectName: string;
       status: string;
       stepCount: number;
@@ -506,7 +511,7 @@ export const listReviewableTraces = query({
       for (const tr of traces) {
         if (tr.status !== "ready") continue;
         out.push({
-          _id: tr._id,
+          handle: tr.reviewToken ?? tr._id,
           projectName: project?.name ?? "Project",
           status: tr.status,
           stepCount: tr.stepCount,
@@ -518,6 +523,58 @@ export const listReviewableTraces = query({
       }
     }
     return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, 200);
+  },
+});
+
+/**
+ * #310: resolve an opaque review handle to the trace id the review queries
+ * take. The handle is the reviewToken; a raw Convex id is accepted only as a
+ * fallback for rows created before tokens existed.
+ * ponytail: delete the normalizeId fallback once backfillReviewTokens has run
+ * in prod — after that every row has a token.
+ */
+export const resolveReviewHandle = query({
+  args: { handle: v.string() },
+  handler: async (ctx, args): Promise<{ agentTraceId: Id<"agentTraces"> } | null> => {
+    const byToken = await ctx.db
+      .query("agentTraces")
+      .withIndex("by_review_token", (q) => q.eq("reviewToken", args.handle))
+      .unique();
+    let trace = byToken;
+    if (!trace) {
+      const id = ctx.db.normalizeId("agentTraces", args.handle);
+      trace = id ? await ctx.db.get(id) : null;
+    }
+    if (!trace) return null;
+    await requireProjectRole(ctx, trace.projectId, ["owner", "editor", "evaluator"]);
+    return { agentTraceId: trace._id };
+  },
+});
+
+/**
+ * #310 one-shot backfill: stamp reviewToken on traces and matchups created
+ * before the token existed. Run once after deploy:
+ *   npx convex run agentTraces:backfillReviewTokens
+ * ponytail: full-table collect — fine at pre-launch scale, paginate if it
+ * ever times out.
+ */
+export const backfillReviewTokens = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ stamped: number }> => {
+    let stamped = 0;
+    for (const tr of await ctx.db.query("agentTraces").collect()) {
+      if (!tr.reviewToken) {
+        await ctx.db.patch(tr._id, { reviewToken: generateToken() });
+        stamped++;
+      }
+    }
+    for (const m of await ctx.db.query("agentTraceMatchups").collect()) {
+      if (!m.reviewToken) {
+        await ctx.db.patch(m._id, { reviewToken: generateToken() });
+        stamped++;
+      }
+    }
+    return { stamped };
   },
 });
 

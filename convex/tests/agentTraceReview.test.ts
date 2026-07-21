@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import {
@@ -148,5 +148,107 @@ describe("#267 step-level trace review", () => {
     // No provenance in the matchup payload.
     expect(JSON.stringify(m)).not.toContain("jeeves_clog");
     expect(JSON.stringify(m)).not.toContain("claude-sonnet-4-0");
+  });
+
+  test("#311: two reviewers' decisions coexist; each sees only their own pick", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner, asBlind } = await seed(t);
+    const left = await persist(asOwner, ids.projectId, baseRun);
+    const right = await persist(asOwner, ids.projectId, { ...baseRun, run_id: "JEEVES-RUN-REVIEW-C" });
+    const matchupId = await asOwner.mutation(api.agentTraceReview.createMatchup, {
+      leftTraceId: left, rightTraceId: right, divergenceStepIndex: 3,
+      leftBlindLabel: "A", rightBlindLabel: "B",
+    });
+
+    await asBlind.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: ["accuracy"] });
+    await asOwner.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "right", reasonTags: ["tone"] });
+    // Re-decide upserts, never duplicates.
+    await asBlind.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "tie", reasonTags: [] });
+
+    const rows = await t.run(async (ctx) =>
+      ctx.db.query("agentTraceMatchupDecisions").withIndex("by_matchup", (q) => q.eq("matchupId", matchupId)).collect(),
+    );
+    expect(rows).toHaveLength(2);
+
+    const mineBlind = await asBlind.query(api.agentTraceReview.getMatchup, { matchupId });
+    const mineOwner = await asOwner.query(api.agentTraceReview.getMatchup, { matchupId });
+    expect(mineBlind?.winner).toBe("tie");
+    expect(mineOwner?.winner).toBe("right");
+    // The matchup row itself is never patched (last-write-wins is gone).
+    const raw = await t.run(async (ctx) => ctx.db.get(matchupId));
+    expect(raw?.winner).toBeUndefined();
+  });
+
+  test("#312: createMatchup rejects divergence points the traces don't share", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner } = await seed(t);
+    const left = await persist(asOwner, ids.projectId, baseRun);
+    // Diverges at step 1 (different tool), so any later divergence index is invalid.
+    const right = await persist(asOwner, ids.projectId, {
+      ...baseRun,
+      run_id: "JEEVES-RUN-REVIEW-D",
+      steps: [
+        { type: "message", role: "assistant", content: "Looking it up." },
+        { type: "tool_call", id: "t1", name: "close_ticket", args: {} },
+        { type: "tool_result", id: "t1", name: "close_ticket", result: {} },
+        { type: "tool_call", id: "t2", name: "create_escalation", args: { reason: "hardship" } },
+      ],
+    });
+    await expect(
+      asOwner.mutation(api.agentTraceReview.createMatchup, {
+        leftTraceId: left, rightTraceId: right, divergenceStepIndex: 3,
+        leftBlindLabel: "A", rightBlindLabel: "B",
+      }),
+    ).rejects.toThrow(/already differ/);
+    // Out-of-range divergence is rejected too.
+    await expect(
+      asOwner.mutation(api.agentTraceReview.createMatchup, {
+        leftTraceId: left, rightTraceId: right, divergenceStepIndex: 99,
+        leftBlindLabel: "A", rightBlindLabel: "B",
+      }),
+    ).rejects.toThrow(/must exist in both/);
+  });
+
+  test("#310: review handles are opaque tokens, resolvable by reviewers", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner, asBlind } = await seed(t);
+    const traceId = await persist(asOwner, ids.projectId, baseRun);
+
+    const list = await asBlind.query(api.agentTraces.listReviewableTraces, {});
+    const handle = list[0]?.handle;
+    expect(handle).toBeDefined();
+    expect(handle).not.toBe(traceId); // never the raw Convex id
+    expect(handle).toMatch(/^[0-9a-f]{32}$/);
+
+    const resolved = await asBlind.query(api.agentTraces.resolveReviewHandle, { handle: handle! });
+    expect(resolved?.agentTraceId).toBe(traceId);
+
+    const right = await persist(asOwner, ids.projectId, { ...baseRun, run_id: "JEEVES-RUN-REVIEW-E" });
+    const matchupId = await asOwner.mutation(api.agentTraceReview.createMatchup, {
+      leftTraceId: traceId, rightTraceId: right, divergenceStepIndex: 3,
+      leftBlindLabel: "A", rightBlindLabel: "B",
+    });
+    const token = await t.run(async (ctx) => (await ctx.db.get(matchupId))?.reviewToken);
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    const m = await asBlind.query(api.agentTraceReview.resolveMatchupHandle, { handle: token! });
+    expect(m?.matchupId).toBe(matchupId);
+  });
+
+  test("#310: pre-token rows still resolve by raw id until backfill runs", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner, asBlind } = await seed(t);
+    const traceId = await persist(asOwner, ids.projectId, baseRun);
+    // Simulate a legacy row created before tokens existed.
+    await t.run(async (ctx) => ctx.db.patch(traceId, { reviewToken: undefined }));
+
+    const resolved = await asBlind.query(api.agentTraces.resolveReviewHandle, { handle: traceId });
+    expect(resolved?.agentTraceId).toBe(traceId);
+
+    // Backfill stamps it; afterwards the token resolves too.
+    await t.mutation(internal.agentTraces.backfillReviewTokens, {});
+    const token = await t.run(async (ctx) => (await ctx.db.get(traceId))?.reviewToken);
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    const byToken = await asBlind.query(api.agentTraces.resolveReviewHandle, { handle: token! });
+    expect(byToken?.agentTraceId).toBe(traceId);
   });
 });

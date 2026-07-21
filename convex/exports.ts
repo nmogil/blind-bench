@@ -25,6 +25,7 @@ import { requireProjectRole } from "./lib/auth";
 import { readMessages } from "./lib/messages";
 import {
   buildExportManifest,
+  contentHash,
   gateRows,
   toJsonl,
   renderStep,
@@ -174,6 +175,9 @@ interface TrajectoryPlanRow {
   privacyClass: PrivacyClass;
   metadata: Record<string, unknown>;
   prefix?: StepRef[];
+  // #312: the LOSER's prefix refs, so the action can verify both sides were
+  // built on identical rendered prefixes before emitting the pair.
+  rejectedPrefix?: StepRef[];
   chosen?: StepRef;
   rejected?: StepRef;
   messages?: StepRef[];
@@ -202,9 +206,26 @@ export const gatherTrajectoryPlan = internalQuery({
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
       for (const m of matchups) {
-        if (m.winner !== "left" && m.winner !== "right") continue;
-        const winnerId = m.winner === "left" ? m.leftTraceId : m.rightTraceId;
-        const loserId = m.winner === "left" ? m.rightTraceId : m.leftTraceId;
+        // #311: aggregate per-reviewer decision rows — strict majority of
+        // left/right picks wins; a split has no signal. The legacy single-
+        // decision fields on the matchup row count as one vote only for
+        // matchups decided before decisions existed.
+        const decisions = await ctx.db
+          .query("agentTraceMatchupDecisions")
+          .withIndex("by_matchup", (q) => q.eq("matchupId", m._id))
+          .collect();
+        const votes =
+          decisions.length > 0
+            ? decisions.map((d) => ({ winner: d.winner, userId: d.userId, reasonTags: d.reasonTags }))
+            : m.winner && m.userId
+              ? [{ winner: m.winner, userId: m.userId, reasonTags: m.reasonTags }]
+              : [];
+        const leftVotes = votes.filter((d) => d.winner === "left").length;
+        const rightVotes = votes.filter((d) => d.winner === "right").length;
+        if (leftVotes === rightVotes) continue;
+        const side = leftVotes > rightVotes ? "left" : "right";
+        const winnerId = side === "left" ? m.leftTraceId : m.rightTraceId;
+        const loserId = side === "left" ? m.rightTraceId : m.leftTraceId;
         const [wt, lt] = [await ctx.db.get(winnerId), await ctx.db.get(loserId)];
         if (!wt || !lt) continue;
         const wSteps = await stepsOf(winnerId);
@@ -212,16 +233,22 @@ export const gatherTrajectoryPlan = internalQuery({
         const chosen = wSteps.find((s) => s.stepIndex === m.divergenceStepIndex);
         const rejected = lSteps.find((s) => s.stepIndex === m.divergenceStepIndex);
         if (!chosen || !rejected) continue;
+        const prefixRefs = (steps: typeof wSteps) =>
+          steps
+            .filter((s) => s.stepIndex < m.divergenceStepIndex)
+            .map((s) => ({ meta: metaOf(s), storageId: s.fullBodyStorageId }));
         plan.push({
           privacyClass: moreSensitive(wt.privacyClass, lt.privacyClass),
-          metadata: { reason_tags: m.reasonTags },
-          prefix: wSteps
-            .filter((s) => s.stepIndex < m.divergenceStepIndex)
-            .map((s) => ({ meta: metaOf(s), storageId: s.fullBodyStorageId })),
+          metadata: {
+            reason_tags: [...new Set(votes.flatMap((d) => d.reasonTags))],
+            decision_counts: { left: leftVotes, right: rightVotes },
+          },
+          prefix: prefixRefs(wSteps),
+          rejectedPrefix: prefixRefs(lSteps),
           chosen: { meta: metaOf(chosen), storageId: chosen.fullBodyStorageId },
           rejected: { meta: metaOf(rejected), storageId: rejected.fullBodyStorageId },
         });
-        if (m.userId) reviewerIds.add(m.userId);
+        for (const d of votes) reviewerIds.add(d.userId);
       }
     } else if (args.format === "sft") {
       const traces = await ctx.db
@@ -400,14 +427,28 @@ async function hydrateTrajectory(
   const out: ClassifiedRow[] = [];
   for (const r of plan) {
     if (format === "dpo" && r.chosen && r.rejected) {
-      const prefix = await Promise.all(
-        (r.prefix ?? []).map(async (s) => ({ meta: s.meta, body: await read(s.storageId) })),
-      );
+      const hydrateRefs = (refs: StepRef[]) =>
+        Promise.all(refs.map(async (s) => ({ meta: s.meta, body: await read(s.storageId) })));
+      const prefix = await hydrateRefs(r.prefix ?? []);
       const chosen = renderStep(r.chosen.meta, await read(r.chosen.storageId));
       const rejected = renderStep(r.rejected.meta, await read(r.rejected.storageId));
+      // #312: prove comparability at content level — render BOTH prefixes and
+      // compare. A match is recorded as prefix_hash on the row (the persisted
+      // proof); a mismatch flags the row so gateRows excludes it with reason.
+      const prompt = renderTranscript(prefix);
+      const rejectedPrompt = renderTranscript(await hydrateRefs(r.rejectedPrefix ?? []));
+      const comparable = prompt === rejectedPrompt;
       out.push({
         privacyClass: r.privacyClass,
-        row: { kind: "dpo", prompt: renderTranscript(prefix), chosen, rejected, metadata: r.metadata },
+        row: {
+          kind: "dpo",
+          prompt,
+          chosen,
+          rejected,
+          metadata: comparable
+            ? { ...r.metadata, prefix_hash: contentHash(prompt) }
+            : { ...r.metadata, prefix_mismatch: true },
+        },
       });
     } else if (format === "sft" && r.messages) {
       const msgs = await Promise.all(

@@ -56,14 +56,14 @@ export function useMutation() {
 // Fixture rows for the blind reviewer's discovery list (listReviewableTraces).
 export const FIXTURE_REVIEWABLE = [
   {
-    _id: "trace_review_1",
+    handle: "trace_review_1",
     projectName: "Support Router",
     status: "ready",
     stepCount: 12,
     createdAt: 2,
   },
   {
-    _id: "trace_review_2",
+    handle: "trace_review_2",
     projectName: "Refund Agent",
     status: "ready",
     stepCount: 3,

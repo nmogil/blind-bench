@@ -85,6 +85,96 @@ describe("#53 training export", () => {
     expect(line.prompt).not.toContain("create_escalation"); // prefix stops before divergence
   });
 
+  test("#311: decisions aggregate by strict majority; splits export nothing", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner, asEval } = await seed(t);
+    const thirdId = await t.run(async (ctx) => {
+      const u = await ctx.db.insert("users", { name: "Rev2", email: "rev2@test.com" });
+      await ctx.db.insert("projectCollaborators", { projectId: ids.projectId, userId: u, role: "evaluator", invitedById: ids.ownerUserId, invitedAt: Date.now() });
+      return u;
+    });
+    const asThird = t.withIdentity({ subject: `${thirdId}|s`, tokenIdentifier: `test|${thirdId}` });
+
+    const left = await persist(asOwner, ids.projectId, runWith("A", "create_escalation"));
+    const right = await persist(asOwner, ids.projectId, runWith("B", "close_ticket"));
+    const matchupId = await asOwner.mutation(api.agentTraceReview.createMatchup, {
+      leftTraceId: left, rightTraceId: right, divergenceStepIndex: 2,
+      leftBlindLabel: "A", rightBlindLabel: "B",
+    });
+
+    // 1-1 split → no signal, nothing exported.
+    await asOwner.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: ["accuracy"] });
+    await asEval.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "right", reasonTags: ["tone"] });
+    const split = await asOwner.action(api.exports.generateExport, {
+      projectId: ids.projectId, source: "trajectory", format: "dpo",
+    });
+    expect(split.rowCount).toBe(0);
+
+    // 2-1 majority → one pair, with the vote tally and the prefix proof on the row.
+    await asThird.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: ["safety"] });
+    const res = await asOwner.action(api.exports.generateExport, {
+      projectId: ids.projectId, source: "trajectory", format: "dpo",
+    });
+    expect(res.rowCount).toBe(1);
+    expect(res.manifest.reviewers).toBe(3);
+    const line = JSON.parse(await readExport(t, res.exportId));
+    expect(line.chosen).toContain("create_escalation");
+    expect(line.metadata.decision_counts).toEqual({ left: 2, right: 1 });
+    expect(line.metadata.prefix_hash).toMatch(/^[0-9a-f]{8}$/);
+    expect(line.metadata.reason_tags).toEqual(expect.arrayContaining(["accuracy", "tone", "safety"]));
+  });
+
+  test("#311: legacy single-decision matchups still export as one vote", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner } = await seed(t);
+    const left = await persist(asOwner, ids.projectId, runWith("A", "create_escalation"));
+    const right = await persist(asOwner, ids.projectId, runWith("B", "close_ticket"));
+    const matchupId = await asOwner.mutation(api.agentTraceReview.createMatchup, {
+      leftTraceId: left, rightTraceId: right, divergenceStepIndex: 2,
+      leftBlindLabel: "A", rightBlindLabel: "B",
+    });
+    // Simulate a pre-#311 row: winner written directly on the matchup, no decision rows.
+    await t.run(async (ctx) =>
+      ctx.db.patch(matchupId, { winner: "right", userId: ids.ownerUserId, decidedAt: Date.now() }),
+    );
+    const res = await asOwner.action(api.exports.generateExport, {
+      projectId: ids.projectId, source: "trajectory", format: "dpo",
+    });
+    expect(res.rowCount).toBe(1);
+    const line = JSON.parse(await readExport(t, res.exportId));
+    expect(line.chosen).toContain("close_ticket");
+  });
+
+  test("#312: pairs whose prefix content differs are excluded with a manifest reason", async () => {
+    const t = convexTest(schema);
+    const { ids, asOwner } = await seed(t);
+    // Same step SKELETON (kind/role/toolName) so createMatchup's guard passes,
+    // but different tool ARGS at step 1 — the content-level check must catch it.
+    const withArgs = (run_id: string, acct: string): JeevesClogRunExport => ({
+      ...runWith(run_id, "create_escalation"),
+      steps: [
+        { type: "message", role: "assistant", content: "Looking it up." },
+        { type: "tool_call", id: "t1", name: "lookup_account", args: { id: acct } },
+        { type: "tool_call", id: "t2", name: run_id === "A" ? "create_escalation" : "close_ticket", args: { note: "x" } },
+      ],
+    });
+    const left = await persist(asOwner, ids.projectId, withArgs("A", "ACCT-1"));
+    const right = await persist(asOwner, ids.projectId, withArgs("B", "ACCT-2"));
+    const matchupId = await asOwner.mutation(api.agentTraceReview.createMatchup, {
+      leftTraceId: left, rightTraceId: right, divergenceStepIndex: 2,
+      leftBlindLabel: "A", rightBlindLabel: "B",
+    });
+    await asOwner.mutation(api.agentTraceReview.decideMatchup, { matchupId, winner: "left", reasonTags: [] });
+
+    const res = await asOwner.action(api.exports.generateExport, {
+      projectId: ids.projectId, source: "trajectory", format: "dpo",
+    });
+    expect(res.rowCount).toBe(0);
+    expect(res.excludedCount).toBe(1);
+    expect(res.manifest.excluded_by_reason.prefix_mismatch).toBe(1);
+    expect(res.manifest.notes.join(" ")).toMatch(/prefix(es)? did not match/);
+  });
+
   test("output-preference DPO: best vs weak with the resolved prompt", async () => {
     const t = convexTest(schema);
     const { ids, asOwner } = await seed(t);

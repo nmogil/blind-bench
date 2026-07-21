@@ -12,6 +12,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireProjectRole } from "./lib/auth";
+import { generateToken } from "./lib/crypto";
 
 const LABEL = v.union(
   v.literal("suggestion"),
@@ -166,7 +167,14 @@ export const myVerdict = query({
 
 // --- step-level pairwise preference ------------------------------------------
 
-/** Owner/editor sets up a pairwise between two traces at a divergence point. */
+/**
+ * Owner/editor sets up a pairwise between two traces at a divergence point.
+ * #312: a matchup is only DPO-valid if both traces genuinely share the prefix
+ * before the divergence step. Mutations can't read step bodies (storage is
+ * action-only), so this checks the step SKELETON (kind/role/toolName per
+ * index); the export action does the content-level comparison and excludes
+ * mismatches with a manifest reason.
+ */
 export const createMatchup = mutation({
   args: {
     leftTraceId: v.id("agentTraces"),
@@ -183,19 +191,50 @@ export const createMatchup = mutation({
       throw new Error("Both traces must be in the same project.");
     }
     await requireProjectRole(ctx, left.projectId, ["owner", "editor"]);
+    const div = args.divergenceStepIndex;
+    if (!Number.isInteger(div) || div < 0 || div >= left.stepCount || div >= right.stepCount) {
+      throw new Error(
+        "The divergence step must exist in both traces — pick an index inside both runs.",
+      );
+    }
+    const prefixOf = (traceId: Id<"agentTraces">) =>
+      ctx.db
+        .query("agentTraceSteps")
+        .withIndex("by_trace_and_index", (q) =>
+          q.eq("agentTraceId", traceId).lt("stepIndex", div),
+        )
+        .collect();
+    const [lSteps, rSteps] = [await prefixOf(args.leftTraceId), await prefixOf(args.rightTraceId)];
+    if (lSteps.length !== rSteps.length) {
+      throw new Error("The two traces don’t share a prefix before that step — pick an earlier divergence point.");
+    }
+    for (let i = 0; i < lSteps.length; i++) {
+      const a = lSteps[i]!;
+      const b = rSteps[i]!;
+      if (a.kind !== b.kind || a.role !== b.role || a.toolName !== b.toolName) {
+        throw new Error(
+          `The traces already differ at step ${a.stepIndex} — pick a divergence point where both runs still match.`,
+        );
+      }
+    }
     return await ctx.db.insert("agentTraceMatchups", {
       projectId: left.projectId,
       leftTraceId: args.leftTraceId,
       rightTraceId: args.rightTraceId,
-      divergenceStepIndex: args.divergenceStepIndex,
+      divergenceStepIndex: div,
       leftBlindLabel: args.leftBlindLabel,
       rightBlindLabel: args.rightBlindLabel,
       reasonTags: [],
+      reviewToken: generateToken(),
     });
   },
 });
 
-/** Reviewer records the better next action. */
+/**
+ * Reviewer records the better next action. #311: one decision row per
+ * (matchup, reviewer) — upserted, never written to the matchup row, so
+ * concurrent reviewers can't overwrite each other.
+ */
 export const decideMatchup = mutation({
   args: {
     matchupId: v.id("agentTraceMatchups"),
@@ -206,10 +245,26 @@ export const decideMatchup = mutation({
     const matchup = await ctx.db.get(args.matchupId);
     if (!matchup) throw new Error("Matchup not found.");
     const { userId } = await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
-    await ctx.db.patch(args.matchupId, {
+    const existing = await ctx.db
+      .query("agentTraceMatchupDecisions")
+      .withIndex("by_matchup_and_user", (q) =>
+        q.eq("matchupId", args.matchupId).eq("userId", userId),
+      )
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        winner: args.winner,
+        reasonTags: args.reasonTags,
+        decidedAt: Date.now(),
+      });
+      return;
+    }
+    await ctx.db.insert("agentTraceMatchupDecisions", {
+      matchupId: args.matchupId,
+      projectId: matchup.projectId,
+      userId,
       winner: args.winner,
       reasonTags: args.reasonTags,
-      userId,
       decidedAt: Date.now(),
     });
   },
@@ -225,8 +280,17 @@ export const getMatchup = query({
   handler: async (ctx, args) => {
     const matchup = await ctx.db.get(args.matchupId);
     if (!matchup) return null;
-    await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
+    const { userId } = await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
     const project = await ctx.db.get(matchup.projectId);
+    // #311: the caller sees ONLY their own decision — never other reviewers'
+    // picks. Legacy single-decision fields count only if they were the caller's.
+    const mine = await ctx.db
+      .query("agentTraceMatchupDecisions")
+      .withIndex("by_matchup_and_user", (q) =>
+        q.eq("matchupId", args.matchupId).eq("userId", userId),
+      )
+      .unique();
+    const legacyMine = matchup.userId === userId ? matchup : null;
     return {
       _id: matchup._id,
       projectName: project?.name ?? "Project",
@@ -235,8 +299,31 @@ export const getMatchup = query({
       divergenceStepIndex: matchup.divergenceStepIndex,
       leftBlindLabel: matchup.leftBlindLabel,
       rightBlindLabel: matchup.rightBlindLabel,
-      winner: matchup.winner ?? null,
-      reasonTags: matchup.reasonTags,
+      winner: mine?.winner ?? legacyMine?.winner ?? null,
+      reasonTags: mine?.reasonTags ?? legacyMine?.reasonTags ?? [],
     };
+  },
+});
+
+/**
+ * #310: resolve an opaque matchup review handle (reviewToken; raw id accepted
+ * only for pre-token rows). Mirrors agentTraces.resolveReviewHandle.
+ * ponytail: delete the normalizeId fallback once backfillReviewTokens has run.
+ */
+export const resolveMatchupHandle = query({
+  args: { handle: v.string() },
+  handler: async (ctx, args): Promise<{ matchupId: Id<"agentTraceMatchups"> } | null> => {
+    const byToken = await ctx.db
+      .query("agentTraceMatchups")
+      .withIndex("by_review_token", (q) => q.eq("reviewToken", args.handle))
+      .unique();
+    let matchup = byToken;
+    if (!matchup) {
+      const id = ctx.db.normalizeId("agentTraceMatchups", args.handle);
+      matchup = id ? await ctx.db.get(id) : null;
+    }
+    if (!matchup) return null;
+    await requireProjectRole(ctx, matchup.projectId, [...REVIEW_ROLES]);
+    return { matchupId: matchup._id };
   },
 });

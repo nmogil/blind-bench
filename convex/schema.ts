@@ -772,10 +772,15 @@ const schema = defineSchema({
     finalAnswerStorageId: v.optional(v.id("_storage")),
     finalAnswerBlindStorageId: v.optional(v.id("_storage")),
     importedById: v.id("users"),
+    // #310: opaque handle for the blind /eval/traces/:handle route so the real
+    // Convex id never appears in reviewer URLs. Stamped at insert; optional for
+    // rows created before the fix (backfillReviewTokens migrates them).
+    reviewToken: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
     .index("by_trace_id", ["traceId"])
-    .index("by_project_and_status", ["projectId", "status"]),
+    .index("by_project_and_status", ["projectId", "status"])
+    .index("by_review_token", ["reviewToken"]),
 
   // #264 (M31 Trajectory Spine): one row per trace step, ordered by
   // (agentTraceId, stepIndex). Own ~1MiB doc budget per row. Light,
@@ -895,6 +900,10 @@ const schema = defineSchema({
     divergenceStepIndex: v.number(),
     leftBlindLabel: v.string(),
     rightBlindLabel: v.string(),
+    // #311 LEGACY single-decision fields. New decisions live one-row-per-
+    // reviewer in agentTraceMatchupDecisions; these remain only so matchups
+    // decided before the fix keep their signal (export reads them as a
+    // fallback). Never written by decideMatchup anymore.
     userId: v.optional(v.id("users")),
     winner: v.optional(
       v.union(
@@ -917,9 +926,43 @@ const schema = defineSchema({
       ),
     ),
     decidedAt: v.optional(v.number()),
+    // #310: opaque handle for /eval/matchups/:handle (see agentTraces.reviewToken).
+    reviewToken: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
-    .index("by_left", ["leftTraceId"]),
+    .index("by_left", ["leftTraceId"])
+    .index("by_review_token", ["reviewToken"]),
+
+  // #311: one decision row per (matchup, reviewer) so concurrent reviewers
+  // never overwrite each other. Export aggregates these (strict majority);
+  // getMatchup returns only the caller's own row — reviewers never see each
+  // other's picks (blind posture).
+  agentTraceMatchupDecisions: defineTable({
+    matchupId: v.id("agentTraceMatchups"),
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    winner: v.union(
+      v.literal("left"),
+      v.literal("right"),
+      v.literal("tie"),
+      v.literal("skip"),
+    ),
+    reasonTags: v.array(
+      v.union(
+        v.literal("tone"),
+        v.literal("accuracy"),
+        v.literal("clarity"),
+        v.literal("length"),
+        v.literal("format"),
+        v.literal("relevance"),
+        v.literal("safety"),
+        v.literal("other"),
+      ),
+    ),
+    decidedAt: v.number(),
+  })
+    .index("by_matchup", ["matchupId"])
+    .index("by_matchup_and_user", ["matchupId", "userId"]),
 
   // #53 (export bridge): a generated training-data export. The JSONL is in
   // storage; this row tracks provenance + counts and gates the download to a
